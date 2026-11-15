@@ -123,6 +123,14 @@ function TreePageInner() {
     setTimeout(() => handle()?.focus(fileNodeId(id)), 50);
   }
 
+  function handleGraphSelection(id: string | null) {
+    if (id) {
+      focusPerson(id);
+    } else {
+      selectPerson(null);
+    }
+  }
+
   function toggleMedia() {
     const next = !showMedia();
     setShowMedia(next);
@@ -256,7 +264,7 @@ function TreePageInner() {
             showMedia={showMedia()}
             layout={layout()}
             generationDirection={generationDirection()}
-            onSelect={selectPerson}
+            onSelect={handleGraphSelection}
             onFileSelect={focusFile}
             onReady={setHandle}
           />
