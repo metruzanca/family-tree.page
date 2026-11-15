@@ -41,9 +41,9 @@ export function GraphView(props: GraphViewProps) {
   let resizeObserver: ResizeObserver | undefined;
   let needsFit = true;
   let previousDirection = props.generationDirection;
-  let draggingNode: GraphNode | null = null;
-  let dragDistance = 0;
-  let dragStart = { x: 0, y: 0 };
+  let pressedNode: GraphNode | null = null;
+  let pressStart = { x: 0, y: 0 };
+  let pressDistance = 0;
   let backgroundDown = false;
   let backgroundStart = { x: 0, y: 0 };
   let pointer = { x: 0, y: 0 };
@@ -136,25 +136,11 @@ export function GraphView(props: GraphViewProps) {
     return fileId ? `/api/files/${fileId}/thumb` : null;
   }
 
-  function setCanvasCursor(cursor: "default" | "pointer" | "grabbing") {
+  function setCanvasCursor(cursor: "default" | "pointer") {
     if (!container) return;
     container.style.cursor = cursor;
     const canvas = container.querySelector("canvas") as HTMLCanvasElement | null;
     if (canvas) canvas.style.cursor = cursor;
-  }
-
-  function dragMemoryForce() {
-    let nodes: GraphNode[] = [];
-    const force = (alpha: number) => {
-      for (const node of nodes) {
-        if (node.softX == null) continue;
-        node.vx = (node.vx ?? 0) + (node.softX - (node.x ?? 0)) * 1.0 * alpha;
-      }
-    };
-    (force as any).initialize = (next: GraphNode[]) => {
-      nodes = next;
-    };
-    return force;
   }
 
   function drawNode(node: GraphNode, context: CanvasRenderingContext2D, globalScale: number) {
@@ -210,7 +196,7 @@ export function GraphView(props: GraphViewProps) {
       context.strokeStyle = isSelected ? "#e3bb68" : isHovered ? "#f3eee3" : "#0b0e0a";
       context.stroke();
 
-      const showLabel = isSelected || isHovered || globalScale > 1.02;
+      const showLabel = isSelected || isHovered || globalScale > 0.88;
       if (showLabel) {
         const fontSize = 11.5 / globalScale;
         context.font = `600 ${fontSize}px ui-sans-serif, system-ui, sans-serif`;
@@ -313,7 +299,7 @@ export function GraphView(props: GraphViewProps) {
   }
 
   function fit() {
-    graph.zoomToFit(650, 110);
+    graph.zoomToFit(0, 110);
   }
 
   function reset() {
@@ -323,9 +309,8 @@ export function GraphView(props: GraphViewProps) {
       nodes: fresh.nodes,
       links: fresh.links,
     });
-    graph?.d3ReheatSimulation();
     needsFit = true;
-    setTimeout(() => graph?.zoomToFit(700, 110), 500);
+    setTimeout(() => graph?.zoomToFit(0, 110), 80);
   }
 
   function applyLayout(mode: "generations" | "freeform") {
@@ -356,12 +341,18 @@ export function GraphView(props: GraphViewProps) {
       graph.d3Force("generation", null);
       graph.d3Force("column", null);
     }
-    graph.d3Force("dragMemory", dragMemoryForce());
     graph.d3Force(
       "collide",
       (forceCollide as any)((node: GraphNode) => nodeRadius(node) + 12).strength(0.95),
     );
-    graph.d3ReheatSimulation();
+  }
+
+  function settleLayout() {
+    if (!graph) return;
+    graph.warmupTicks(300);
+    const data = graph.graphData();
+    graph.graphData({ nodes: [...data.nodes], links: [...data.links] });
+    fit();
   }
 
   onMount(async () => {
@@ -390,21 +381,20 @@ export function GraphView(props: GraphViewProps) {
         updateHoverAt(pointer.x, pointer.y);
         if (needsFit) {
           needsFit = false;
-          setTimeout(() => fit(), 150);
+          fit();
         }
       })
-      .warmupTicks(60)
-      .cooldownTicks(120)
-      .cooldownTime(2500)
-      .d3AlphaDecay(0.035)
+      .warmupTicks(300)
+      .cooldownTicks(0)
+      .cooldownTime(0)
       .minZoom(0.2)
       .maxZoom(4.5)
       .enableNodeDrag(false)
       .enablePointerInteraction(false)
       .autoPauseRedraw(true);
 
-    graph.graphData({ nodes: model.nodes, links: model.links });
     applyLayout(props.layout);
+    graph.graphData({ nodes: model.nodes, links: model.links });
     if (import.meta.env.DEV) {
       (window as any).__rootsGraph = graph;
       (window as any).__rootsNodes = () =>
@@ -414,7 +404,6 @@ export function GraphView(props: GraphViewProps) {
           level: node.level,
           x: node.x,
           y: node.y,
-          softX: node.softX,
         }));
     }
     setReady(true);
@@ -434,46 +423,37 @@ export function GraphView(props: GraphViewProps) {
 
     const onPointerDown = (event: PointerEvent) => {
       if (event.pointerType === "mouse" && event.button !== 0) return;
-      if (draggingNode) return;
+      if (pressedNode) return;
       pointer = { x: event.clientX, y: event.clientY };
       const node = hitTestNode(event.clientX, event.clientY);
       if (node) {
         event.preventDefault();
         event.stopPropagation();
-        draggingNode = node;
-        dragStart = { x: event.clientX, y: event.clientY };
-        dragDistance = 0;
-        node.fx = node.x;
-        node.fy = node.y;
+        pressedNode = node;
+        pressStart = { x: event.clientX, y: event.clientY };
+        pressDistance = 0;
         setHovered(node.id);
-        setCanvasCursor("grabbing");
+        setCanvasCursor("pointer");
         refreshPaint();
         return;
       }
       backgroundDown = true;
       backgroundStart = { x: event.clientX, y: event.clientY };
-      dragDistance = 0;
+      pressDistance = 0;
     };
 
     const onPointerMove = (event: PointerEvent) => {
       pointer = { x: event.clientX, y: event.clientY };
-      if (draggingNode) {
-        event.preventDefault();
-        dragDistance += Math.hypot(
-          event.clientX - dragStart.x,
-          event.clientY - dragStart.y,
+      if (pressedNode) {
+        pressDistance += Math.hypot(
+          event.clientX - pressStart.x,
+          event.clientY - pressStart.y,
         );
-        dragStart = { x: event.clientX, y: event.clientY };
-        const point = graph.screen2GraphCoords(event.clientX, event.clientY);
-        draggingNode.fx = point.x;
-        draggingNode.fy = point.y;
-        draggingNode.x = point.x;
-        draggingNode.y = point.y;
-        graph.d3ReheatSimulation();
+        pressStart = { x: event.clientX, y: event.clientY };
         return;
       }
       if (backgroundDown) {
-        dragDistance += Math.hypot(
+        pressDistance += Math.hypot(
           event.clientX - backgroundStart.x,
           event.clientY - backgroundStart.y,
         );
@@ -485,44 +465,34 @@ export function GraphView(props: GraphViewProps) {
       }
     };
 
-    const releaseDrag = (select: boolean) => {
-      if (!draggingNode) return;
-      const node = draggingNode;
-      draggingNode = null;
-      node.fx = null;
-      node.fy = null;
-      node.softX = node.x;
-      graph.d3ReheatSimulation();
-      setHovered(node.id);
-      setCanvasCursor("pointer");
-      suppressClickUntil = Date.now() + 400;
-      if (select) selectNode(node);
-      dragDistance = 0;
-    };
-
     const onPointerUp = (event: PointerEvent) => {
       pointer = { x: event.clientX, y: event.clientY };
-      if (draggingNode) {
-        releaseDrag(dragDistance <= 6);
+      if (pressedNode) {
+        const node = pressedNode;
+        pressedNode = null;
+        const wasClick = pressDistance <= 6;
+        pressDistance = 0;
+        setCanvasCursor("pointer");
+        if (wasClick) selectNode(node);
         return;
       }
       if (backgroundDown) {
-        const wasClick = dragDistance <= 6;
+        const wasClick = pressDistance <= 6;
         backgroundDown = false;
-        dragDistance = 0;
+        pressDistance = 0;
         if (wasClick) props.onSelect(null);
         updateHoverAt(event.clientX, event.clientY);
       }
     };
 
     const onPointerCancel = () => {
-      if (draggingNode) releaseDrag(false);
+      pressedNode = null;
       backgroundDown = false;
-      dragDistance = 0;
+      pressDistance = 0;
     };
 
     const onPointerLeave = () => {
-      if (draggingNode || backgroundDown) return;
+      if (pressedNode || backgroundDown) return;
       setHovered(null);
       setCanvasCursor("default");
       refreshPaint();
@@ -576,7 +546,6 @@ export function GraphView(props: GraphViewProps) {
           node.y = old.y;
           node.vx = old.vx;
           node.vy = old.vy;
-          node.softX = old.softX;
         }
       }
     } else {
@@ -584,13 +553,13 @@ export function GraphView(props: GraphViewProps) {
     }
     model = next;
     graph.graphData({ nodes: next.nodes, links: next.links });
-    graph.d3ReheatSimulation();
   });
 
   createEffect(() => {
     props.layout;
     props.generationDirection;
     applyLayout(props.layout);
+    settleLayout();
   });
 
   createEffect(() => {

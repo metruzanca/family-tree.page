@@ -19,7 +19,6 @@ export type GraphNode = {
   vy?: number;
   fx?: number | null;
   fy?: number | null;
-  softX?: number;
 };
 
 export type GraphLink = {
