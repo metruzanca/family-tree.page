@@ -127,7 +127,7 @@ export async function getTreeGraph(treeId: string): Promise<TreeGraph> {
         personId: group.personId,
         name: group.name,
         count: groupFiles.length,
-        coverFileId: cover?.id ?? null,
+        coverFileId: cover?.thumbKey ? cover.id : null,
         createdAt: group.createdAt,
       };
     })
