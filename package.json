@@ -1,0 +1,57 @@
+{
+  "name": "roots",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "vite dev --host 0.0.0.0",
+    "build": "vite build",
+    "start": "node .output/server/index.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "e2e": "playwright test",
+    "dev:services": "bash scripts/dev-services.sh start",
+    "dev:stop": "bash scripts/dev-services.sh stop",
+    "dev:status": "bash scripts/dev-services.sh status",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx scripts/migrate.ts",
+    "db:seed": "tsx scripts/seed.ts",
+    "storage:cors": "tsx scripts/storage-cors.ts"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.1",
+    "@types/d3-force": "^3.0.10",
+    "@types/node": "^24.7.0",
+    "@types/pg": "^8.23.1",
+    "@types/s3rver": "^3.7.4",
+    "drizzle-kit": "^0.31.10",
+    "s3rver": "^3.7.1",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vitest": "^5.1.0"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1169.0",
+    "@aws-sdk/s3-presigned-post": "^3.1169.0",
+    "@aws-sdk/s3-request-presigner": "^3.1169.0",
+    "@kobalte/core": "^0.13.14",
+    "@solid-primitives/resize-observer": "^2.2.0",
+    "@solidjs/router": "^1.0.0",
+    "@solidjs/start": "^2.0.0",
+    "@tailwindcss/vite": "^4.3.5",
+    "d3-force": "^3.0.1",
+    "drizzle-orm": "^0.45.2",
+    "file-type": "^22.3.0",
+    "force-graph": "^1.52.0",
+    "lucide-solid": "^1.73.0",
+    "nitro": "3.0.260903-beta",
+    "pg": "^8.23.1",
+    "solid-js": "^1.9.14",
+    "tailwindcss": "^4.3.5",
+    "vite": "^8.1.4",
+    "zod": "^4.6.7"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

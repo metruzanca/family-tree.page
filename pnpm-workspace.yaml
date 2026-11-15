@@ -1,0 +1,6 @@
+allowBuilds:
+  "@tailwindcss/oxide": true
+  esbuild: true
+
+minimumReleaseAgeExclude:
+  - lucide-solid@1.73.0
