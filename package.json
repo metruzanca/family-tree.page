@@ -2,6 +2,7 @@
   "name": "roots",
   "type": "module",
   "private": true,
+  "packageManager": "pnpm@11.22.0",
   "scripts": {
     "dev": "vite dev --host 0.0.0.0",
     "build": "vite build",
