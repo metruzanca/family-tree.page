@@ -32,6 +32,7 @@ import { Field } from "~/components/ui/Field";
 import { LoadingScreen } from "~/components/ui/Loading";
 import { useToast } from "~/components/ui/Toast";
 import { formatDate, formatRelative, roleLabel } from "~/lib/format";
+import { track } from "~/lib/analytics";
 
 export const route = {
   preload: ({ params }: { params: { treeId: string } }) => {
@@ -132,6 +133,7 @@ function TreeSettingsInner() {
     }
     setCreatedInvite(result.data.url);
     await revalidate(invitesQuery.key);
+    track("invite_created", { role: inviteRole() });
     toast.show("Invite link created. Copy it now.", "success");
   }
 
@@ -158,6 +160,7 @@ function TreeSettingsInner() {
         const result = await leaveTree(params.treeId);
         if (!result.ok) return toast.show(result.error, "error");
         await revalidate(getMyTrees.key);
+        track("tree_left");
         toast.show("You left the tree.", "success");
         navigate("/trees");
         return;
@@ -165,6 +168,7 @@ function TreeSettingsInner() {
         const result = await deleteTree(params.treeId);
         if (!result.ok) return toast.show(result.error, "error");
         await revalidate(getMyTrees.key);
+        track("tree_deleted");
         toast.show("Tree deleted.", "success");
         navigate("/trees");
         return;

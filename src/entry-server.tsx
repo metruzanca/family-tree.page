@@ -15,6 +15,14 @@ export default createHandler(() => (
           <meta name="theme-color" content="#f6f1e7" />
           <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
           <title>Roots</title>
+          {import.meta.env.PROD && (
+            <script
+              defer
+              src="https://analytics.zanca.dev/script.js"
+              data-website-id="f2a5b922-2a17-432f-8e5e-b4a0c61578b3"
+              data-exclude-search="true"
+            />
+          )}
           <script innerHTML={themeScript} />
           {assets}
         </head>

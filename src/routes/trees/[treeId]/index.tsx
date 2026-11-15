@@ -30,6 +30,7 @@ import { useToast } from "~/components/ui/Toast";
 import { uploadPersonFile } from "~/lib/upload";
 import { mimeForFile } from "~/lib/image-thumb";
 import { fileNodeId, groupNodeId, type GenerationDirection } from "~/lib/graph";
+import { track } from "~/lib/analytics";
 
 export const route = {
   preload: ({ params }: { params: { treeId: string } }) => getTreeGraph(params.treeId),
@@ -264,6 +265,7 @@ function TreePageInner() {
     }
     await revalidate([getTreeGraph.key, getTreeOverview.key, getMyTrees.key]);
     if (uploaded) {
+      track("media_uploaded", { count: uploaded, album: Boolean(groupId) });
       toast.show(
         groupId
           ? `${uploaded} files added to an album.`
@@ -280,6 +282,7 @@ function TreePageInner() {
       return;
     }
     await revalidate(getTreeGraph.key);
+    track(fileId ? "portrait_set" : "portrait_removed");
     toast.show(fileId ? "Portrait updated." : "Portrait removed.", "success");
   }
 
@@ -302,6 +305,7 @@ function TreePageInner() {
       }
     }
     setDeleteFileTarget(null);
+    track("file_deleted", { album: Boolean(file.groupId) });
     await revalidate([getTreeGraph.key, getTreeOverview.key, getMyTrees.key]);
     toast.show("File deleted.", "success");
   }
@@ -318,6 +322,7 @@ function TreePageInner() {
     }
     setDeleteGroupTarget(null);
     selectPerson(null);
+    track("album_deleted");
     await revalidate([getTreeGraph.key, getTreeOverview.key, getMyTrees.key]);
     toast.show("Album deleted.", "success");
   }
@@ -331,6 +336,7 @@ function TreePageInner() {
       return;
     }
     await revalidate(getTreeGraph.key);
+    track("album_renamed");
     toast.show("Album renamed.", "success");
   }
 
@@ -346,6 +352,7 @@ function TreePageInner() {
     }
     setDeletePersonOpen(false);
     selectPerson(null);
+    track("person_deleted");
     await revalidate([getTreeGraph.key, getTreeOverview.key, getMyTrees.key]);
     toast.show("Person removed.", "success");
   }
@@ -360,6 +367,7 @@ function TreePageInner() {
       return;
     }
     await revalidate([getTreeGraph.key, getTreeOverview.key, getMyTrees.key]);
+    track("relationship_removed", { relation: relationship.type });
     toast.show("Connection removed.", "success");
   }
 

@@ -8,6 +8,7 @@ import { Button } from "~/components/ui/Button";
 import { LoadingScreen } from "~/components/ui/Loading";
 import { useToast } from "~/components/ui/Toast";
 import { formatDate, roleLabel } from "~/lib/format";
+import { track } from "~/lib/analytics";
 
 export const route = {
   preload: ({ params }: { params: { token: string } }) => getInvitePreview(params.token),
@@ -40,6 +41,7 @@ function InviteInner() {
       return;
     }
     await revalidate([getMyTrees.key, getInvitePreview.key]);
+    track("invite_accepted");
     toast.show("You joined the tree.", "success");
     navigate(`/trees/${result.data.treeId}`);
   }

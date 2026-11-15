@@ -10,6 +10,7 @@ import { Button } from "../ui/Button";
 import { Field } from "../ui/Field";
 import { Modal } from "../ui/Modal";
 import { useToast } from "../ui/Toast";
+import { track } from "~/lib/analytics";
 
 type Relation = "parent" | "partner" | "child";
 
@@ -97,6 +98,7 @@ export function AddRelativeDialog(props: {
       return;
     }
     await revalidate([getTreeGraph.key, getTreeOverview.key, getMyTrees.key]);
+    track("relationship_added", { relation: relation(), mode: mode() });
     toast.show(
       mode() === "new" ? "Person added and connected." : "People connected.",
       "success",

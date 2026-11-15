@@ -6,6 +6,7 @@ import { Button } from "../ui/Button";
 import { Field } from "../ui/Field";
 import { Modal } from "../ui/Modal";
 import { useToast } from "../ui/Toast";
+import { track } from "~/lib/analytics";
 
 export function CreateTreeDialog(props: {
   open: boolean;
@@ -30,6 +31,7 @@ export function CreateTreeDialog(props: {
       return;
     }
     await revalidate(getMyTrees.key);
+    track("tree_created");
     toast.show("Tree created. Add your first person.", "success");
     props.onClose();
     navigate(`/trees/${result.data.id}`);

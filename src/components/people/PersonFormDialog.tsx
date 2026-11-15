@@ -8,6 +8,7 @@ import { Button } from "../ui/Button";
 import { Field } from "../ui/Field";
 import { Modal } from "../ui/Modal";
 import { useToast } from "../ui/Toast";
+import { track } from "~/lib/analytics";
 
 export type PersonFormState = {
   firstName: string;
@@ -91,6 +92,7 @@ export function PersonFormDialog(props: {
       return;
     }
     await revalidate([getTreeGraph.key, getTreeOverview.key, getMyTrees.key]);
+    track(props.person ? "person_updated" : "person_created");
     toast.show(props.person ? "Person updated." : "Person added.", "success");
     if (!props.person && result.data) {
       props.onSaved?.(result.data.id);
