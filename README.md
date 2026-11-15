@@ -142,6 +142,12 @@ pnpm storage:cors   set bucket CORS from APP_URL and CORS_ORIGINS
 pnpm dev:services   start local Postgres and S3
 ```
 
+The Playwright test needs the dev server and local services running. On NixOS, point Playwright at an installed Chromium or Brave binary:
+
+```bash
+PLAYWRIGHT_BROWSER_PATH=/path/to/chrome pnpm e2e
+```
+
 ## Project layout
 
 ```text
