@@ -82,7 +82,7 @@ Copy `.env.example` to `.env`. The important variables:
 |---|---|
 | `DATABASE_URL` | PostgreSQL connection string |
 | `SESSION_SECRET` | 32+ random characters used to encrypt session cookies |
-| `APP_URL` | Public origin, used for invite links and CORS |
+| `APP_URL` | Public origin fallback for invite links and CORS when `RAILWAY_PUBLIC_DOMAIN` is unset |
 | `S3_ENDPOINT` | S3 API endpoint |
 | `S3_REGION` | Bucket region |
 | `S3_BUCKET` | Bucket name |
@@ -91,6 +91,8 @@ Copy `.env.example` to `.env`. The important variables:
 | `S3_FORCE_PATH_STYLE` | `true` for local s3rver, `false` for Railway buckets |
 
 `CORS_ORIGINS` can hold extra comma-separated origins for `pnpm storage:cors`.
+
+On Railway, invite links use `RAILWAY_PUBLIC_DOMAIN` (the assigned public domain, custom domains included) before falling back to `APP_URL`. `pnpm storage:cors` also includes that domain automatically when the variable is present.
 
 ## How media works
 

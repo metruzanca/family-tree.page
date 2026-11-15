@@ -11,7 +11,15 @@ if (!endpoint || !bucket || !accessKeyId || !secretAccessKey) {
   process.exit(1);
 }
 
+const railwayDomain = (process.env.RAILWAY_PUBLIC_DOMAIN ?? "").trim().replace(/\/$/, "");
+const railwayOrigin = railwayDomain
+  ? /^https?:\/\//.test(railwayDomain)
+    ? railwayDomain
+    : `https://${railwayDomain}`
+  : undefined;
+
 const origins = [
+  railwayOrigin,
   process.env.APP_URL,
   ...(process.env.CORS_ORIGINS ?? "").split(","),
   "http://localhost:3000",

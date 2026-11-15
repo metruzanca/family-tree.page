@@ -20,7 +20,7 @@ import {
 import { AppError, runAction, type ActionResult } from "../server/errors";
 import { inviteSchema, treeRoleSchema, treeSchema } from "../server/validation";
 import { deletePrefix, TREE_PREFIX } from "../server/storage";
-import { optionalEnv } from "../server/config";
+import { publicOrigin } from "../server/config";
 
 export type TreeSummary = {
   id: string;
@@ -284,10 +284,9 @@ export async function createInvite(input: {
         expiresAt,
       })
       .returning();
-    const origin = optionalEnv("APP_URL", "http://localhost:3000").replace(/\/$/, "");
     return {
       id: invite.id,
-      url: `${origin}/invite/${token}`,
+      url: `${publicOrigin()}/invite/${token}`,
       expiresAt: invite.expiresAt,
       role: invite.role,
     };
