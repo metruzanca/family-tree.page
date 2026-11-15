@@ -42,7 +42,7 @@ export function GraphSearch(props: {
       open={props.open}
       onClose={props.onClose}
       title="Search the tree"
-      description="Find a person or a file. Selecting a person brings them into view."
+      description="Find a person or a file. Selecting a result opens its panel and brings it into view."
     >
       <label class="relative block">
         <Search size={16} class="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />

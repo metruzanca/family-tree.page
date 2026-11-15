@@ -1,6 +1,7 @@
 import { A } from "@solidjs/router";
 import { Show } from "solid-js";
 import {
+  ArrowDownUp,
   ArrowLeft,
   Image as ImageIcon,
   ImageOff,
@@ -8,12 +9,14 @@ import {
   MoreHorizontal,
   Network,
   Plus,
+  RotateCcw,
   Search,
   Settings,
   Waves,
   ZoomIn,
   ZoomOut,
 } from "lucide-solid";
+import type { GenerationDirection } from "~/lib/graph";
 import type { TreeRole } from "~/server/guards";
 import { roleLabel } from "~/lib/format";
 
@@ -24,8 +27,11 @@ type ToolbarProps = {
   role: TreeRole;
   showMedia: boolean;
   layout: "generations" | "freeform";
+  generationDirection: GenerationDirection;
   onToggleMedia: () => void;
   onToggleLayout: () => void;
+  onFlipDirection: () => void;
+  onResetLayout: () => void;
   onSearch: () => void;
   onFit: () => void;
   onZoomIn: () => void;
@@ -77,7 +83,7 @@ export function GraphToolbar(props: ToolbarProps) {
               <span class="hidden sm:inline">Add person</span>
             </button>
           </Show>
-          <div class="hidden items-center gap-1.5 sm:flex">
+          <div class="hidden items-center gap-1.5 lg:flex">
             <ToolbarToggle
               active={props.showMedia}
               label={props.showMedia ? "Hide media" : "Show media"}
@@ -100,6 +106,19 @@ export function GraphToolbar(props: ToolbarProps) {
                 <Network size={17} />
               </Show>
             </ToolbarToggle>
+            <button
+              type="button"
+              class={control}
+              onClick={props.onFlipDirection}
+              aria-label="Flip generation direction"
+              title={
+                props.generationDirection === "oldest-top"
+                  ? "Oldest at top. Flip so oldest is at the bottom"
+                  : "Oldest at bottom. Flip so oldest is at the top"
+              }
+            >
+              <ArrowDownUp size={17} />
+            </button>
             <button type="button" class={control} onClick={props.onZoomOut} aria-label="Zoom out" title="Zoom out">
               <ZoomOut size={17} />
             </button>
@@ -109,12 +128,21 @@ export function GraphToolbar(props: ToolbarProps) {
             <button type="button" class={control} onClick={props.onFit} aria-label="Fit tree" title="Fit tree">
               <Maximize2 size={17} />
             </button>
+            <button
+              type="button"
+              class={control}
+              onClick={props.onResetLayout}
+              aria-label="Reset layout"
+              title="Reset layout and clear dragged positions"
+            >
+              <RotateCcw size={17} />
+            </button>
             <A href={`/trees/${props.treeId}/settings`} class={control} aria-label="Tree settings" title="Tree settings">
               <Settings size={17} />
             </A>
           </div>
 
-          <details class="group relative sm:hidden">
+          <details class="group relative lg:hidden">
             <summary class={`${control} list-none cursor-pointer [&::-webkit-details-marker]:hidden`} aria-label="More controls">
               <MoreHorizontal size={18} />
             </summary>
@@ -132,6 +160,9 @@ export function GraphToolbar(props: ToolbarProps) {
                   <Network size={15} />
                 </Show>
               </MobileAction>
+              <MobileAction label="Flip generations" onClick={props.onFlipDirection}>
+                <ArrowDownUp size={15} />
+              </MobileAction>
               <MobileAction label="Zoom out" onClick={props.onZoomOut}>
                 <ZoomOut size={15} />
               </MobileAction>
@@ -140,6 +171,9 @@ export function GraphToolbar(props: ToolbarProps) {
               </MobileAction>
               <MobileAction label="Fit tree" onClick={props.onFit}>
                 <Maximize2 size={15} />
+              </MobileAction>
+              <MobileAction label="Reset layout" onClick={props.onResetLayout}>
+                <RotateCcw size={15} />
               </MobileAction>
               <A
                 href={`/trees/${props.treeId}/settings`}

@@ -1,5 +1,9 @@
 import type { GraphFile, GraphPerson, GraphRelationship, TreeGraph } from "~/api/people-server";
 
+export type GenerationDirection = "oldest-top" | "oldest-bottom";
+export const GENERATION_SPACING = 190;
+export const GENERATION_BAND = 58;
+
 export type GraphNode = {
   id: string;
   kind: "person" | "file";
@@ -15,6 +19,7 @@ export type GraphNode = {
   vy?: number;
   fx?: number | null;
   fy?: number | null;
+  softX?: number;
 };
 
 export type GraphLink = {
@@ -36,7 +41,11 @@ export function fileNodeId(fileId: string) {
   return `file:${fileId}`;
 }
 
-export function buildGraphModel(data: TreeGraph, showMedia: boolean): GraphModel {
+export function buildGraphModel(
+  data: TreeGraph,
+  showMedia: boolean,
+  direction: GenerationDirection = "oldest-top",
+): GraphModel {
   const generations = computeGenerations(data.people, data.relationships);
   const degree = new Map<string, number>();
   for (const relationship of data.relationships) {
@@ -47,7 +56,7 @@ export function buildGraphModel(data: TreeGraph, showMedia: boolean): GraphModel
   const nodes: GraphNode[] = [];
   for (const person of data.people) {
     const level = generations.get(person.id) ?? 0;
-    const spot = initialSpot(person.id, level);
+    const spot = initialSpot(person.id, level, direction);
     nodes.push({
       id: person.id,
       kind: "person",
@@ -77,7 +86,7 @@ export function buildGraphModel(data: TreeGraph, showMedia: boolean): GraphModel
       const parent = byPerson.get(file.personId);
       if (!parent) continue;
       const level = parent.level;
-      const offset = initialSpot(file.id, level);
+      const offset = initialSpot(file.id, level, direction);
       nodes.push({
         id: fileNodeId(file.id),
         kind: "file",
@@ -150,13 +159,36 @@ export function computeGenerations(
   return levels;
 }
 
-export function initialSpot(id: string, level: number) {
+export function generationRowY(
+  level: number,
+  direction: GenerationDirection,
+  spacing = GENERATION_SPACING,
+) {
+  return (direction === "oldest-top" ? 1 : -1) * level * spacing;
+}
+
+export function clampToGenerationBand(
+  y: number,
+  level: number,
+  direction: GenerationDirection,
+  spacing = GENERATION_SPACING,
+  halfBand = GENERATION_BAND,
+) {
+  const row = generationRowY(level, direction, spacing);
+  return Math.max(row - halfBand, Math.min(row + halfBand, y));
+}
+
+export function initialSpot(
+  id: string,
+  level: number,
+  direction: GenerationDirection = "oldest-top",
+) {
   const hash = hashString(id);
   const angle = ((hash % 1000) / 1000) * Math.PI * 2;
   const radius = 70 + (hash % 180);
   return {
     x: Math.cos(angle) * radius,
-    y: level * 170 + Math.sin(angle) * 55,
+    y: generationRowY(level, direction) + Math.sin(angle) * 48,
   };
 }
 

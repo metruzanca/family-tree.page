@@ -34,7 +34,7 @@ type PersonPanelProps = {
   onDelete: () => void;
   onAddRelative: () => void;
   onSelectPerson: (id: string) => void;
-  onPreviewFile: (file: GraphFile) => void;
+  onSelectFile: (file: GraphFile) => void;
   onSetAvatar: (fileId: string | null) => void;
   onDeleteFile: (file: GraphFile) => void;
   onUpload: (files: File[]) => void;
@@ -246,7 +246,7 @@ export function PersonPanel(props: PersonPanelProps) {
                   <FileTile
                     file={file}
                     editable={editable()}
-                    onPreview={() => props.onPreviewFile(file)}
+                    onPreview={() => props.onSelectFile(file)}
                     onAvatar={() => props.onSetAvatar(file.isAvatar ? null : file.id)}
                     onDelete={() => props.onDeleteFile(file)}
                   />

@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { buildGraphModel, computeGenerations } from "./graph";
+import {
+  buildGraphModel,
+  clampToGenerationBand,
+  computeGenerations,
+  generationRowY,
+} from "./graph";
 import type { GraphPerson, GraphRelationship, TreeGraph } from "../api/people-server";
 
 function person(id: string, firstName = id, lastName = "Zanca"): GraphPerson {
@@ -68,6 +73,23 @@ describe("computeGenerations", () => {
   });
 });
 
+describe("generation bands", () => {
+  it("puts older generations above newer ones by default", () => {
+    expect(generationRowY(0, "oldest-top")).toBeLessThan(generationRowY(1, "oldest-top"));
+    expect(generationRowY(0, "oldest-bottom")).toBeGreaterThan(
+      generationRowY(1, "oldest-bottom"),
+    );
+  });
+
+  it("only clamps a node when it leaves its generation band", () => {
+    const level = 1;
+    const row = generationRowY(level, "oldest-top");
+    expect(clampToGenerationBand(row + 20, level, "oldest-top")).toBe(row + 20);
+    expect(clampToGenerationBand(row + 200, level, "oldest-top")).toBe(row + 58);
+    expect(clampToGenerationBand(row - 200, level, "oldest-top")).toBe(row - 58);
+  });
+});
+
 describe("buildGraphModel", () => {
   const people = [person("a"), person("b")];
   const relationships = [parent("r1", "a", "b")];
@@ -86,6 +108,8 @@ describe("buildGraphModel", () => {
         thumbUrl: "/api/files/avatar/thumb",
         width: 100,
         height: 100,
+        sizeBytes: 1000,
+        createdAt: new Date(),
         isAvatar: true,
       },
       {
@@ -97,20 +121,22 @@ describe("buildGraphModel", () => {
         thumbUrl: null,
         width: null,
         height: null,
+        sizeBytes: 2000,
+        createdAt: new Date(),
         isAvatar: false,
       },
     ],
   };
 
   it("adds non-avatar files when media is visible", () => {
-    const model = buildGraphModel(data, true);
+    const model = buildGraphModel(data, true, "oldest-top");
     expect(model.nodes.map(node => node.id)).toContain("file:doc");
     expect(model.nodes.map(node => node.id)).not.toContain("file:avatar");
     expect(model.links.some(link => link.kind === "media")).toBe(true);
   });
 
   it("drops media nodes when media is hidden", () => {
-    const model = buildGraphModel(data, false);
+    const model = buildGraphModel(data, false, "oldest-top");
     expect(model.nodes.map(node => node.id)).toEqual(["a", "b"]);
     expect(model.links.some(link => link.kind === "media")).toBe(false);
   });

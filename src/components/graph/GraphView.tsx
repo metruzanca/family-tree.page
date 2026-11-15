@@ -1,14 +1,16 @@
 import { createEffect, createMemo, createSignal, onCleanup, onMount, Show } from "solid-js";
-import { forceCollide, forceX, forceY } from "d3-force";
+import { forceCollide, forceY } from "d3-force";
 import type { TreeGraph } from "~/api/people-server";
 import type { TreeRole } from "~/server/guards";
 import {
   branchColor,
   buildGraphModel,
-  fileNodeId,
+  clampToGenerationBand,
+  generationRowY,
   initialsOf,
   neighborsOf,
   nodeRadius,
+  type GenerationDirection,
   type GraphLink,
   type GraphModel,
   type GraphNode,
@@ -27,8 +29,9 @@ type GraphViewProps = {
   selectedId: string | null;
   showMedia: boolean;
   layout: "generations" | "freeform";
+  generationDirection: GenerationDirection;
   onSelect: (id: string | null) => void;
-  onFileOpen: (fileId: string) => void;
+  onFileSelect: (fileId: string) => void;
   onReady?: (handle: GraphHandle) => void;
 };
 
@@ -37,7 +40,19 @@ export function GraphView(props: GraphViewProps) {
   let graph: any;
   let resizeObserver: ResizeObserver | undefined;
   let needsFit = true;
-  let model: GraphModel = buildGraphModel(props.data, props.showMedia);
+  let previousDirection = props.generationDirection;
+  let draggingNode: GraphNode | null = null;
+  let dragDistance = 0;
+  let dragStart = { x: 0, y: 0 };
+  let backgroundDown = false;
+  let backgroundStart = { x: 0, y: 0 };
+  let pointer = { x: 0, y: 0 };
+  let suppressClickUntil = 0;
+  let model: GraphModel = buildGraphModel(
+    props.data,
+    props.showMedia,
+    props.generationDirection,
+  );
   const [hovered, setHovered] = createSignal<string | null>(null);
   const [ready, setReady] = createSignal(false);
   const [paintVersion, setPaintVersion] = createSignal(0);
@@ -62,8 +77,48 @@ export function GraphView(props: GraphViewProps) {
     if (!graph) return;
     setPaintVersion(value => value + 1);
     graph.nodeCanvasObject(drawNode);
-    graph.nodePointerAreaPaint(drawPointerArea);
     graph.linkColor(linkColor);
+  }
+
+  function hitTestNode(clientX: number, clientY: number): GraphNode | null {
+    if (!graph) return null;
+    const point = graph.screen2GraphCoords(clientX, clientY);
+    const zoom = graph.zoom();
+    const nodes = graph.graphData().nodes as GraphNode[];
+    for (let index = nodes.length - 1; index >= 0; index -= 1) {
+      const node = nodes[index];
+      if (node.x == null || node.y == null) continue;
+      const radius = nodeRadius(node) + 14 / zoom;
+      if (node.kind === "person") {
+        if (Math.hypot(point.x - node.x, point.y - node.y) <= radius) return node;
+      } else {
+        if (Math.abs(point.x - node.x) <= radius && Math.abs(point.y - node.y) <= radius) {
+          return node;
+        }
+      }
+    }
+    return null;
+  }
+
+  function updateHoverAt(clientX: number, clientY: number) {
+    const node = hitTestNode(clientX, clientY);
+    const next = node?.id ?? null;
+    setCanvasCursor(node ? "pointer" : "default");
+    if (next !== hovered()) {
+      setHovered(next);
+      refreshPaint();
+    }
+  }
+
+  function selectNode(node: GraphNode) {
+    // The panel can render directly under the pointer on mobile. Suppress the
+    // synthetic click so it cannot land on a button in the newly opened panel.
+    suppressClickUntil = Date.now() + 400;
+    if (node.kind === "person") {
+      props.onSelect(node.id);
+    } else if (node.file) {
+      props.onFileSelect(node.file.id);
+    }
   }
 
   function imageFor(url: string) {
@@ -79,6 +134,27 @@ export function GraphView(props: GraphViewProps) {
 
   function avatarUrl(fileId: string | null | undefined) {
     return fileId ? `/api/files/${fileId}/thumb` : null;
+  }
+
+  function setCanvasCursor(cursor: "default" | "pointer" | "grabbing") {
+    if (!container) return;
+    container.style.cursor = cursor;
+    const canvas = container.querySelector("canvas") as HTMLCanvasElement | null;
+    if (canvas) canvas.style.cursor = cursor;
+  }
+
+  function dragMemoryForce() {
+    let nodes: GraphNode[] = [];
+    const force = (alpha: number) => {
+      for (const node of nodes) {
+        if (node.softX == null) continue;
+        node.vx = (node.vx ?? 0) + (node.softX - (node.x ?? 0)) * 1.0 * alpha;
+      }
+    };
+    (force as any).initialize = (next: GraphNode[]) => {
+      nodes = next;
+    };
+    return force;
   }
 
   function drawNode(node: GraphNode, context: CanvasRenderingContext2D, globalScale: number) {
@@ -210,24 +286,6 @@ export function GraphView(props: GraphViewProps) {
     context.restore();
   }
 
-  function drawPointerArea(
-    node: GraphNode,
-    paintColor: string,
-    context: CanvasRenderingContext2D,
-    globalScale: number,
-  ) {
-    const radius = nodeRadius(node) + 7 / globalScale;
-    context.fillStyle = paintColor;
-    if (node.kind === "person") {
-      context.beginPath();
-      context.arc(node.x ?? 0, node.y ?? 0, radius, 0, Math.PI * 2);
-      context.fill();
-    } else {
-      const size = radius * 2;
-      context.fillRect((node.x ?? 0) - radius, (node.y ?? 0) - radius, size, size);
-    }
-  }
-
   function linkConnected(link: GraphLink, id: string) {
     const source = typeof link.source === "string" ? link.source : link.source.id;
     const target = typeof link.target === "string" ? link.target : link.target.id;
@@ -255,22 +313,24 @@ export function GraphView(props: GraphViewProps) {
   }
 
   function fit() {
-    graph.zoomToFit(650, 90);
+    graph.zoomToFit(650, 110);
   }
 
   function reset() {
-    const fresh = buildGraphModel(props.data, props.showMedia);
+    const fresh = buildGraphModel(props.data, props.showMedia, props.generationDirection);
     model = fresh;
     graph?.graphData({
       nodes: fresh.nodes,
       links: fresh.links,
     });
     graph?.d3ReheatSimulation();
-    setTimeout(() => graph?.zoomToFit(700, 90), 500);
+    needsFit = true;
+    setTimeout(() => graph?.zoomToFit(700, 110), 500);
   }
 
   function applyLayout(mode: "generations" | "freeform") {
     if (!graph) return;
+    const direction = props.generationDirection;
     const linkForce = graph.d3Force("link") as any;
     if (linkForce) {
       linkForce.distance((link: GraphLink) =>
@@ -284,12 +344,19 @@ export function GraphView(props: GraphViewProps) {
       charge.distanceMax(1600);
     }
     if (mode === "generations") {
-      graph.d3Force("generation", (forceY as any)((node: GraphNode) => node.level * 190).strength(0.28));
-      graph.d3Force("column", (forceX as any)(0).strength(0.008));
+      graph.d3Force(
+        "generation",
+        (forceY as any)((node: GraphNode) => {
+          const row = generationRowY(node.level, direction);
+          return clampToGenerationBand(node.y ?? row, node.level, direction);
+        }).strength(0.5),
+      );
+      graph.d3Force("column", null);
     } else {
       graph.d3Force("generation", null);
       graph.d3Force("column", null);
     }
+    graph.d3Force("dragMemory", dragMemoryForce());
     graph.d3Force(
       "collide",
       (forceCollide as any)((node: GraphNode) => nodeRadius(node) + 12).strength(0.95),
@@ -307,7 +374,6 @@ export function GraphView(props: GraphViewProps) {
       .nodeId("id")
       .nodeVal((node: GraphNode) => node.val)
       .nodeCanvasObject(drawNode)
-      .nodePointerAreaPaint(drawPointerArea)
       .nodeLabel("")
       .linkColor(linkColor)
       .linkWidth((link: GraphLink) => (link.kind === "media" ? 0.8 : 1.25))
@@ -319,34 +385,38 @@ export function GraphView(props: GraphViewProps) {
       .linkDirectionalArrowColor((link: GraphLink) =>
         link.kind === "parent" ? colors.parentStep : "rgba(0,0,0,0)",
       )
-      .onNodeHover((node: GraphNode | null) => {
-        setHovered(node?.id ?? null);
-        refreshPaint();
-      })
-      .onNodeClick((node: GraphNode) => {
-        if (node.kind === "person") {
-          props.onSelect(node.id);
-        } else if (node.file) {
-          props.onFileOpen(node.file.id);
-        }
-      })
-      .onBackgroundClick(() => props.onSelect(null))
       .onEngineStop(() => {
+        if (import.meta.env.DEV) (window as any).__rootsStoppedAt = Date.now();
+        updateHoverAt(pointer.x, pointer.y);
         if (needsFit) {
           needsFit = false;
           setTimeout(() => fit(), 150);
         }
       })
-      .warmupTicks(25)
-      .cooldownTicks(220)
-      .cooldownTime(9000)
+      .warmupTicks(60)
+      .cooldownTicks(120)
+      .cooldownTime(2500)
+      .d3AlphaDecay(0.035)
       .minZoom(0.2)
       .maxZoom(4.5)
-      .enableNodeDrag(true)
+      .enableNodeDrag(false)
+      .enablePointerInteraction(false)
       .autoPauseRedraw(true);
 
     graph.graphData({ nodes: model.nodes, links: model.links });
     applyLayout(props.layout);
+    if (import.meta.env.DEV) {
+      (window as any).__rootsGraph = graph;
+      (window as any).__rootsNodes = () =>
+        graph.graphData().nodes.map((node: GraphNode) => ({
+          id: node.id,
+          kind: node.kind,
+          level: node.level,
+          x: node.x,
+          y: node.y,
+          softX: node.softX,
+        }));
+    }
     setReady(true);
     props.onReady?.({
       fit,
@@ -361,15 +431,136 @@ export function GraphView(props: GraphViewProps) {
       graph.width(rect.width).height(rect.height);
     });
     resizeObserver.observe(container);
+
+    const onPointerDown = (event: PointerEvent) => {
+      if (event.pointerType === "mouse" && event.button !== 0) return;
+      if (draggingNode) return;
+      pointer = { x: event.clientX, y: event.clientY };
+      const node = hitTestNode(event.clientX, event.clientY);
+      if (node) {
+        event.preventDefault();
+        event.stopPropagation();
+        draggingNode = node;
+        dragStart = { x: event.clientX, y: event.clientY };
+        dragDistance = 0;
+        node.fx = node.x;
+        node.fy = node.y;
+        setHovered(node.id);
+        setCanvasCursor("grabbing");
+        refreshPaint();
+        return;
+      }
+      backgroundDown = true;
+      backgroundStart = { x: event.clientX, y: event.clientY };
+      dragDistance = 0;
+    };
+
+    const onPointerMove = (event: PointerEvent) => {
+      pointer = { x: event.clientX, y: event.clientY };
+      if (draggingNode) {
+        event.preventDefault();
+        dragDistance += Math.hypot(
+          event.clientX - dragStart.x,
+          event.clientY - dragStart.y,
+        );
+        dragStart = { x: event.clientX, y: event.clientY };
+        const point = graph.screen2GraphCoords(event.clientX, event.clientY);
+        draggingNode.fx = point.x;
+        draggingNode.fy = point.y;
+        draggingNode.x = point.x;
+        draggingNode.y = point.y;
+        graph.d3ReheatSimulation();
+        return;
+      }
+      if (backgroundDown) {
+        dragDistance += Math.hypot(
+          event.clientX - backgroundStart.x,
+          event.clientY - backgroundStart.y,
+        );
+        backgroundStart = { x: event.clientX, y: event.clientY };
+        return;
+      }
+      if (container.contains(event.target as Node)) {
+        updateHoverAt(event.clientX, event.clientY);
+      }
+    };
+
+    const releaseDrag = (select: boolean) => {
+      if (!draggingNode) return;
+      const node = draggingNode;
+      draggingNode = null;
+      node.fx = null;
+      node.fy = null;
+      node.softX = node.x;
+      graph.d3ReheatSimulation();
+      setHovered(node.id);
+      setCanvasCursor("pointer");
+      suppressClickUntil = Date.now() + 400;
+      if (select) selectNode(node);
+      dragDistance = 0;
+    };
+
+    const onPointerUp = (event: PointerEvent) => {
+      pointer = { x: event.clientX, y: event.clientY };
+      if (draggingNode) {
+        releaseDrag(dragDistance <= 6);
+        return;
+      }
+      if (backgroundDown) {
+        const wasClick = dragDistance <= 6;
+        backgroundDown = false;
+        dragDistance = 0;
+        if (wasClick) props.onSelect(null);
+        updateHoverAt(event.clientX, event.clientY);
+      }
+    };
+
+    const onPointerCancel = () => {
+      if (draggingNode) releaseDrag(false);
+      backgroundDown = false;
+      dragDistance = 0;
+    };
+
+    const onPointerLeave = () => {
+      if (draggingNode || backgroundDown) return;
+      setHovered(null);
+      setCanvasCursor("default");
+      refreshPaint();
+    };
+
+    const onCaptureClick = (event: MouseEvent) => {
+      if (Date.now() < suppressClickUntil) {
+        event.preventDefault();
+        event.stopPropagation();
+        suppressClickUntil = 0;
+      }
+    };
+
+    container.addEventListener("pointerdown", onPointerDown, { capture: true });
+    window.addEventListener("pointermove", onPointerMove, { passive: false });
+    window.addEventListener("pointerup", onPointerUp);
+    window.addEventListener("pointercancel", onPointerCancel);
+    container.addEventListener("pointerleave", onPointerLeave);
+    window.addEventListener("click", onCaptureClick, true);
+
     onCleanup(() => {
       resizeObserver?.disconnect();
+      container.removeEventListener("pointerdown", onPointerDown, { capture: true });
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("pointercancel", onPointerCancel);
+      container.removeEventListener("pointerleave", onPointerLeave);
+      window.removeEventListener("click", onCaptureClick, true);
       graph?._destructor?.();
       graph = undefined;
     });
   });
 
   createEffect(() => {
-    const next = buildGraphModel(props.data, props.showMedia);
+    const direction = props.generationDirection;
+    const directionChanged = direction !== previousDirection;
+    previousDirection = direction;
+    const next = buildGraphModel(props.data, props.showMedia, direction);
     if (!graph) {
       model = next;
       return;
@@ -377,14 +568,19 @@ export function GraphView(props: GraphViewProps) {
     const previous = new Map<string, GraphNode>(
       graph.graphData().nodes.map((node: GraphNode) => [node.id, node]),
     );
-    for (const node of next.nodes) {
-      const old = previous.get(node.id);
-      if (old) {
-        node.x = old.x;
-        node.y = old.y;
-        node.vx = old.vx;
-        node.vy = old.vy;
+    if (!directionChanged) {
+      for (const node of next.nodes) {
+        const old = previous.get(node.id);
+        if (old) {
+          node.x = old.x;
+          node.y = old.y;
+          node.vx = old.vx;
+          node.vy = old.vy;
+          node.softX = old.softX;
+        }
       }
+    } else {
+      needsFit = true;
     }
     model = next;
     graph.graphData({ nodes: next.nodes, links: next.links });
@@ -393,6 +589,7 @@ export function GraphView(props: GraphViewProps) {
 
   createEffect(() => {
     props.layout;
+    props.generationDirection;
     applyLayout(props.layout);
   });
 
@@ -402,7 +599,6 @@ export function GraphView(props: GraphViewProps) {
     paintVersion();
     if (graph) {
       graph.nodeCanvasObject(drawNode);
-      graph.nodePointerAreaPaint(drawPointerArea);
       graph.linkColor(linkColor);
     }
   });

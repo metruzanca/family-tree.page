@@ -34,6 +34,8 @@ export type GraphFile = {
   thumbUrl: string | null;
   width: number | null;
   height: number | null;
+  sizeBytes: number;
+  createdAt: Date;
   isAvatar: boolean;
 };
 
@@ -153,6 +155,8 @@ function toGraphFile(file: StoredFile): GraphFile {
     thumbUrl: file.thumbKey ? `/api/files/${file.id}/thumb` : null,
     width: file.width,
     height: file.height,
+    sizeBytes: file.sizeBytes,
+    createdAt: file.createdAt,
     isAvatar: file.isAvatar,
   };
 }

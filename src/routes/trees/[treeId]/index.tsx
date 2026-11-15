@@ -11,12 +11,14 @@ import { GraphSearch } from "~/components/graph/GraphSearch";
 import { PersonPanel } from "~/components/people/PersonPanel";
 import { PersonFormDialog } from "~/components/people/PersonFormDialog";
 import { AddRelativeDialog } from "~/components/people/AddRelativeDialog";
+import { FilePanel } from "~/components/files/FilePanel";
 import { FilePreviewDialog } from "~/components/files/FilePreviewDialog";
 import { ConfirmDialog } from "~/components/ui/ConfirmDialog";
 import { Button } from "~/components/ui/Button";
 import { useToast } from "~/components/ui/Toast";
 import { uploadPersonFile } from "~/lib/upload";
 import { mimeForFile } from "~/lib/image-thumb";
+import { fileNodeId, type GenerationDirection } from "~/lib/graph";
 
 export const route = {
   preload: ({ params }: { params: { treeId: string } }) => getTreeGraph(params.treeId),
@@ -38,6 +40,9 @@ function TreePageInner() {
   const [handle, setHandle] = createSignal<GraphHandle>();
   const [showMedia, setShowMedia] = createSignal(true);
   const [layout, setLayout] = createSignal<"generations" | "freeform">("generations");
+  const [generationDirection, setGenerationDirection] = createSignal<GenerationDirection>(
+    "oldest-top",
+  );
   const [searchOpen, setSearchOpen] = createSignal(false);
   const [addPersonOpen, setAddPersonOpen] = createSignal(false);
   const [editPersonOpen, setEditPersonOpen] = createSignal(false);
@@ -53,8 +58,21 @@ function TreePageInner() {
     const value = searchParams.person;
     return typeof value === "string" ? value : null;
   });
-  const selectedPerson = createMemo(
-    () => data()?.people.find(person => person.id === selectedId()) ?? null,
+  const selectedFileId = createMemo(() => {
+    const value = searchParams.file;
+    return typeof value === "string" ? value : null;
+  });
+  const selectedPerson = createMemo(() =>
+    selectedFileId() ? null : (data()?.people.find(person => person.id === selectedId()) ?? null),
+  );
+  const selectedFile = createMemo(
+    () => data()?.files.find(file => file.id === selectedFileId()) ?? null,
+  );
+  const selectedFilePerson = createMemo(
+    () => data()?.people.find(person => person.id === selectedFile()?.personId) ?? undefined,
+  );
+  const selectedNodeId = createMemo(
+    () => selectedPerson()?.id ?? (selectedFile() ? fileNodeId(selectedFile()!.id) : null),
   );
   const editable = () => data()?.role === "owner" || data()?.role === "editor";
 
@@ -62,6 +80,9 @@ function TreePageInner() {
     const storedLayout = localStorage.getItem("roots-layout");
     if (storedLayout === "freeform") setLayout("freeform");
     if (localStorage.getItem("roots-media") === "off") setShowMedia(false);
+    if (localStorage.getItem("roots-generation-direction") === "oldest-bottom") {
+      setGenerationDirection("oldest-bottom");
+    }
 
     const listener = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
@@ -82,12 +103,24 @@ function TreePageInner() {
   });
 
   function selectPerson(id: string | null) {
-    setSearchParams({ person: id ?? undefined }, { replace: true });
+    setSearchParams(
+      { person: id ?? undefined, file: undefined },
+      { replace: true },
+    );
+  }
+
+  function selectFile(id: string) {
+    setSearchParams({ file: id, person: undefined }, { replace: true });
   }
 
   function focusPerson(id: string) {
     selectPerson(id);
     setTimeout(() => handle()?.focus(id), 50);
+  }
+
+  function focusFile(id: string) {
+    selectFile(id);
+    setTimeout(() => handle()?.focus(fileNodeId(id)), 50);
   }
 
   function toggleMedia() {
@@ -100,6 +133,13 @@ function TreePageInner() {
     const next = layout() === "generations" ? "freeform" : "generations";
     setLayout(next);
     localStorage.setItem("roots-layout", next);
+  }
+
+  function flipGenerationDirection() {
+    const next =
+      generationDirection() === "oldest-top" ? "oldest-bottom" : "oldest-top";
+    setGenerationDirection(next);
+    localStorage.setItem("roots-generation-direction", next);
   }
 
   async function handleUpload(files: File[]) {
@@ -145,10 +185,8 @@ function TreePageInner() {
     }
   }
 
-  async function handleSetAvatar(fileId: string | null) {
-    const person = selectedPerson();
-    if (!person) return;
-    const result = await setAvatar({ treeId: params.treeId, personId: person.id, fileId });
+  async function handleSetAvatar(personId: string, fileId: string | null) {
+    const result = await setAvatar({ treeId: params.treeId, personId, fileId });
     if (!result.ok) {
       toast.show(result.error, "error");
       return;
@@ -167,6 +205,7 @@ function TreePageInner() {
       toast.show(result.error, "error");
       return;
     }
+    if (selectedFileId() === file.id) selectPerson(null);
     setDeleteFileTarget(null);
     setPreviewFile(null);
     await revalidate([getTreeGraph.key, getTreeOverview.key, getMyTrees.key]);
@@ -202,9 +241,8 @@ function TreePageInner() {
     toast.show("Connection removed.", "success");
   }
 
-  function openFile(file: GraphFile) {
+  function openFilePreview(file: GraphFile) {
     setPreviewFile(file);
-    if (file.personId !== selectedId()) focusPerson(file.personId);
   }
 
   return (
@@ -214,14 +252,12 @@ function TreePageInner() {
           <GraphView
             data={graph()}
             role={graph().role}
-            selectedId={selectedId()}
+            selectedId={selectedNodeId()}
             showMedia={showMedia()}
             layout={layout()}
+            generationDirection={generationDirection()}
             onSelect={selectPerson}
-            onFileOpen={id => {
-              const file = graph().files.find(candidate => candidate.id === id);
-              if (file) openFile(file);
-            }}
+            onFileSelect={focusFile}
             onReady={setHandle}
           />
 
@@ -232,8 +268,11 @@ function TreePageInner() {
             role={graph().role}
             showMedia={showMedia()}
             layout={layout()}
+            generationDirection={generationDirection()}
             onToggleMedia={toggleMedia}
             onToggleLayout={toggleLayout}
+            onFlipDirection={flipGenerationDirection}
+            onResetLayout={() => handle()?.reset()}
             onSearch={() => setSearchOpen(true)}
             onFit={() => handle()?.fit()}
             onZoomIn={() => handle()?.zoomBy(1.25)}
@@ -276,8 +315,8 @@ function TreePageInner() {
                 onDelete={() => setDeletePersonOpen(true)}
                 onAddRelative={() => setAddRelativeOpen(true)}
                 onSelectPerson={focusPerson}
-                onPreviewFile={openFile}
-                onSetAvatar={handleSetAvatar}
+                onSelectFile={file => focusFile(file.id)}
+                onSetAvatar={fileId => handleSetAvatar(person().id, fileId)}
                 onDeleteFile={file => setDeleteFileTarget(file)}
                 onUpload={handleUpload}
                 onRemoveRelationship={handleRemoveRelationship}
@@ -285,7 +324,29 @@ function TreePageInner() {
             )}
           </Show>
 
+          <Show when={selectedFile()}>
+            {file => (
+              <FilePanel
+                file={file()}
+                person={selectedFilePerson()}
+                role={graph().role}
+                onClose={() => selectPerson(null)}
+                onPreview={() => openFilePreview(file())}
+                onSelectPerson={focusPerson}
+                onSetAvatar={fileId => handleSetAvatar(file().personId, fileId)}
+                onDelete={() => setDeleteFileTarget(file())}
+              />
+            )}
+          </Show>
+
           <div class="pointer-events-none absolute bottom-4 left-4 z-10 hidden items-center gap-3 rounded-full border border-white/10 bg-black/30 px-3 py-1.5 text-[0.65rem] text-white/45 backdrop-blur sm:flex">
+            <span class="rounded-full bg-white/10 px-2 py-0.5 text-[0.6rem] font-semibold uppercase tracking-wide text-white/60">
+              {layout() === "generations"
+                ? generationDirection() === "oldest-top"
+                  ? "Oldest at top"
+                  : "Oldest at bottom"
+                : "Freeform"}
+            </span>
             <span class="flex items-center gap-1.5">
               <span class="h-1.5 w-4 rounded-full bg-[#66735f]" /> Parent
             </span>
@@ -313,7 +374,7 @@ function TreePageInner() {
             onClose={() => setSearchOpen(false)}
             data={graph()}
             onPerson={person => focusPerson(person.id)}
-            onFile={openFile}
+            onFile={file => focusFile(file.id)}
           />
 
           <PersonFormDialog
@@ -343,7 +404,10 @@ function TreePageInner() {
             file={previewFile()}
             editable={editable()}
             onClose={() => setPreviewFile(null)}
-            onSetAvatar={handleSetAvatar}
+            onSetAvatar={fileId => {
+              const personId = previewFile()?.personId ?? selectedFilePerson()?.id;
+              if (personId) handleSetAvatar(personId, fileId);
+            }}
             onDelete={file => setDeleteFileTarget(file)}
           />
 
