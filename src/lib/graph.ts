@@ -6,10 +6,13 @@ export const GENERATION_BAND = 58;
 
 export type GraphNode = {
   id: string;
-  kind: "person" | "file";
+  kind: "person" | "file" | "union";
   name: string;
   person?: GraphPerson;
   file?: GraphFile;
+  memberIds?: string[];
+  parentIds?: string[];
+  childIds?: string[];
   degree: number;
   val: number;
   level: number;
@@ -25,7 +28,8 @@ export type GraphLink = {
   id: string;
   source: string | GraphNode;
   target: string | GraphNode;
-  kind: "parent" | "partner" | "media";
+  kind: "parent" | "partner" | "media" | "union";
+  viaUnion?: boolean;
   parentType?: "biological" | "adoptive" | "foster" | "step" | "unknown";
   status?: string;
 };
@@ -33,6 +37,7 @@ export type GraphLink = {
 export type GraphModel = {
   nodes: GraphNode[];
   links: GraphLink[];
+  semanticLinks: GraphLink[];
   generations: Map<string, number>;
 };
 
@@ -69,14 +74,136 @@ export function buildGraphModel(
     });
   }
 
-  const links: GraphLink[] = data.relationships.map(relationship => ({
-    id: relationship.id,
-    source: relationship.source,
-    target: relationship.target,
-    kind: relationship.type,
-    parentType: relationship.type === "parent" ? relationship.parentType : undefined,
-    status: relationship.type === "partner" ? relationship.status : undefined,
-  }));
+  const links: GraphLink[] = [];
+  const semanticLinks: GraphLink[] = [];
+
+  for (const relationship of data.relationships) {
+    if (relationship.type !== "partner") continue;
+    const link: GraphLink = {
+      id: relationship.id,
+      source: relationship.source,
+      target: relationship.target,
+      kind: "partner",
+      status: relationship.status,
+    };
+    links.push(link);
+    semanticLinks.push({ ...link });
+  }
+
+  type ParentEdge = {
+    relationshipId: string;
+    id: string;
+    parentType: "biological" | "adoptive" | "foster" | "step" | "unknown";
+  };
+  const parentsByChild = new Map<string, ParentEdge[]>();
+  for (const relationship of data.relationships) {
+    if (relationship.type !== "parent") continue;
+    const list = parentsByChild.get(relationship.target) ?? [];
+    list.push({
+      relationshipId: relationship.id,
+      id: relationship.source,
+      parentType: relationship.parentType,
+    });
+    parentsByChild.set(relationship.target, list);
+  }
+
+  type UnionRecord = {
+    id: string;
+    parentIds: string[];
+    childIds: string[];
+    level: number;
+    parentTypeByChild: Map<string, "biological" | "adoptive" | "foster" | "step" | "unknown">;
+  };
+  const unions = new Map<string, UnionRecord>();
+
+  for (const [childId, parentEdges] of parentsByChild) {
+    const uniqueParents = [
+      ...new Map(parentEdges.map(parent => [parent.id, parent])).values(),
+    ];
+    if (uniqueParents.length === 1) {
+      const parent = uniqueParents[0];
+      const link: GraphLink = {
+        id: parent.relationshipId,
+        source: parent.id,
+        target: childId,
+        kind: "parent",
+        parentType: parent.parentType,
+      };
+      links.push(link);
+      semanticLinks.push({ ...link });
+      continue;
+    }
+    if (uniqueParents.length < 2) continue;
+
+    const parentIds = uniqueParents.map(parent => parent.id).sort();
+    const key = parentIds.join("|");
+    let union = unions.get(key);
+    if (!union) {
+      union = {
+        id: `union:${key}`,
+        parentIds,
+        childIds: [],
+        level: Math.max(...parentIds.map(id => generations.get(id) ?? 0)) + 0.5,
+        parentTypeByChild: new Map(),
+      };
+      unions.set(key, union);
+    }
+    union.childIds.push(childId);
+    const nonBiological = uniqueParents.find(parent => parent.parentType !== "biological");
+    union.parentTypeByChild.set(childId, nonBiological?.parentType ?? "biological");
+    for (const parent of uniqueParents) {
+      semanticLinks.push({
+        id: parent.relationshipId,
+        source: parent.id,
+        target: childId,
+        kind: "parent",
+        parentType: parent.parentType,
+      });
+    }
+  }
+
+  const byId = new Map(nodes.map(node => [node.id, node]));
+  for (const union of unions.values()) {
+    const parentNodes = union.parentIds
+      .map(id => byId.get(id))
+      .filter((node): node is GraphNode => Boolean(node));
+    const averageX =
+      parentNodes.reduce((sum, node) => sum + (node.x ?? 0), 0) /
+      Math.max(1, parentNodes.length);
+    const hash = hashString(union.id);
+    nodes.push({
+      id: union.id,
+      kind: "union",
+      name: "",
+      memberIds: [...union.parentIds, ...union.childIds],
+      parentIds: union.parentIds,
+      childIds: union.childIds,
+      degree: 0,
+      val: 0.2,
+      level: union.level,
+      x: averageX + ((hash % 40) - 20),
+      y: generationRowY(union.level, direction) + ((hash % 30) - 15),
+    });
+
+    for (const parentId of union.parentIds) {
+      links.push({
+        id: `union-parent:${union.id}:${parentId}`,
+        source: parentId,
+        target: union.id,
+        kind: "union",
+      });
+    }
+    for (const childId of union.childIds) {
+      links.push({
+        id: `union-child:${union.id}:${childId}`,
+        source: union.id,
+        target: childId,
+        kind: "parent",
+        viaUnion: true,
+        parentType: union.parentTypeByChild.get(childId) ?? "biological",
+      });
+    }
+  }
 
   if (showMedia) {
     const byPerson = new Map(nodes.map(node => [node.id, node]));
@@ -97,16 +224,18 @@ export function buildGraphModel(
         x: (parent.x ?? 0) + offset.x * 0.35,
         y: (parent.y ?? 0) + offset.y * 0.35,
       });
-      links.push({
+      const link: GraphLink = {
         id: `media:${file.id}`,
         source: parent.id,
         target: fileNodeId(file.id),
         kind: "media",
-      });
+      };
+      links.push(link);
+      semanticLinks.push({ ...link });
     }
   }
 
-  return { nodes, links, generations };
+  return { nodes, links, semanticLinks, generations };
 }
 
 export function computeGenerations(
@@ -238,6 +367,7 @@ export function neighborsOf(links: GraphLink[], id: string): Set<string> {
 }
 
 export function nodeRadius(node: GraphNode) {
+  if (node.kind === "union") return 6;
   if (node.kind === "file") return 11;
   return Math.min(28, 12 + Math.sqrt(node.degree) * 4.2);
 }

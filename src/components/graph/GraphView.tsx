@@ -62,7 +62,15 @@ export function GraphView(props: GraphViewProps) {
   const activeId = createMemo(() => hovered() ?? props.selectedId);
   const active = createMemo(() => {
     const id = activeId();
-    return id ? neighborsOf(model.links, id) : null;
+    if (!id) return null;
+    const set = neighborsOf(model.semanticLinks, id);
+    for (const node of model.nodes) {
+      if (node.kind !== "union") continue;
+      const connectsActiveParent = node.parentIds?.some(parentId => set.has(parentId));
+      const connectsActiveChild = node.childIds?.some(childId => set.has(childId));
+      if (connectsActiveParent && connectsActiveChild) set.add(node.id);
+    }
+    return set;
   });
 
   const colors = {
@@ -88,6 +96,7 @@ export function GraphView(props: GraphViewProps) {
     const nodes = graph.graphData().nodes as GraphNode[];
     for (let index = nodes.length - 1; index >= 0; index -= 1) {
       const node = nodes[index];
+      if (node.kind === "union") continue;
       if (node.x == null || node.y == null) continue;
       const radius = nodeRadius(node) + 14 / zoom;
       if (node.kind === "person") {
@@ -151,6 +160,25 @@ export function GraphView(props: GraphViewProps) {
     const isHovered = node.id === hovered();
     context.save();
     context.globalAlpha = isActive ? 1 : 0.16;
+
+    if (node.kind === "union") {
+      const radius = 6;
+      const x = node.x ?? 0;
+      const y = node.y ?? 0;
+      context.beginPath();
+      context.moveTo(x, y - radius);
+      context.lineTo(x + radius, y);
+      context.lineTo(x, y + radius);
+      context.lineTo(x - radius, y);
+      context.closePath();
+      context.fillStyle = "#8fa98f";
+      context.fill();
+      context.lineWidth = 1.1 / globalScale;
+      context.strokeStyle = "rgba(17,20,16,0.9)";
+      context.stroke();
+      context.restore();
+      return;
+    }
 
     if (node.kind === "person") {
       if (isSelected || isHovered) {
@@ -273,23 +301,20 @@ export function GraphView(props: GraphViewProps) {
     context.restore();
   }
 
-  function linkConnected(link: GraphLink, id: string) {
+  function linkColor(link: GraphLink) {
     const source = typeof link.source === "string" ? link.source : link.source.id;
     const target = typeof link.target === "string" ? link.target : link.target.id;
-    return source === id || target === id;
-  }
-
-  function linkColor(link: GraphLink) {
-    const id = activeId();
-    const dim = id && !linkConnected(link, id);
-    const alpha = dim ? 0.08 : 1;
+    const set = active();
+    const activeLink = !set || (set.has(source) && set.has(target));
     const base =
       link.kind === "partner"
         ? colors.partner
         : link.kind === "media"
           ? colors.media
-          : colors.edge;
-    return withAlpha(base, alpha);
+          : link.kind === "union"
+            ? "#7f8d75"
+            : colors.edge;
+    return withAlpha(base, activeLink ? 1 : 0.08);
   }
 
   function focusNode(id: string) {
@@ -321,13 +346,25 @@ export function GraphView(props: GraphViewProps) {
     const linkForce = graph.d3Force("link") as any;
     if (linkForce) {
       linkForce.distance((link: GraphLink) =>
-        link.kind === "partner" ? 165 : link.kind === "media" ? 65 : 220,
+        link.kind === "partner"
+          ? 165
+          : link.kind === "media"
+            ? 65
+            : link.kind === "union"
+              ? 55
+              : link.viaUnion
+                ? 105
+                : 210,
       );
-      linkForce.strength(0.82);
+      linkForce.strength((link: GraphLink) =>
+        link.kind === "union" ? 1 : link.viaUnion ? 0.9 : 0.82,
+      );
     }
     const charge = graph.d3Force("charge") as any;
     if (charge) {
-      charge.strength(-800);
+      charge.strength((node: GraphNode) =>
+        node.kind === "union" ? -60 : node.kind === "file" ? -140 : -600,
+      );
       charge.distanceMax(2400);
     }
     if (mode === "generations") {
@@ -344,9 +381,12 @@ export function GraphView(props: GraphViewProps) {
       graph.d3Force("column", null);
     }
     graph.d3Force("partnerRow", partnerRowForce());
+    graph.d3Force("unionPosition", unionPositionForce());
     graph.d3Force(
       "collide",
-      (forceCollide as any)((node: GraphNode) => nodeRadius(node) + 28).strength(1),
+      (forceCollide as any)((node: GraphNode) =>
+        nodeRadius(node) + (node.kind === "union" ? 18 : 28),
+      ).strength(1),
     );
   }
 
@@ -373,6 +413,31 @@ export function GraphView(props: GraphViewProps) {
         const targetY = ((a.y ?? 0) + (b.y ?? 0)) / 2;
         a.vy = (a.vy ?? 0) + (targetY - (a.y ?? 0)) * 0.9 * alpha;
         b.vy = (b.vy ?? 0) + (targetY - (b.y ?? 0)) * 0.9 * alpha;
+      }
+    };
+    (force as any).initialize = (next: GraphNode[]) => {
+      nodes = next;
+    };
+    return force;
+  }
+
+  function unionPositionForce() {
+    let nodes: GraphNode[] = [];
+    const force = (alpha: number) => {
+      const byId = new Map(nodes.map(node => [node.id, node]));
+      for (const node of nodes) {
+        if (node.kind !== "union" || !node.parentIds?.length) continue;
+        const parents = node.parentIds
+          .map(id => byId.get(id))
+          .filter((parent): parent is GraphNode => Boolean(parent));
+        if (!parents.length) continue;
+        const targetX =
+          parents.reduce((sum, parent) => sum + (parent.x ?? 0), 0) / parents.length;
+        const targetY =
+          parents.reduce((sum, parent) => sum + (parent.y ?? 0), 0) / parents.length +
+          (props.generationDirection === "oldest-top" ? 95 : -95);
+        node.vx = (node.vx ?? 0) + (targetX - (node.x ?? 0)) * 0.9 * alpha;
+        node.vy = (node.vy ?? 0) + (targetY - (node.y ?? 0)) * 0.9 * alpha;
       }
     };
     (force as any).initialize = (next: GraphNode[]) => {
@@ -415,7 +480,9 @@ export function GraphView(props: GraphViewProps) {
       .nodeCanvasObject(drawNode)
       .nodeLabel("")
       .linkColor(linkColor)
-      .linkWidth((link: GraphLink) => (link.kind === "media" ? 0.8 : 1.25))
+      .linkWidth((link: GraphLink) =>
+        link.kind === "media" ? 0.8 : link.kind === "union" ? 0.9 : 1.25,
+      )
       .linkLineDash((link: GraphLink) =>
         link.kind === "partner" ? [4, 5] : link.kind === "media" ? [2, 5] : link.parentType && link.parentType !== "biological" ? [6, 5] : null,
       )

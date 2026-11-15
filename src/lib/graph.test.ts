@@ -159,4 +159,44 @@ describe("buildGraphModel", () => {
     expect(model.nodes.map(node => node.id)).toEqual(["a", "b"]);
     expect(model.links.some(link => link.kind === "media")).toBe(false);
   });
+
+  it("keeps single-parent links direct", () => {
+    const model = buildGraphModel(data, false, "oldest-top");
+    expect(model.nodes.some(node => node.kind === "union")).toBe(false);
+    expect(model.links.filter(link => link.kind === "parent")).toHaveLength(1);
+    expect(model.links.find(link => link.kind === "parent")?.viaUnion).toBeUndefined();
+  });
+
+  it("shares one junction for siblings with the same two parents", () => {
+    const familyPeople = [person("a"), person("b"), person("c"), person("d")];
+    const familyRelationships = [
+      partner("p1", "a", "b"),
+      parent("r1", "a", "c"),
+      parent("r2", "b", "c"),
+      parent("r3", "a", "d"),
+      parent("r4", "b", "d"),
+    ];
+    const model = buildGraphModel(
+      {
+        tree: { id: "family", name: "Family", description: null },
+        role: "owner",
+        people: familyPeople,
+        relationships: familyRelationships,
+        files: [],
+      },
+      false,
+      "oldest-top",
+    );
+
+    const unions = model.nodes.filter(node => node.kind === "union");
+    expect(unions).toHaveLength(1);
+    expect(unions[0].memberIds?.sort()).toEqual(["a", "b", "c", "d"]);
+    expect(model.links.filter(link => link.kind === "union")).toHaveLength(2);
+    expect(
+      model.links.filter(link => link.kind === "parent" && link.viaUnion),
+    ).toHaveLength(2);
+    expect(
+      model.links.filter(link => link.kind === "parent" && !link.viaUnion),
+    ).toHaveLength(0);
+  });
 });

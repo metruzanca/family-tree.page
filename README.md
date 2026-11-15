@@ -23,6 +23,7 @@ The graph is the main view. People are nodes, parent and partner relationships a
 - Generation-aware force graph with a freeform layout toggle
 - Static generation bands: parents and children stay in ordered rows, with no node dragging
 - Partners are aligned on the same row and placed side by side
+- Parent pairs join at one small junction before branching to their children, so each child gets one parent-line arrow
 - Direction flip for oldest-at-top or oldest-at-bottom layouts
 - Search, neighbor highlighting, zoom and pan
 - Pointer cursor only over nodes, not links or empty canvas
