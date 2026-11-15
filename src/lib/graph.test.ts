@@ -4,6 +4,7 @@ import {
   clampToGenerationBand,
   computeGenerations,
   generationRowY,
+  partnerGroups,
 } from "./graph";
 import type { GraphPerson, GraphRelationship, TreeGraph } from "../api/people-server";
 
@@ -87,6 +88,24 @@ describe("generation bands", () => {
     expect(clampToGenerationBand(row + 20, level, "oldest-top")).toBe(row + 20);
     expect(clampToGenerationBand(row + 200, level, "oldest-top")).toBe(row + 58);
     expect(clampToGenerationBand(row - 200, level, "oldest-top")).toBe(row - 58);
+  });
+});
+
+describe("partnerGroups", () => {
+  it("groups direct and chained partners so their rows can be aligned", () => {
+    const groups = partnerGroups([
+      partner("p1", "a", "b"),
+      partner("p2", "b", "c"),
+      partner("p3", "d", "e"),
+      parent("c1", "a", "f"),
+    ]);
+    expect(groups).toHaveLength(2);
+    expect(groups.map(group => group.sort())).toEqual(
+      expect.arrayContaining([
+        ["a", "b", "c"],
+        ["d", "e"],
+      ]),
+    );
   });
 });
 

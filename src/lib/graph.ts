@@ -177,6 +177,41 @@ export function clampToGenerationBand(
   return Math.max(row - halfBand, Math.min(row + halfBand, y));
 }
 
+export function partnerGroups(relationships: GraphRelationship[]): string[][] {
+  const parent = new Map<string, string>();
+  const find = (id: string): string => {
+    const current = parent.get(id) ?? id;
+    if (current === id) {
+      parent.set(id, id);
+      return id;
+    }
+    const root = find(current);
+    parent.set(id, root);
+    return root;
+  };
+  const union = (a: string, b: string) => {
+    const rootA = find(a);
+    const rootB = find(b);
+    if (rootA !== rootB) parent.set(rootA, rootB);
+  };
+
+  for (const relationship of relationships) {
+    if (relationship.type !== "partner") continue;
+    parent.set(relationship.source, parent.get(relationship.source) ?? relationship.source);
+    parent.set(relationship.target, parent.get(relationship.target) ?? relationship.target);
+    union(relationship.source, relationship.target);
+  }
+
+  const groups = new Map<string, string[]>();
+  for (const id of parent.keys()) {
+    const root = find(id);
+    const list = groups.get(root) ?? [];
+    list.push(id);
+    groups.set(root, list);
+  }
+  return [...groups.values()].filter(group => group.length > 1);
+}
+
 export function initialSpot(
   id: string,
   level: number,

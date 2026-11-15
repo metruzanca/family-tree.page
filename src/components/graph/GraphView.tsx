@@ -10,6 +10,7 @@ import {
   initialsOf,
   neighborsOf,
   nodeRadius,
+  partnerGroups,
   type GenerationDirection,
   type GraphLink,
   type GraphModel,
@@ -309,6 +310,7 @@ export function GraphView(props: GraphViewProps) {
       nodes: fresh.nodes,
       links: fresh.links,
     });
+    snapPartnerRows();
     needsFit = true;
     setTimeout(() => graph?.zoomToFit(0, 110), 80);
   }
@@ -319,14 +321,14 @@ export function GraphView(props: GraphViewProps) {
     const linkForce = graph.d3Force("link") as any;
     if (linkForce) {
       linkForce.distance((link: GraphLink) =>
-        link.kind === "partner" ? 105 : link.kind === "media" ? 58 : 150,
+        link.kind === "partner" ? 165 : link.kind === "media" ? 65 : 220,
       );
-      linkForce.strength(0.78);
+      linkForce.strength(0.82);
     }
     const charge = graph.d3Force("charge") as any;
     if (charge) {
-      charge.strength(-280);
-      charge.distanceMax(1600);
+      charge.strength(-800);
+      charge.distanceMax(2400);
     }
     if (mode === "generations") {
       graph.d3Force(
@@ -341,9 +343,10 @@ export function GraphView(props: GraphViewProps) {
       graph.d3Force("generation", null);
       graph.d3Force("column", null);
     }
+    graph.d3Force("partnerRow", partnerRowForce());
     graph.d3Force(
       "collide",
-      (forceCollide as any)((node: GraphNode) => nodeRadius(node) + 12).strength(0.95),
+      (forceCollide as any)((node: GraphNode) => nodeRadius(node) + 28).strength(1),
     );
   }
 
@@ -352,7 +355,52 @@ export function GraphView(props: GraphViewProps) {
     graph.warmupTicks(300);
     const data = graph.graphData();
     graph.graphData({ nodes: [...data.nodes], links: [...data.links] });
+    snapPartnerRows();
     fit();
+  }
+
+  function partnerRowForce() {
+    let nodes: GraphNode[] = [];
+    const force = (alpha: number) => {
+      const byId = new Map(nodes.map(node => [node.id, node]));
+      for (const link of model.links) {
+        if (link.kind !== "partner") continue;
+        const a =
+          typeof link.source === "string" ? byId.get(link.source) : (link.source as GraphNode);
+        const b =
+          typeof link.target === "string" ? byId.get(link.target) : (link.target as GraphNode);
+        if (!a || !b) continue;
+        const targetY = ((a.y ?? 0) + (b.y ?? 0)) / 2;
+        a.vy = (a.vy ?? 0) + (targetY - (a.y ?? 0)) * 0.9 * alpha;
+        b.vy = (b.vy ?? 0) + (targetY - (b.y ?? 0)) * 0.9 * alpha;
+      }
+    };
+    (force as any).initialize = (next: GraphNode[]) => {
+      nodes = next;
+    };
+    return force;
+  }
+
+  function snapPartnerRows() {
+    if (!graph) return;
+    const groups = partnerGroups(props.data.relationships);
+    if (!groups.length) return;
+    const nodes = new Map(
+      (graph.graphData().nodes as GraphNode[]).map(node => [node.id, node]),
+    );
+    for (const group of groups) {
+      const members = group
+        .map(id => nodes.get(id))
+        .filter((node): node is GraphNode => Boolean(node));
+      if (members.length < 2) continue;
+      const targetY =
+        members.reduce((sum, node) => sum + (node.y ?? 0), 0) / members.length;
+      for (const node of members) {
+        node.y = targetY;
+        node.vy = 0;
+      }
+    }
+    graph.nodeCanvasObject(drawNode);
   }
 
   onMount(async () => {
@@ -378,6 +426,7 @@ export function GraphView(props: GraphViewProps) {
       )
       .onEngineStop(() => {
         if (import.meta.env.DEV) (window as any).__rootsStoppedAt = Date.now();
+        snapPartnerRows();
         updateHoverAt(pointer.x, pointer.y);
         if (needsFit) {
           needsFit = false;
@@ -395,6 +444,7 @@ export function GraphView(props: GraphViewProps) {
 
     applyLayout(props.layout);
     graph.graphData({ nodes: model.nodes, links: model.links });
+    snapPartnerRows();
     if (import.meta.env.DEV) {
       (window as any).__rootsGraph = graph;
       (window as any).__rootsNodes = () =>
@@ -553,6 +603,7 @@ export function GraphView(props: GraphViewProps) {
     }
     model = next;
     graph.graphData({ nodes: next.nodes, links: next.links });
+    snapPartnerRows();
   });
 
   createEffect(() => {
