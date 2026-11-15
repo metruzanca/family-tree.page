@@ -1,6 +1,14 @@
 import { Show, type JSX } from "solid-js";
-import { Button } from "../ui/Button";
-import { Modal } from "../ui/Modal";
+import { Button } from "./button";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogPortal,
+  AlertDialogTitle,
+} from "./alert-dialog";
 
 export function ConfirmDialog(props: {
   open: boolean;
@@ -13,29 +21,39 @@ export function ConfirmDialog(props: {
   onConfirm: () => void;
 }) {
   return (
-    <Modal
+    <AlertDialog
       open={props.open}
-      onClose={props.onClose}
-      title={props.title}
-      footer={
-        <>
-          <Button variant="ghost" type="button" onClick={props.onClose}>
-            Cancel
-          </Button>
-          <Button
-            variant={props.danger ? "danger" : "primary"}
-            type="button"
-            disabled={props.pending}
-            onClick={props.onConfirm}
-          >
-            {props.pending ? "Working…" : props.confirmLabel ?? "Confirm"}
-          </Button>
-        </>
-      }
+      onOpenChange={open => {
+        if (!open) props.onClose();
+      }}
     >
-      <Show when={props.message}>
-        <div class="text-sm leading-relaxed text-muted">{props.message}</div>
-      </Show>
-    </Modal>
+      <AlertDialogPortal>
+        <AlertDialogContent class="gap-5 rounded-[1.35rem] border-border bg-card shadow-[var(--shadow-soft)]">
+          <AlertDialogHeader class="gap-2">
+            <AlertDialogTitle class="font-display text-xl leading-tight tracking-tight">
+              {props.title}
+            </AlertDialogTitle>
+            <Show when={props.message}>
+              <AlertDialogDescription as="div" class="text-sm leading-relaxed text-muted-foreground">
+                {props.message}
+              </AlertDialogDescription>
+            </Show>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <Button variant="ghost" type="button" onClick={props.onClose}>
+              Cancel
+            </Button>
+            <Button
+              variant={props.danger ? "destructive" : "default"}
+              type="button"
+              disabled={props.pending}
+              onClick={props.onConfirm}
+            >
+              {props.pending ? "Working…" : (props.confirmLabel ?? "Confirm")}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialogPortal>
+    </AlertDialog>
   );
 }

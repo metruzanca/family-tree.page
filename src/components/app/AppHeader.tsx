@@ -1,9 +1,18 @@
-import { A } from "@solidjs/router";
+import { A, useNavigate } from "@solidjs/router";
 import { Show, type JSX } from "solid-js";
 import { LogOut, Moon, Settings, Sun } from "lucide-solid";
 import type { PublicUser } from "~/server/auth-service";
 import { logout } from "~/api";
 import { Avatar } from "../ui/Avatar";
+import { buttonVariants } from "../ui/button";
+import { IconButton } from "../ui/icon-button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
 import { useTheme } from "../ui/Theme";
 
 export function BrandMark(props: { compact?: boolean }) {
@@ -31,19 +40,24 @@ export function AppHeader(props: {
   center?: JSX.Element;
 }) {
   const { theme, toggle } = useTheme();
+  const navigate = useNavigate();
+  let signOutForm: HTMLFormElement | undefined;
+
   return (
-    <header class="sticky top-0 z-30 border-b border-line/80 bg-paper/85 backdrop-blur-xl">
+    <header class="sticky top-0 z-30 border-b border-border/80 bg-background/85 backdrop-blur-xl">
       <div class="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4 sm:px-6">
         <Show when={props.back} fallback={<BrandMark compact />}>
           <A
             href={props.back!.href}
-            class="btn btn-ghost btn-sm -ml-2 gap-1.5 text-muted hover:text-ink"
+            class={buttonVariants({ variant: "ghost", size: "sm", class: "-ml-2 gap-1.5" })}
           >
             <span aria-hidden="true">←</span>
             <span class="hidden sm:inline">{props.back!.label}</span>
           </A>
-          <span class="hidden h-5 w-px bg-line sm:block" />
-          <span class="hidden text-sm font-semibold sm:inline">{props.center}</span>
+          <Show when={props.center}>
+            <span class="hidden h-5 w-px bg-border sm:block" />
+            <span class="hidden truncate text-sm font-semibold sm:inline">{props.center}</span>
+          </Show>
         </Show>
         <Show when={props.center && props.back}>
           <span class="min-w-0 flex-1 truncate text-sm font-semibold sm:hidden">
@@ -52,44 +66,47 @@ export function AppHeader(props: {
         </Show>
         <div class="ml-auto flex items-center gap-1.5">
           {props.actions}
-          <button
-            type="button"
-            class="btn btn-ghost btn-icon"
-            aria-label="Toggle theme"
+          <IconButton
+            label={theme() === "dark" ? "Switch to light theme" : "Switch to dark theme"}
             onClick={toggle}
           >
-            <Show when={theme() === "dark"} fallback={<Moon size={17} />}>
-              <Sun size={17} />
+            <Show when={theme() === "dark"} fallback={<Moon />}>
+              <Sun />
             </Show>
-          </button>
-          <details class="group relative">
-            <summary class="flex cursor-pointer list-none items-center gap-2 rounded-full p-0.5 hover:bg-moss/10 [&::-webkit-details-marker]:hidden">
+          </IconButton>
+
+          <DropdownMenu placement="bottom-end">
+            <DropdownMenuTrigger
+              class="rounded-full p-0.5 outline-hidden transition hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/35"
+              aria-label="Account menu"
+            >
               <Avatar name={props.user.displayName} size={34} />
-            </summary>
-            <div class="absolute right-0 top-11 w-56 overflow-hidden rounded-2xl border border-line bg-raised p-1.5 shadow-xl">
+            </DropdownMenuTrigger>
+            <DropdownMenuContent class="w-64 rounded-2xl p-1.5">
               <div class="px-3 py-2">
                 <p class="truncate text-sm font-semibold">{props.user.displayName}</p>
-                <p class="truncate text-xs text-muted">{props.user.email}</p>
+                <p class="truncate text-xs text-muted-foreground">{props.user.email}</p>
               </div>
-              <hr class="divider my-1" />
-              <A
-                href="/settings"
-                class="flex items-center gap-2 rounded-xl px-3 py-2 text-sm hover:bg-moss/8"
+              <DropdownMenuSeparator class="my-1" />
+              <DropdownMenuItem
+                class="gap-2 rounded-xl px-3 py-2"
+                onSelect={() => navigate("/settings")}
               >
-                <Settings size={15} />
+                <Settings />
                 Account settings
-              </A>
-              <form action={logout} method="post">
-                <button
-                  type="submit"
-                  class="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-danger hover:bg-danger/10"
-                >
-                  <LogOut size={15} />
-                  Sign out
-                </button>
-              </form>
-            </div>
-          </details>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                variant="destructive"
+                class="gap-2 rounded-xl px-3 py-2"
+                onSelect={() => signOutForm?.requestSubmit()}
+              >
+                <LogOut />
+                Sign out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <form ref={signOutForm} action={logout} method="post" class="hidden" />
         </div>
       </div>
     </header>

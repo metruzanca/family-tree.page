@@ -6,13 +6,38 @@ import type { GraphPerson } from "~/api/people-server";
 import { addRelative } from "~/api/people-server";
 import { getMyTrees, getTreeGraph, getTreeOverview } from "~/api";
 import { Avatar } from "../ui/Avatar";
-import { Button } from "../ui/Button";
+import { Button } from "../ui/button";
 import { Field } from "../ui/Field";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectPortal,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/select";
 import { Modal } from "../ui/Modal";
 import { useToast } from "../ui/Toast";
 import { track } from "~/lib/analytics";
 
 type Relation = "parent" | "partner" | "child";
+
+const parentTypeOptions = [
+  { value: "biological", label: "Biological" },
+  { value: "adoptive", label: "Adoptive" },
+  { value: "foster", label: "Foster" },
+  { value: "step", label: "Step" },
+  { value: "unknown", label: "Unknown" },
+];
+
+const statusOptions = [
+  { value: "partnered", label: "Partners" },
+  { value: "married", label: "Married" },
+  { value: "divorced", label: "Divorced" },
+  { value: "separated", label: "Separated" },
+  { value: "widowed", label: "Widowed" },
+  { value: "unknown", label: "Unknown" },
+];
 
 export function AddRelativeDialog(props: {
   open: boolean;
@@ -151,50 +176,65 @@ export function AddRelativeDialog(props: {
 
         <Show when={relation() !== "partner"}>
           <Field label="Relationship type" for="parent-type">
-            <select
-              id="parent-type"
-              class="input"
-              value={parentType()}
-              onChange={event => setParentType(event.currentTarget.value)}
+            <Select
+              options={parentTypeOptions}
+              optionValue="value"
+              optionTextValue="label"
+              value={parentTypeOptions.find(option => option.value === parentType())}
+              onChange={option => option && setParentType(option.value)}
+              itemComponent={itemProps => (
+                <SelectItem item={itemProps.item}>{itemProps.item.rawValue.label}</SelectItem>
+              )}
             >
-              <option value="biological">Biological</option>
-              <option value="adoptive">Adoptive</option>
-              <option value="foster">Foster</option>
-              <option value="step">Step</option>
-              <option value="unknown">Unknown</option>
-            </select>
+              <SelectTrigger id="parent-type" class="w-full" aria-label="Relationship type">
+                <SelectValue<{ value: string; label: string }>>
+                  {state => state.selectedOption().label}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectPortal>
+                <SelectContent />
+              </SelectPortal>
+            </Select>
           </Field>
         </Show>
 
         <Show when={relation() === "partner"}>
           <Field label="Partnership" for="partner-status">
-            <select
-              id="partner-status"
-              class="input"
-              value={status()}
-              onChange={event => setStatus(event.currentTarget.value)}
+            <Select
+              options={statusOptions}
+              optionValue="value"
+              optionTextValue="label"
+              value={statusOptions.find(option => option.value === status())}
+              onChange={option => option && setStatus(option.value)}
+              itemComponent={itemProps => (
+                <SelectItem item={itemProps.item}>{itemProps.item.rawValue.label}</SelectItem>
+              )}
             >
-              <option value="partnered">Partners</option>
-              <option value="married">Married</option>
-              <option value="divorced">Divorced</option>
-              <option value="separated">Separated</option>
-              <option value="widowed">Widowed</option>
-              <option value="unknown">Unknown</option>
-            </select>
+              <SelectTrigger id="partner-status" class="w-full" aria-label="Partnership">
+                <SelectValue<{ value: string; label: string }>>
+                  {state => state.selectedOption().label}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectPortal>
+                <SelectContent />
+              </SelectPortal>
+            </Select>
           </Field>
         </Show>
 
-        <div class="flex gap-1 rounded-full border border-line bg-paper p-1 text-sm">
+        <div class="flex gap-1 rounded-full border border-border bg-muted/70 p-1 text-sm">
           <button
             type="button"
-            class={`flex-1 rounded-full px-3 py-1.5 font-semibold transition ${mode() === "existing" ? "bg-raised text-ink shadow-sm" : "text-muted"}`}
+            aria-pressed={mode() === "existing"}
+            class={`flex-1 rounded-full px-3 py-1.5 font-semibold transition ${mode() === "existing" ? "border border-border/70 bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"}`}
             onClick={() => setMode("existing")}
           >
             Existing person
           </button>
           <button
             type="button"
-            class={`flex-1 rounded-full px-3 py-1.5 font-semibold transition ${mode() === "new" ? "bg-raised text-ink shadow-sm" : "text-muted"}`}
+            aria-pressed={mode() === "new"}
+            class={`flex-1 rounded-full px-3 py-1.5 font-semibold transition ${mode() === "new" ? "border border-border/70 bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"}`}
             onClick={() => setMode("new")}
           >
             New person
@@ -204,7 +244,7 @@ export function AddRelativeDialog(props: {
         <Show when={mode() === "existing"}>
           <div class="space-y-2">
             <label class="relative block">
-              <Search size={15} class="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+              <Search size={15} class="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <input
                 class="input pl-9"
                 placeholder="Search people already in this tree"
@@ -212,11 +252,11 @@ export function AddRelativeDialog(props: {
                 onInput={event => setSearch(event.currentTarget.value)}
               />
             </label>
-            <div class="scroll-thin max-h-52 space-y-1 overflow-y-auto rounded-2xl border border-line p-1.5">
+            <div class="scroll-thin max-h-52 space-y-1 overflow-y-auto rounded-2xl border border-border p-1.5">
               <Show
                 when={options().length}
                 fallback={
-                  <p class="px-3 py-8 text-center text-xs leading-relaxed text-muted">
+                  <p class="px-3 py-8 text-center text-xs leading-relaxed text-muted-foreground">
                     {props.people.length <= 1
                       ? "There is nobody else in this tree yet. Switch to New person."
                       : "No matching people."}
@@ -228,7 +268,7 @@ export function AddRelativeDialog(props: {
                     <button
                       type="button"
                       class={`flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left transition ${
-                        selectedId() === person.id ? "bg-moss-soft" : "hover:bg-moss/5"
+                        selectedId() === person.id ? "bg-accent" : "hover:bg-primary/5"
                       }`}
                       onClick={() => setSelectedId(person.id)}
                     >
@@ -236,7 +276,7 @@ export function AddRelativeDialog(props: {
                       <span class="min-w-0 flex-1">
                         <span class="block truncate text-sm font-medium">{person.displayName}</span>
                         <Show when={person.birthDate}>
-                          <span class="block text-[0.7rem] text-muted">
+                          <span class="block text-[0.7rem] text-muted-foreground">
                             Born {person.birthDate!.slice(0, 4)}
                           </span>
                         </Show>
@@ -290,7 +330,7 @@ export function AddRelativeDialog(props: {
         </Show>
 
         <Show when={error()}>
-          <p class="rounded-xl border border-danger/25 bg-danger/10 px-3 py-2 text-sm text-danger" role="alert">
+          <p class="rounded-xl border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
             {error()}
           </p>
         </Show>
@@ -311,12 +351,12 @@ function RelationChoice(props: {
       type="button"
       class={`flex flex-col items-center gap-1 rounded-2xl border px-2 py-3 text-center transition ${
         props.active
-          ? "border-moss bg-moss-soft text-ink"
-          : "border-line bg-paper text-muted hover:border-moss/30 hover:text-ink"
+          ? "border-primary bg-accent text-foreground"
+          : "border-border bg-background text-muted-foreground hover:border-primary/30 hover:text-foreground"
       }`}
       onClick={props.onClick}
     >
-      <span class={props.active ? "text-moss" : ""}>{props.icon}</span>
+      <span class={props.active ? "text-primary" : ""}>{props.icon}</span>
       <span class="text-sm font-semibold">{props.label}</span>
       <span class="text-[0.62rem] leading-tight">{props.hint}</span>
     </button>

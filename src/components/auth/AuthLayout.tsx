@@ -2,6 +2,7 @@ import { A } from "@solidjs/router";
 import { Show, type JSX } from "solid-js";
 import { Moon, Sun } from "lucide-solid";
 import { useTheme } from "../ui/Theme";
+import { IconButton } from "../ui/icon-button";
 
 export function AuthLayout(props: {
   title: string;
@@ -59,31 +60,29 @@ export function AuthLayout(props: {
             </span>
             <span class="font-display text-xl">Roots</span>
           </A>
-          <button
-            type="button"
-            class="btn btn-ghost btn-icon"
-            aria-label="Toggle theme"
+          <IconButton
+            label={theme() === "dark" ? "Switch to light theme" : "Switch to dark theme"}
             onClick={toggle}
           >
             <Show when={theme() === "dark"} fallback={<Moon size={18} />}>
               <Sun size={18} />
             </Show>
-          </button>
+          </IconButton>
         </div>
 
         <div class="mx-auto flex w-full max-w-md flex-1 flex-col justify-center py-10">
           <Show when={props.notice}>
-            <div class="mb-5 rounded-2xl border border-line bg-moss-soft px-4 py-3 text-sm text-ink">
+            <div class="mb-5 rounded-2xl border border-border bg-accent px-4 py-3 text-sm text-foreground">
               {props.notice}
             </div>
           </Show>
           <h1 class="font-display text-3xl tracking-tight sm:text-4xl">{props.title}</h1>
-          <p class="mt-2 text-sm leading-relaxed text-muted">{props.subtitle}</p>
+          <p class="mt-2 text-sm leading-relaxed text-muted-foreground">{props.subtitle}</p>
           <div class="mt-8">{props.children}</div>
-          <div class="mt-6 text-sm text-muted">{props.footer}</div>
+          <div class="mt-6 text-sm text-muted-foreground">{props.footer}</div>
         </div>
 
-        <p class="text-center text-[0.7rem] text-muted">
+        <p class="text-center text-[0.7rem] text-muted-foreground">
           Your family data stays private to the people you invite.
         </p>
       </section>

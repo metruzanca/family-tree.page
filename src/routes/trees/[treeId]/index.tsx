@@ -25,7 +25,7 @@ import { AddRelativeDialog } from "~/components/people/AddRelativeDialog";
 import { FilePanel } from "~/components/files/FilePanel";
 import { MediaLightbox } from "~/components/files/MediaLightbox";
 import { ConfirmDialog } from "~/components/ui/ConfirmDialog";
-import { Button } from "~/components/ui/Button";
+import { Button } from "~/components/ui/button";
 import { useToast } from "~/components/ui/Toast";
 import { uploadPersonFile } from "~/lib/upload";
 import { mimeForFile } from "~/lib/image-thumb";
@@ -135,6 +135,9 @@ function TreePageInner() {
         setSearchOpen(true);
       }
       if (event.key === "f") handle()?.fit();
+      if (event.key === "+" || event.key === "=") handle()?.zoomBy(1.25);
+      if (event.key === "-" || event.key === "_") handle()?.zoomBy(0.8);
+      if (event.key === "Escape") setSearchOpen(false);
     };
     window.addEventListener("keydown", listener);
     onCleanup(() => window.removeEventListener("keydown", listener));
@@ -606,10 +609,23 @@ function TreePageInner() {
 
 function GraphLoading() {
   return (
-    <div class="graph-shell grid place-items-center">
-      <div class="flex items-center gap-3 rounded-full border border-white/10 bg-black/30 px-4 py-2 text-xs text-white/60 backdrop-blur">
-        <span class="h-2 w-2 animate-pulse rounded-full bg-gold" />
-        Finding the branches…
+    <div class="graph-shell relative">
+      <div class="pointer-events-none absolute inset-x-0 top-0 z-20 p-3 sm:p-4">
+        <div class="flex items-center gap-2">
+          <div class="h-10 w-24 animate-pulse rounded-full border border-white/10 bg-black/35 backdrop-blur" />
+          <div class="h-10 w-52 animate-pulse rounded-full border border-white/10 bg-black/35 backdrop-blur" />
+          <div class="ml-auto flex items-center gap-1.5">
+            <div class="size-10 animate-pulse rounded-full border border-white/10 bg-black/35 backdrop-blur" />
+            <div class="h-10 w-32 animate-pulse rounded-full border border-white/10 bg-black/35 backdrop-blur" />
+            <div class="hidden size-10 animate-pulse rounded-full border border-white/10 bg-black/35 backdrop-blur sm:block" />
+          </div>
+        </div>
+      </div>
+      <div class="grid h-full place-items-center">
+        <div class="flex items-center gap-3 rounded-full border border-white/10 bg-black/30 px-4 py-2 text-xs text-white/60 backdrop-blur">
+          <span class="size-2 animate-pulse rounded-full bg-gold" />
+          Finding the branches…
+        </div>
       </div>
     </div>
   );

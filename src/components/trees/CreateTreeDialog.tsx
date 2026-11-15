@@ -2,7 +2,7 @@ import { createSignal } from "solid-js";
 import { revalidate, useNavigate } from "@solidjs/router";
 import { createTree } from "~/api/trees-server";
 import { getMyTrees } from "~/api";
-import { Button } from "../ui/Button";
+import { Button } from "../ui/button";
 import { Field } from "../ui/Field";
 import { Modal } from "../ui/Modal";
 import { useToast } from "../ui/Toast";
@@ -78,7 +78,7 @@ export function CreateTreeDialog(props: {
           />
         </Field>
         {error() && (
-          <p class="rounded-xl border border-danger/25 bg-danger/10 px-3 py-2 text-sm text-danger" role="alert">
+          <p class="rounded-xl border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
             {error()}
           </p>
         )}

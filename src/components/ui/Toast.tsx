@@ -33,7 +33,7 @@ export function ToastProvider(props: { children: JSX.Element }) {
   function show(message: string, tone: ToastTone = "info") {
     const id = Date.now() + Math.random();
     setItems(current => [...current, { id, message, tone }]);
-    const timer = setTimeout(() => dismiss(id), 4200);
+    const timer = setTimeout(() => dismiss(id), 4600);
     timers.set(id, timer);
   }
 
@@ -41,20 +41,39 @@ export function ToastProvider(props: { children: JSX.Element }) {
     <ToastContext.Provider value={{ show }}>
       {props.children}
       <Portal>
-        <div class="pointer-events-none fixed inset-x-0 bottom-4 z-[80] flex flex-col items-center gap-2 px-4 sm:bottom-6">
+        <div
+          class="pointer-events-none fixed inset-x-0 bottom-4 z-[80] flex flex-col items-center gap-2 px-4 sm:bottom-6"
+          role="status"
+          aria-live="polite"
+        >
           <For each={items()}>
             {item => (
-              <div class="pointer-events-auto flex w-full max-w-md items-start gap-3 rounded-2xl border border-line bg-raised px-4 py-3 text-sm text-ink shadow-lg">
-                <span class="mt-0.5">
-                  <Show when={item.tone === "success"} fallback={<Show when={item.tone === "error"} fallback={<Info size={17} />}><CircleAlert size={17} /></Show>}>
+              <div class="animate-in fade-in-0 slide-in-from-bottom-2 pointer-events-auto flex w-full max-w-md items-start gap-3 rounded-2xl border border-border bg-card px-4 py-3 text-sm text-foreground shadow-[var(--shadow-soft)]">
+                <span
+                  class={`mt-0.5 shrink-0 ${
+                    item.tone === "success"
+                      ? "text-success"
+                      : item.tone === "error"
+                        ? "text-destructive"
+                        : "text-muted-foreground"
+                  }`}
+                >
+                  <Show
+                    when={item.tone === "success"}
+                    fallback={
+                      <Show when={item.tone === "error"} fallback={<Info size={17} />}>
+                        <CircleAlert size={17} />
+                      </Show>
+                    }
+                  >
                     <CheckCircle2 size={17} />
                   </Show>
                 </span>
                 <span class="flex-1 leading-snug">{item.message}</span>
                 <button
                   type="button"
-                  class="text-muted hover:text-ink"
-                  aria-label="Dismiss"
+                  class="rounded-full p-0.5 text-muted-foreground transition hover:bg-accent hover:text-foreground"
+                  aria-label="Dismiss notification"
                   onClick={() => dismiss(item.id)}
                 >
                   <X size={15} />

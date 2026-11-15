@@ -40,7 +40,7 @@ export function Avatar(props: AvatarProps) {
   const colors = createMemo(() => palette[hash(props.name) % palette.length]);
   return (
     <span
-      class={`relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full ${props.ring ? "ring-2 ring-raised" : ""} ${props.class ?? ""}`}
+      class={`relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full ${props.ring ? "ring-2 ring-card" : ""} ${props.class ?? ""}`}
       style={{
         width: `${size()}px`,
         height: `${size()}px`,

@@ -1,15 +1,6 @@
 import { For, Show, createEffect, createMemo, createSignal } from "solid-js";
 import { createAsync, useNavigate, useParams, revalidate } from "@solidjs/router";
-import {
-  Copy,
-  Link2,
-  LogOut,
-  Plus,
-  Settings,
-  Shield,
-  Trash2,
-  Users,
-} from "lucide-solid";
+import { Copy, Link2, LogOut, Plus, Settings, Shield, Trash2, Users } from "lucide-solid";
 import {
   createInvite,
   deleteTree,
@@ -22,17 +13,54 @@ import {
   updateMemberRole,
   updateTree,
 } from "~/api/trees-server";
-import { getMyTrees, getTreeGraph, getTreeMembers as membersQuery, getTreeOverview as overviewQuery, getTreeInvites as invitesQuery, requireUserPage } from "~/api";
+import {
+  getMyTrees,
+  getTreeGraph,
+  getTreeMembers as membersQuery,
+  getTreeOverview as overviewQuery,
+  getTreeInvites as invitesQuery,
+  requireUserPage,
+} from "~/api";
 import type { TreeRole } from "~/server/guards";
 import { AppHeader } from "~/components/app/AppHeader";
 import { Avatar } from "~/components/ui/Avatar";
-import { Button, IconButton } from "~/components/ui/Button";
+import { Badge } from "~/components/ui/badge";
+import { Button } from "~/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { ConfirmDialog } from "~/components/ui/ConfirmDialog";
 import { Field } from "~/components/ui/Field";
+import { IconButton } from "~/components/ui/icon-button";
 import { LoadingScreen } from "~/components/ui/Loading";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectPortal,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
+import {
+  Tabs,
+  TabsContent,
+  TabsIndicator,
+  TabsList,
+  TabsTrigger,
+} from "~/components/ui/tabs";
 import { useToast } from "~/components/ui/Toast";
-import { formatDate, formatRelative, roleLabel } from "~/lib/format";
+import { formatRelative, roleLabel } from "~/lib/format";
 import { track } from "~/lib/analytics";
+
+const roleOptions: { value: TreeRole; label: string }[] = [
+  { value: "owner", label: "Owner" },
+  { value: "editor", label: "Editor" },
+  { value: "viewer", label: "Viewer" },
+];
+
+const expiryOptions = [
+  { value: "1", label: "In 1 day" },
+  { value: "7", label: "In 7 days" },
+  { value: "30", label: "In 30 days" },
+];
 
 export const route = {
   preload: ({ params }: { params: { treeId: string } }) => {
@@ -194,212 +222,303 @@ function TreeSettingsInner() {
             center={overview()?.tree.name ?? "Tree settings"}
           />
           <main class="mx-auto max-w-4xl px-4 pb-20 pt-8 sm:px-6">
-            <div class="mb-8 flex items-end justify-between gap-4">
+            <div class="mb-8 flex flex-wrap items-end justify-between gap-4">
               <div>
-                <p class="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-moss">
-                  Tree settings
-                </p>
+                <p class="eyebrow mb-2">Tree settings</p>
                 <h1 class="font-display text-4xl tracking-tight">{overview()?.tree.name}</h1>
-                <p class="mt-2 text-sm text-muted">
-                  {overview()?.peopleCount ?? 0} people · {overview()?.memberCount ?? 0} members ·{" "}
-                  <span class="badge">{roleLabel(overview()?.role ?? "viewer")}</span>
+                <p class="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                  <span>
+                    {overview()?.peopleCount ?? 0} people · {overview()?.memberCount ?? 0} members
+                  </span>
+                  <Badge variant="secondary" class="uppercase tracking-wide">
+                    {roleLabel(overview()?.role ?? "viewer")}
+                  </Badge>
                 </p>
               </div>
             </div>
 
-            <div class="space-y-5">
-              <SettingsCard icon={<Settings size={18} />} title="The tree" description="Name and description shown to everyone in this tree.">
-                <form class="space-y-4" onSubmit={saveTree}>
-                  <Field label="Tree name" for="settings-name">
-                    <input
-                      id="settings-name"
-                      class="input"
-                      value={name()}
-                      onInput={event => setName(event.currentTarget.value)}
-                      disabled={!isOwner()}
-                      maxlength={80}
-                      required
-                    />
-                  </Field>
-                  <Field label="Description" for="settings-description">
-                    <textarea
-                      id="settings-description"
-                      class="input min-h-20"
-                      value={description()}
-                      onInput={event => setDescription(event.currentTarget.value)}
-                      disabled={!isOwner()}
-                      maxlength={500}
-                    />
-                  </Field>
-                  <Show when={isOwner()}>
-                    <Button type="submit" disabled={saving()}>
-                      {saving() ? "Saving…" : "Save changes"}
-                    </Button>
-                  </Show>
-                </form>
-              </SettingsCard>
+            <Tabs defaultValue="tree" class="gap-5">
+              <TabsList class="max-w-full overflow-x-auto">
+                <TabsIndicator />
+                <TabsTrigger value="tree">
+                  <Settings />
+                  Tree
+                </TabsTrigger>
+                <TabsTrigger value="members">
+                  <Users />
+                  Members
+                </TabsTrigger>
+                <Show when={isOwner()}>
+                  <TabsTrigger value="invites">
+                    <Link2 />
+                    Invites
+                  </TabsTrigger>
+                </Show>
+              </TabsList>
 
-              <SettingsCard
-                icon={<Users size={18} />}
-                title="Members"
-                description="Everyone with access to this tree. Editors can add people and files."
-              >
-                <div class="space-y-1">
-                  <For each={members()}>
-                    {member => (
-                      <div class="flex flex-wrap items-center gap-3 rounded-2xl px-2 py-2.5 hover:bg-moss/5">
-                        <Avatar name={member.displayName} size={38} />
-                        <div class="min-w-0 flex-1">
-                          <p class="truncate text-sm font-semibold">
-                            {member.displayName}
-                            <Show when={member.userId === currentUser().id}>
-                              <span class="ml-1.5 text-xs font-normal text-muted">you</span>
-                            </Show>
-                          </p>
-                          <p class="truncate text-xs text-muted">{member.email}</p>
-                        </div>
-                        <Show
-                          when={isOwner() && member.userId !== currentUser().id}
-                          fallback={
-                            <span class="badge">{roleLabel(member.role)}</span>
-                          }
-                        >
-                          <select
-                            class="input !w-auto !py-1.5 text-xs"
-                            value={member.role}
-                            onChange={event => changeRole(member.userId, event.currentTarget.value as TreeRole)}
-                          >
-                            <option value="owner">Owner</option>
-                            <option value="editor">Editor</option>
-                            <option value="viewer">Viewer</option>
-                          </select>
-                          <IconButton
-                            label={`Remove ${member.displayName}`}
-                            class="text-danger"
-                            onClick={() =>
-                              setConfirm({ kind: "remove", userId: member.userId, name: member.displayName })
+              <TabsContent value="tree">
+                <SectionCard
+                  title="The tree"
+                  description="Name and description shown to everyone in this tree."
+                >
+                  <form class="space-y-4" onSubmit={saveTree}>
+                    <Field label="Tree name" for="settings-name">
+                      <input
+                        id="settings-name"
+                        class="input"
+                        value={name()}
+                        onInput={event => setName(event.currentTarget.value)}
+                        disabled={!isOwner()}
+                        maxlength={80}
+                        required
+                      />
+                    </Field>
+                    <Field label="Description" for="settings-description">
+                      <textarea
+                        id="settings-description"
+                        class="input min-h-20"
+                        value={description()}
+                        onInput={event => setDescription(event.currentTarget.value)}
+                        disabled={!isOwner()}
+                        maxlength={500}
+                      />
+                    </Field>
+                    <Show when={isOwner()}>
+                      <Button type="submit" disabled={saving()}>
+                        {saving() ? "Saving…" : "Save changes"}
+                      </Button>
+                    </Show>
+                  </form>
+                </SectionCard>
+              </TabsContent>
+
+              <TabsContent value="members">
+                <SectionCard
+                  title="Members"
+                  description="Everyone with access to this tree. Editors can add people and files."
+                >
+                  <div class="space-y-1">
+                    <For each={members()}>
+                      {member => (
+                        <div class="flex flex-wrap items-center gap-3 rounded-2xl px-2 py-2.5 transition hover:bg-accent/50">
+                          <Avatar name={member.displayName} size={38} />
+                          <div class="min-w-0 flex-1">
+                            <p class="truncate text-sm font-semibold">
+                              {member.displayName}
+                              <Show when={member.userId === currentUser().id}>
+                                <span class="ml-1.5 text-xs font-normal text-muted-foreground">
+                                  you
+                                </span>
+                              </Show>
+                            </p>
+                            <p class="truncate text-xs text-muted-foreground">{member.email}</p>
+                          </div>
+                          <Show
+                            when={isOwner() && member.userId !== currentUser().id}
+                            fallback={
+                              <Badge variant="secondary" class="uppercase tracking-wide">
+                                {roleLabel(member.role)}
+                              </Badge>
                             }
                           >
-                            <Trash2 size={15} />
-                          </IconButton>
-                        </Show>
-                      </div>
-                    )}
-                  </For>
-                </div>
-              </SettingsCard>
+                            <Select
+                              options={roleOptions}
+                              optionValue="value"
+                              optionTextValue="label"
+                              value={roleOptions.find(option => option.value === member.role)}
+                              onChange={option => option && changeRole(member.userId, option.value)}
+                              itemComponent={itemProps => (
+                                <SelectItem item={itemProps.item}>
+                                  {itemProps.item.rawValue.label}
+                                </SelectItem>
+                              )}
+                            >
+                              <SelectTrigger size="sm" class="w-32" aria-label="Member role">
+                                <SelectValue<{ value: TreeRole; label: string }>>
+                                  {state => state.selectedOption().label}
+                                </SelectValue>
+                              </SelectTrigger>
+                              <SelectPortal>
+                                <SelectContent />
+                              </SelectPortal>
+                            </Select>
+                            <IconButton
+                              label={`Remove ${member.displayName}`}
+                              variant="ghost"
+                              size="icon-sm"
+                              class="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                              onClick={() =>
+                                setConfirm({
+                                  kind: "remove",
+                                  userId: member.userId,
+                                  name: member.displayName,
+                                })
+                              }
+                            >
+                              <Trash2 />
+                            </IconButton>
+                          </Show>
+                        </div>
+                      )}
+                    </For>
+                  </div>
+                </SectionCard>
+              </TabsContent>
 
               <Show when={isOwner()}>
-                <SettingsCard
-                  icon={<Link2 size={18} />}
-                  title="Invites"
-                  description="Share a link with someone you trust. Links are single-use and expire."
-                >
-                  <div class="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
-                    <Field label="Role" for="invite-role">
-                      <select
-                        id="invite-role"
-                        class="input"
-                        value={inviteRole()}
-                        onChange={event => setInviteRole(event.currentTarget.value as TreeRole)}
-                      >
-                        <option value="editor">Editor</option>
-                        <option value="viewer">Viewer</option>
-                        <option value="owner">Owner</option>
-                      </select>
-                    </Field>
-                    <Field label="Expires" for="invite-days">
-                      <select
-                        id="invite-days"
-                        class="input"
-                        value={String(inviteDays())}
-                        onChange={event => setInviteDays(Number(event.currentTarget.value))}
-                      >
-                        <option value="1">In 1 day</option>
-                        <option value="7">In 7 days</option>
-                        <option value="30">In 30 days</option>
-                      </select>
-                    </Field>
-                    <Button type="button" onClick={createNewInvite} disabled={creatingInvite()}>
-                      <Plus size={15} />
-                      {creatingInvite() ? "Creating…" : "Create link"}
-                    </Button>
-                  </div>
-
-                  <Show when={randomInvite()}>
-                    {url => (
-                      <div class="mt-4 rounded-2xl border border-moss/25 bg-moss-soft p-3">
-                        <p class="mb-2 text-xs font-semibold text-moss">
-                          Copy this link now. It will not be shown again.
-                        </p>
-                        <div class="flex gap-2">
-                          <input class="input text-xs" readonly value={url()} onFocus={event => event.currentTarget.select()} />
-                          <Button type="button" size="sm" variant="secondary" onClick={() => copyInvite(url())}>
-                            <Copy size={14} />
-                            Copy
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </Show>
-
-                  <div class="mt-5">
-                    <h3 class="label mb-2">Recent invites</h3>
-                    <Show
-                      when={invites()?.length}
-                      fallback={<p class="text-xs text-muted">No invites created yet.</p>}
-                    >
-                      <div class="space-y-1">
-                        <For each={invites()}>
-                          {invite => (
-                            <div class="flex items-center gap-3 rounded-xl px-2 py-2 text-sm hover:bg-moss/5">
-                              <Shield size={15} class="text-muted" />
-                              <div class="min-w-0 flex-1">
-                                <p class="font-medium">{roleLabel(invite.role)} invite</p>
-                                <p class="text-[0.7rem] text-muted">
-                                  {inviteStatus(invite)} · {formatRelative(invite.createdAt)}
-                                </p>
-                              </div>
-                              <Show when={inviteStatus(invite) === "Pending"}>
-                                <button
-                                  type="button"
-                                  class="btn btn-ghost btn-sm text-danger"
-                                  onClick={() => setConfirm({ kind: "revoke", inviteId: invite.id })}
-                                >
-                                  Revoke
-                                </button>
-                              </Show>
-                            </div>
+                <TabsContent value="invites">
+                  <SectionCard
+                    title="Invites"
+                    description="Share a link with someone you trust. Links are single-use and expire."
+                  >
+                    <div class="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+                      <Field label="Role" for="invite-role">
+                        <Select
+                          options={roleOptions}
+                          optionValue="value"
+                          optionTextValue="label"
+                          value={roleOptions.find(option => option.value === inviteRole())}
+                          onChange={option => option && setInviteRole(option.value)}
+                          itemComponent={itemProps => (
+                            <SelectItem item={itemProps.item}>
+                              {itemProps.item.rawValue.label}
+                            </SelectItem>
                           )}
-                        </For>
-                      </div>
-                    </Show>
-                  </div>
-                </SettingsCard>
-              </Show>
+                        >
+                          <SelectTrigger id="invite-role" class="w-full" aria-label="Invite role">
+                            <SelectValue<{ value: TreeRole; label: string }>>
+                              {state => state.selectedOption().label}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectPortal>
+                            <SelectContent />
+                          </SelectPortal>
+                        </Select>
+                      </Field>
+                      <Field label="Expires" for="invite-days">
+                        <Select
+                          options={expiryOptions}
+                          optionValue="value"
+                          optionTextValue="label"
+                          value={expiryOptions.find(
+                            option => option.value === String(inviteDays()),
+                          )}
+                          onChange={option => option && setInviteDays(Number(option.value))}
+                          itemComponent={itemProps => (
+                            <SelectItem item={itemProps.item}>
+                              {itemProps.item.rawValue.label}
+                            </SelectItem>
+                          )}
+                        >
+                          <SelectTrigger id="invite-days" class="w-full" aria-label="Invite expiry">
+                            <SelectValue<{ value: string; label: string }>>
+                              {state => state.selectedOption().label}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectPortal>
+                            <SelectContent />
+                          </SelectPortal>
+                        </Select>
+                      </Field>
+                      <Button type="button" onClick={createNewInvite} disabled={creatingInvite()}>
+                        <Plus />
+                        {creatingInvite() ? "Creating…" : "Create link"}
+                      </Button>
+                    </div>
 
-              <SettingsCard
-                icon={<LogOut size={18} />}
-                title="Leave or delete"
-                description="Leaving removes your access. Deleting removes the whole tree for everyone."
-              >
-                <div class="flex flex-wrap gap-2">
-                  <Button variant="secondary" type="button" onClick={() => setConfirm({ kind: "leave" })}>
-                    <LogOut size={15} />
-                    Leave this tree
+                    <Show when={randomInvite()}>
+                      {url => (
+                        <div class="mt-4 rounded-2xl border border-primary/25 bg-accent p-3">
+                          <p class="mb-2 text-xs font-semibold text-primary">
+                            Copy this link now. It will not be shown again.
+                          </p>
+                          <div class="flex gap-2">
+                            <input
+                              class="input text-xs"
+                              readonly
+                              value={url()}
+                              onFocus={event => event.currentTarget.select()}
+                            />
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => copyInvite(url())}
+                            >
+                              <Copy />
+                              Copy
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </Show>
+
+                    <div class="mt-5">
+                      <h3 class="field-label mb-2">Recent invites</h3>
+                      <Show
+                        when={invites()?.length}
+                        fallback={
+                          <p class="rounded-xl border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
+                            No invites created yet.
+                          </p>
+                        }
+                      >
+                        <div class="space-y-1">
+                          <For each={invites()}>
+                            {invite => (
+                              <div class="flex items-center gap-3 rounded-xl px-2 py-2 text-sm transition hover:bg-accent/50">
+                                <Shield size={15} class="text-muted-foreground" />
+                                <div class="min-w-0 flex-1">
+                                  <p class="font-medium">{roleLabel(invite.role)} invite</p>
+                                  <p class="text-xs text-muted-foreground">
+                                    {inviteStatus(invite)} · {formatRelative(invite.createdAt)}
+                                  </p>
+                                </div>
+                                <Show when={inviteStatus(invite) === "Pending"}>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    class="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                    onClick={() =>
+                                      setConfirm({ kind: "revoke", inviteId: invite.id })
+                                    }
+                                  >
+                                    Revoke
+                                  </Button>
+                                </Show>
+                              </div>
+                            )}
+                          </For>
+                        </div>
+                      </Show>
+                    </div>
+                  </SectionCard>
+                </TabsContent>
+              </Show>
+            </Tabs>
+
+            <SectionCard
+              class="mt-5"
+              title="Leave or delete"
+              description="Leaving removes your access. Deleting removes the whole tree for everyone."
+            >
+              <div class="flex flex-wrap gap-2">
+                <Button variant="secondary" type="button" onClick={() => setConfirm({ kind: "leave" })}>
+                  <LogOut />
+                  Leave this tree
+                </Button>
+                <Show when={isOwner()}>
+                  <Button variant="destructive" type="button" onClick={() => setConfirm({ kind: "delete" })}>
+                    <Trash2 />
+                    Delete tree
                   </Button>
-                  <Show when={isOwner()}>
-                    <Button variant="danger" type="button" onClick={() => setConfirm({ kind: "delete" })}>
-                      <Trash2 size={15} />
-                      Delete tree
-                    </Button>
-                  </Show>
-                </div>
-                <p class="mt-3 text-xs leading-relaxed text-muted">
-                  If you are the only owner, promote another member to owner before leaving.
-                </p>
-              </SettingsCard>
-            </div>
+                </Show>
+              </div>
+              <p class="mt-3 text-xs leading-relaxed text-muted-foreground">
+                If you are the only owner, promote another member to owner before leaving.
+              </p>
+            </SectionCard>
           </main>
 
           <ConfirmDialog
@@ -418,25 +537,20 @@ function TreeSettingsInner() {
   );
 }
 
-function SettingsCard(props: {
-  icon: any;
+function SectionCard(props: {
   title: string;
   description: string;
+  class?: string;
   children: any;
 }) {
   return (
-    <section class="paper-card p-5 sm:p-6">
-      <div class="mb-4 flex items-start gap-3">
-        <span class="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-moss-soft text-moss">
-          {props.icon}
-        </span>
-        <div>
-          <h2 class="font-display text-xl tracking-tight">{props.title}</h2>
-          <p class="mt-0.5 text-xs leading-relaxed text-muted">{props.description}</p>
-        </div>
-      </div>
-      {props.children}
-    </section>
+    <Card class={`gap-4 py-5 sm:py-6 ${props.class ?? ""}`}>
+      <CardHeader class="gap-1 px-5 sm:px-6">
+        <CardTitle class="font-display text-xl tracking-tight">{props.title}</CardTitle>
+        <CardDescription class="text-xs leading-relaxed">{props.description}</CardDescription>
+      </CardHeader>
+      <CardContent class="px-5 sm:px-6">{props.children}</CardContent>
+    </Card>
   );
 }
 

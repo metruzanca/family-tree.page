@@ -21,7 +21,10 @@ import type {
 } from "~/api/people-server";
 import type { TreeRole } from "~/server/guards";
 import { Avatar } from "../ui/Avatar";
-import { Button, IconButton } from "../ui/Button";
+import { Badge } from "../ui/badge";
+import { Button, buttonVariants } from "../ui/button";
+import { IconButton } from "../ui/icon-button";
+import { Progress, ProgressGroup, ProgressLabel, ProgressValueLabel } from "../ui/progress";
 import { FileUploadButton } from "../files/FileUploadButton";
 import { formatYears } from "~/lib/format";
 
@@ -99,7 +102,7 @@ export function PersonPanel(props: PersonPanelProps) {
   return (
     <aside class="mobile-sheet absolute inset-x-0 bottom-0 z-30 flex flex-col sm:inset-x-auto sm:bottom-4 sm:right-4 sm:top-20 sm:max-h-none sm:w-[24rem] sm:rounded-3xl sm:border sm:pb-0">
       <div class="flex items-center justify-between px-4 pb-1 pt-2 sm:hidden">
-        <span class="mx-auto h-1 w-10 rounded-full bg-line" />
+        <span class="mx-auto h-1 w-10 rounded-full bg-border" />
         <IconButton label="Close" onClick={props.onClose} class="!absolute right-2 top-2">
           <X size={17} />
         </IconButton>
@@ -112,13 +115,13 @@ export function PersonPanel(props: PersonPanelProps) {
             {props.person.displayName}
           </h2>
           <Show when={formatYears(props.person.birthDate, props.person.deathDate)}>
-            <p class="mt-1 flex items-center gap-1.5 text-xs text-muted">
+            <p class="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
               <CalendarDays size={12} />
               {formatYears(props.person.birthDate, props.person.deathDate)}
             </p>
           </Show>
           <Show when={props.person.birthPlace || props.person.deathPlace}>
-            <p class="mt-1 flex items-center gap-1.5 truncate text-xs text-muted">
+            <p class="mt-1 flex items-center gap-1.5 truncate text-xs text-muted-foreground">
               <MapPin size={12} />
               {props.person.birthPlace ?? props.person.deathPlace}
             </p>
@@ -131,7 +134,7 @@ export function PersonPanel(props: PersonPanelProps) {
         </div>
       </div>
 
-      <div class="flex items-center gap-2 overflow-x-auto border-y border-line px-5 py-2.5 no-scrollbar">
+      <div class="flex items-center gap-2 overflow-x-auto border-y border-border px-5 py-2.5 no-scrollbar">
         <Show when={editable()}>
           <Button size="sm" variant="secondary" onClick={props.onEdit}>
             <Pencil size={13} />
@@ -145,39 +148,35 @@ export function PersonPanel(props: PersonPanelProps) {
             multiple
             onFiles={props.onUpload}
             disabled={props.uploading}
-            class="btn btn-secondary btn-sm"
+            class={buttonVariants({ variant: "secondary", size: "sm" })}
           >
             <Upload size={13} />
             {props.uploading ? "Uploading…" : "Add files"}
           </FileUploadButton>
         </Show>
         <Show when={editable()}>
-          <IconButton label="Delete person" class="ml-auto text-danger" onClick={props.onDelete}>
+          <IconButton label="Delete person" class="ml-auto text-destructive" onClick={props.onDelete}>
             <Trash2 size={16} />
           </IconButton>
         </Show>
       </div>
 
       <Show when={props.uploading}>
-        <div class="border-b border-line px-5 py-2.5">
-          <div class="mb-1 flex items-center justify-between text-[0.7rem] text-muted">
-            <span>Uploading to this person</span>
-            <span>{Math.round(props.uploadProgress * 100)}%</span>
-          </div>
-          <div class="h-1.5 overflow-hidden rounded-full bg-moss-soft">
-            <div
-              class="h-full rounded-full bg-moss transition-[width]"
-              style={{ width: `${Math.max(4, props.uploadProgress * 100)}%` }}
-            />
-          </div>
+        <div class="border-b border-border px-5 py-2.5">
+          <Progress value={props.uploadProgress * 100} class="gap-1.5">
+            <ProgressGroup class="text-xs text-muted-foreground">
+              <ProgressLabel>Uploading to this person</ProgressLabel>
+              <ProgressValueLabel />
+            </ProgressGroup>
+          </Progress>
         </div>
       </Show>
 
       <div class="scroll-thin min-h-0 flex-1 overflow-y-auto px-5 py-4">
         <Show when={props.person.bio}>
           <section class="mb-5">
-            <h3 class="label">About</h3>
-            <p class="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-ink/90">
+            <h3 class="field-label">About</h3>
+            <p class="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
               {props.person.bio}
             </p>
           </section>
@@ -186,12 +185,14 @@ export function PersonPanel(props: PersonPanelProps) {
         <Show when={props.person.maidenName || props.person.nickname}>
           <section class="mb-5 flex flex-wrap gap-2 text-xs">
             <Show when={props.person.nickname}>
-              <span class="rounded-full bg-moss-soft px-2.5 py-1">“{props.person.nickname}”</span>
+              <Badge variant="secondary" class="px-2.5 py-1 text-xs normal-case">
+                “{props.person.nickname}”
+              </Badge>
             </Show>
             <Show when={props.person.maidenName}>
-              <span class="rounded-full bg-moss-soft px-2.5 py-1">
+              <Badge variant="secondary" class="px-2.5 py-1 text-xs normal-case">
                 Born {props.person.maidenName}
-              </span>
+              </Badge>
             </Show>
           </section>
         </Show>
@@ -228,7 +229,7 @@ export function PersonPanel(props: PersonPanelProps) {
             <button
               type="button"
               onClick={props.onAddRelative}
-              class="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-line py-2 text-xs font-semibold text-muted transition hover:border-moss/40 hover:text-ink"
+              class="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-border py-2 text-xs font-semibold text-muted-foreground transition hover:border-primary/40 hover:text-foreground"
             >
               <Plus size={13} />
               Connect another person
@@ -238,13 +239,13 @@ export function PersonPanel(props: PersonPanelProps) {
 
         <section>
           <div class="flex items-center justify-between">
-            <h3 class="label">Photos and files</h3>
-            <span class="text-[0.7rem] text-muted">{mediaCount()}</span>
+            <h3 class="field-label">Photos and files</h3>
+            <span class="text-[0.7rem] text-muted-foreground">{mediaCount()}</span>
           </div>
           <Show
             when={mediaCount()}
             fallback={
-              <p class="mt-2 rounded-xl border border-dashed border-line px-3 py-5 text-center text-xs leading-relaxed text-muted">
+              <p class="mt-2 rounded-xl border border-dashed border-border px-3 py-5 text-center text-xs leading-relaxed text-muted-foreground">
                 No files yet. Add a portrait or a document about {firstName(props.person)}.
               </p>
             }
@@ -290,15 +291,15 @@ function RelationGroup(props: {
 }) {
   return (
     <div>
-      <h3 class="label">{props.title}</h3>
+      <h3 class="field-label">{props.title}</h3>
       <Show
         when={props.entries.length}
-        fallback={<p class="mt-1 text-xs text-muted">{props.empty}</p>}
+        fallback={<p class="mt-1 text-xs text-muted-foreground">{props.empty}</p>}
       >
         <ul class="mt-1.5 space-y-1">
           <For each={props.entries}>
             {entry => (
-              <li class="group flex items-center gap-2 rounded-xl px-1 py-1 hover:bg-moss/5">
+              <li class="group flex items-center gap-2 rounded-xl px-1 py-1 hover:bg-primary/5">
                 <button
                   type="button"
                   class="flex min-w-0 flex-1 items-center gap-2 text-left"
@@ -308,14 +309,14 @@ function RelationGroup(props: {
                   <span class="min-w-0 flex-1">
                     <span class="block truncate text-sm font-medium">{entry.person?.displayName}</span>
                     <Show when={props.labelFor?.(entry)}>
-                      <span class="block text-[0.68rem] text-muted">{props.labelFor?.(entry)}</span>
+                      <span class="block text-[0.68rem] text-muted-foreground">{props.labelFor?.(entry)}</span>
                     </Show>
                   </span>
                 </button>
                 <Show when={props.editable}>
                   <button
                     type="button"
-                    class="rounded-full p-1 text-muted opacity-60 transition hover:bg-danger/10 hover:text-danger group-hover:opacity-100"
+                    class="rounded-full p-1 text-muted-foreground opacity-60 transition hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
                     aria-label="Remove relationship"
                     onClick={() => props.onRemove(entry.relationship)}
                   >
@@ -337,18 +338,18 @@ function GroupTile(props: { group: GraphFileGroup; onOpen: () => void }) {
   return (
     <button
       type="button"
-      class="group relative aspect-square overflow-hidden rounded-xl border border-line bg-paper text-left"
+      class="group relative aspect-square overflow-hidden rounded-xl border border-border bg-background text-left"
       title={props.group.name}
       aria-label={`Open ${props.group.name}`}
       onClick={props.onOpen}
     >
-      <span class="absolute left-2 top-2 h-[calc(100%-0.4rem)] w-[calc(100%-0.4rem)] rounded-lg border border-line bg-raised/80" />
-      <span class="absolute left-1 top-1 h-[calc(100%-0.4rem)] w-[calc(100%-0.4rem)] rounded-lg border border-line bg-raised" />
+      <span class="absolute left-2 top-2 h-[calc(100%-0.4rem)] w-[calc(100%-0.4rem)] rounded-lg border border-border bg-card/80" />
+      <span class="absolute left-1 top-1 h-[calc(100%-0.4rem)] w-[calc(100%-0.4rem)] rounded-lg border border-border bg-card" />
       <span class="absolute inset-0 overflow-hidden rounded-xl">
         <Show
           when={cover()}
           fallback={
-            <span class="flex h-full w-full items-center justify-center text-muted">
+            <span class="flex h-full w-full items-center justify-center text-muted-foreground">
               <Layers size={24} />
             </span>
           }
@@ -374,12 +375,12 @@ function FileTile(props: {
   onDelete: () => void;
 }) {
   return (
-    <div class="group relative aspect-square overflow-hidden rounded-xl border border-line bg-paper">
+    <div class="group relative aspect-square overflow-hidden rounded-xl border border-border bg-background">
       <button type="button" class="h-full w-full" onClick={props.onPreview} aria-label={`Open ${props.file.name}`}>
         <Show
           when={props.file.thumbUrl}
           fallback={
-            <span class="flex h-full w-full flex-col items-center justify-center gap-1 p-2 text-muted">
+            <span class="flex h-full w-full flex-col items-center justify-center gap-1 p-2 text-muted-foreground">
               <Show when={props.file.kind === "image"} fallback={<FileText size={22} />}>
                 <ImageIcon size={22} />
               </Show>
@@ -415,7 +416,7 @@ function FileTile(props: {
           </button>
           <button
             type="button"
-            class="rounded-full bg-black/60 p-1.5 text-white hover:bg-danger"
+            class="rounded-full bg-black/60 p-1.5 text-white hover:bg-destructive"
             title="Delete file"
             aria-label="Delete file"
             onClick={props.onDelete}

@@ -12,16 +12,16 @@ type FieldProps = {
 export function Field(props: FieldProps) {
   const [local, rest] = splitProps(props, ["label", "hint", "error", "for", "class", "children"]);
   return (
-    <div class={`field ${local.class ?? ""}`}>
-      <label class="label" for={local.for}>
+    <div class={`flex flex-col gap-1.5 ${local.class ?? ""}`} {...rest}>
+      <label class="field-label" for={local.for}>
         {local.label}
       </label>
       {local.children}
       <Show when={local.hint && !local.error}>
-        <span class="text-[0.72rem] text-muted">{local.hint}</span>
+        <span class="text-xs text-muted-foreground">{local.hint}</span>
       </Show>
       <Show when={local.error}>
-        <span class="text-[0.72rem] text-danger" role="alert">
+        <span class="text-xs font-medium text-destructive" role="alert">
           {local.error}
         </span>
       </Show>

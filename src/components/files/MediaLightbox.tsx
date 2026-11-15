@@ -22,7 +22,9 @@ import {
 import type { GraphFile, GraphFileGroup, GraphPerson } from "~/api/people-server";
 import type { TreeRole } from "~/server/guards";
 import { Avatar } from "../ui/Avatar";
-import { Button, IconButton } from "../ui/Button";
+import { Badge } from "../ui/badge";
+import { Button, buttonVariants } from "../ui/button";
+import { IconButton } from "../ui/icon-button";
 import { formatBytes, formatDate, formatRelative } from "~/lib/format";
 
 type MediaLightboxProps = {
@@ -132,7 +134,7 @@ export function MediaLightbox(props: MediaLightboxProps) {
                     {file => (
                       <a
                         href={`/api/files/${file().id}/download`}
-                        class="btn btn-secondary btn-sm"
+                        class={buttonVariants({ variant: "secondary", size: "sm" })}
                         download={file().name}
                       >
                         <Download size={14} />
@@ -210,10 +212,10 @@ export function MediaLightbox(props: MediaLightboxProps) {
           </Show>
         </div>
 
-        <aside class="scroll-thin max-h-[46dvh] shrink-0 overflow-y-auto border-t border-line bg-raised px-5 py-4 text-ink sm:max-h-none sm:w-[24rem] sm:border-l sm:border-t-0 sm:py-5">
+        <aside class="scroll-thin max-h-[46dvh] shrink-0 overflow-y-auto border-t border-border bg-card px-5 py-4 text-foreground sm:max-h-none sm:w-[24rem] sm:border-l sm:border-t-0 sm:py-5">
           <div class="mx-auto max-w-lg">
             <div class="flex items-start gap-3">
-              <span class="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-xl border border-line bg-paper text-muted">
+              <span class="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-xl border border-border bg-background text-muted-foreground">
                 <Show
                   when={current()?.thumbUrl}
                   fallback={
@@ -252,7 +254,7 @@ export function MediaLightbox(props: MediaLightboxProps) {
                     </Button>
                   </div>
                 </Show>
-                <p class="mt-1 text-[0.7rem] text-muted">
+                <p class="mt-1 text-[0.7rem] text-muted-foreground">
                   <Show
                     when={props.group}
                     fallback={
@@ -266,12 +268,12 @@ export function MediaLightbox(props: MediaLightboxProps) {
                   </Show>
                 </p>
                 <div class="mt-1.5 flex flex-wrap gap-1.5">
-                  <span class="badge">{current()?.kind ?? "file"}</span>
+                  <Badge variant="secondary" class="uppercase tracking-wide">{current()?.kind ?? "file"}</Badge>
                   <Show when={current()?.isAvatar}>
-                    <span class="badge">Portrait</span>
+                    <Badge variant="secondary" class="uppercase tracking-wide">Portrait</Badge>
                   </Show>
                   <Show when={props.files.length > 1}>
-                    <span class="badge">{index() + 1} / {props.files.length}</span>
+                    <Badge variant="secondary">{index() + 1} / {props.files.length}</Badge>
                   </Show>
                 </div>
               </div>
@@ -282,7 +284,7 @@ export function MediaLightbox(props: MediaLightboxProps) {
                 {file => (
                   <a
                     href={`/api/files/${file().id}/download`}
-                    class="btn btn-secondary btn-sm"
+                    class={buttonVariants({ variant: "secondary", size: "sm" })}
                     download={file().name}
                   >
                     <Download size={14} />
@@ -309,7 +311,7 @@ export function MediaLightbox(props: MediaLightboxProps) {
               <Show when={editable()}>
                 <IconButton
                   label="Delete file"
-                  class="ml-auto text-danger"
+                  class="ml-auto text-destructive"
                   onClick={() => current() && props.onDeleteFile(current()!)}
                 >
                   <Trash2 size={16} />
@@ -320,27 +322,27 @@ export function MediaLightbox(props: MediaLightboxProps) {
             <Show when={current()}>
               {file => (
                 <section class="mt-5">
-                  <h3 class="label">Current file</h3>
+                  <h3 class="field-label">Current file</h3>
                   <p class="mt-1 truncate text-sm font-medium">{file().name}</p>
                   <dl class="mt-2 grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
                     <div>
-                      <dt class="text-[0.68rem] text-muted">Type</dt>
+                      <dt class="text-[0.68rem] text-muted-foreground">Type</dt>
                       <dd class="mt-0.5 truncate">{file().mimeType}</dd>
                     </div>
                     <div>
-                      <dt class="text-[0.68rem] text-muted">Size</dt>
+                      <dt class="text-[0.68rem] text-muted-foreground">Size</dt>
                       <dd class="mt-0.5">{formatBytes(file().sizeBytes)}</dd>
                     </div>
                     <Show when={file().width && file().height}>
                       <div>
-                        <dt class="text-[0.68rem] text-muted">Dimensions</dt>
+                        <dt class="text-[0.68rem] text-muted-foreground">Dimensions</dt>
                         <dd class="mt-0.5">
                           {file().width} × {file().height}
                         </dd>
                       </div>
                     </Show>
                     <div>
-                      <dt class="text-[0.68rem] text-muted">Added</dt>
+                      <dt class="text-[0.68rem] text-muted-foreground">Added</dt>
                       <dd class="mt-0.5">{formatDate(file().createdAt)}</dd>
                     </div>
                   </dl>
@@ -349,15 +351,15 @@ export function MediaLightbox(props: MediaLightboxProps) {
             </Show>
 
             <section class="mt-5">
-              <h3 class="label">Attached to</h3>
+              <h3 class="field-label">Attached to</h3>
               <Show
                 when={props.person}
-                fallback={<p class="mt-1.5 text-xs text-muted">This person is no longer in the tree.</p>}
+                fallback={<p class="mt-1.5 text-xs text-muted-foreground">This person is no longer in the tree.</p>}
               >
                 {person => (
                   <button
                     type="button"
-                    class="mt-1.5 flex w-full items-center gap-2.5 rounded-xl px-1 py-1 text-left hover:bg-moss/5"
+                    class="mt-1.5 flex w-full items-center gap-2.5 rounded-xl px-1 py-1 text-left hover:bg-primary/5"
                     onClick={() => props.onSelectPerson(person().id)}
                   >
                     <Avatar
@@ -369,7 +371,7 @@ export function MediaLightbox(props: MediaLightboxProps) {
                       <span class="block truncate text-sm font-semibold">
                         {person().displayName}
                       </span>
-                      <span class="block text-[0.7rem] text-muted">Open their profile</span>
+                      <span class="block text-[0.7rem] text-muted-foreground">Open their profile</span>
                     </span>
                   </button>
                 )}
@@ -377,22 +379,22 @@ export function MediaLightbox(props: MediaLightboxProps) {
             </section>
 
             <Show when={props.group && editable()}>
-              <section class="mt-5 border-t border-line pt-4">
+              <section class="mt-5 border-t border-border pt-4">
                 <Button
-                  variant="danger"
+                  variant="destructive"
                   size="sm"
                   onClick={() => props.onDeleteGroup?.()}
                 >
                   <Trash2 size={14} />
                   Delete album
                 </Button>
-                <p class="mt-2 text-[0.68rem] leading-relaxed text-muted">
+                <p class="mt-2 text-[0.68rem] leading-relaxed text-muted-foreground">
                   This removes every file in the album.
                 </p>
               </section>
             </Show>
 
-            <p class="mt-5 text-[0.68rem] leading-relaxed text-muted">
+            <p class="mt-5 text-[0.68rem] leading-relaxed text-muted-foreground">
               Files stay private to this tree. Downloads use a short-lived signed link.
             </p>
           </div>

@@ -11,6 +11,7 @@ The graph is the main view. People are nodes, parent and partner relationships a
 - Railway Storage Bucket (S3-compatible) for originals and thumbnails
 - `force-graph` + `d3-force` for the canvas graph
 - Tailwind CSS v4
+- shadcn-solid components on Kobalte for dialogs, menus, selects, tabs and toasts
 - Zod for server input validation
 - Vitest for unit tests
 
@@ -166,6 +167,16 @@ src/lib/            pure client helpers: graph model, thumbnails, uploads, forma
 src/routes/         file-based routes and API handlers
 src/server/         auth, guards, storage, file service, config
 ```
+
+### UI conventions
+
+The interface uses [shadcn-solid](https://shadcn-solid.com) components on top of Kobalte, kept in `src/components/ui`. Tailwind theme tokens live in `src/app.css` and carry the paper, moss and gold palette: use `bg-background`, `bg-card`, `text-foreground`, `text-muted-foreground`, `border-border`, `bg-primary`, `bg-accent`, `text-destructive` and `text-gold` rather than raw hex values.
+
+- Add a component with `pnpm dlx shadcn-solid@latest add <name>` (configured by `components.json`), then edit it in place like any other source file.
+- `~/components/ui/button.tsx` holds the shared button variants, `icon-button.tsx` wraps icon-only buttons with a tooltip, and `~/lib/utils.ts` exports `cva`/`cx` with `tailwind-merge` applied.
+- `Modal`, `ConfirmDialog`, `Field`, `Toast` and `Loading` are thin adapters over the generated primitives, so app code does not need to change when a primitive is restyled.
+- Dark mode is the `.dark` class on `<html>`, set by `ThemeProvider`, and is wired into Tailwind through `@custom-variant dark` in `src/app.css`.
+- The graph canvas draws with its own hardcoded colours in `src/components/graph/GraphView.tsx`; theme tokens do not affect it.
 
 ## Known limitations
 

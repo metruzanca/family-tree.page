@@ -4,7 +4,9 @@ import { ArrowRight, Clock, Leaf, LockKeyhole } from "lucide-solid";
 import { getInvitePreview, getUser, getMyTrees } from "~/api";
 import { acceptInvite } from "~/api/trees-server";
 import { BrandMark } from "~/components/app/AppHeader";
-import { Button } from "~/components/ui/Button";
+import { Button, buttonVariants } from "~/components/ui/button";
+import { Card } from "~/components/ui/card";
+import { Skeleton } from "~/components/ui/skeleton";
 import { LoadingScreen } from "~/components/ui/Loading";
 import { useToast } from "~/components/ui/Toast";
 import { formatDate, roleLabel } from "~/lib/format";
@@ -51,33 +53,33 @@ function InviteInner() {
       <div class="flex items-center justify-between px-5 py-5 sm:px-8">
         <BrandMark />
         <Show when={user()}>
-          <A href="/trees" class="btn btn-ghost btn-sm">
+          <A href="/trees" class={buttonVariants({ variant: "ghost", size: "sm" })}>
             Your trees
           </A>
         </Show>
       </div>
       <div class="flex flex-1 items-center justify-center px-4 pb-16">
-        <div class="paper-card w-full max-w-lg p-7 text-center sm:p-10">
+        <Card class="w-full max-w-lg items-center gap-0 p-7 text-center sm:p-10">
           <Show when={preview()}>
             {invite => (
               <Switch>
                 <Match when={invite().status === "valid" && invite()}>
                   {valid => (
                     <>
-                      <div class="mx-auto grid h-16 w-16 place-items-center rounded-3xl bg-moss-soft text-moss">
+                      <div class="mx-auto grid h-16 w-16 place-items-center rounded-3xl bg-accent text-primary">
                         <Leaf size={28} />
                       </div>
-                      <p class="mt-6 text-xs font-semibold uppercase tracking-[0.18em] text-moss">
+                      <p class="mt-6 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
                         You are invited
                       </p>
                       <h1 class="mt-2 font-display text-4xl tracking-tight">
                         {(valid() as any).treeName}
                       </h1>
-                      <p class="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-muted">
+                      <p class="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-muted-foreground">
                         {(valid() as any).inviterName} invited you to join as{" "}
-                        <span class="font-semibold text-ink">{roleLabel((valid() as any).role)}</span>.
+                        <span class="font-semibold text-foreground">{roleLabel((valid() as any).role)}</span>.
                       </p>
-                      <div class="mt-6 flex items-center justify-center gap-2 text-xs text-muted">
+                      <div class="mt-6 flex items-center justify-center gap-2 text-xs text-muted-foreground">
                         <Clock size={13} />
                         Expires {formatDate((valid() as any).expiresAt)}
                       </div>
@@ -88,14 +90,14 @@ function InviteInner() {
                           <div class="mt-8 space-y-3">
                             <A
                               href={`/login?redirectTo=${encodeURIComponent(redirectTo())}`}
-                              class="btn btn-primary w-full"
+                              class={buttonVariants({ class: "w-full" })}
                             >
                               Sign in to join
                               <ArrowRight size={16} />
                             </A>
                             <A
                               href={`/register?redirectTo=${encodeURIComponent(redirectTo())}`}
-                              class="btn btn-secondary w-full"
+                              class={buttonVariants({ variant: "secondary", class: "w-full" })}
                             >
                               Create an account
                             </A>
@@ -106,7 +108,7 @@ function InviteInner() {
                           {pending() ? "Joining…" : `Join ${(valid() as any).treeName}`}
                         </Button>
                       </Show>
-                      <p class="mt-5 flex items-center justify-center gap-1.5 text-[0.7rem] text-muted">
+                      <p class="mt-5 flex items-center justify-center gap-1.5 text-[0.7rem] text-muted-foreground">
                         <LockKeyhole size={12} />
                         This link works once. The tree stays private to its members.
                       </p>
@@ -114,11 +116,11 @@ function InviteInner() {
                   )}
                 </Match>
                 <Match when={true}>
-                  <div class="mx-auto grid h-16 w-16 place-items-center rounded-3xl bg-paper text-muted">
+                  <div class="mx-auto grid h-16 w-16 place-items-center rounded-3xl bg-background text-muted-foreground">
                     <Clock size={28} />
                   </div>
                   <h1 class="mt-6 font-display text-3xl tracking-tight">This invite is not usable</h1>
-                  <p class="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-muted">
+                  <p class="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-muted-foreground">
                     {invite().status === "used"
                       ? "This link has already been used."
                       : invite().status === "expired"
@@ -127,8 +129,8 @@ function InviteInner() {
                           ? "The tree owner revoked this invite."
                           : "This invite link does not exist."}
                   </p>
-                  <p class="mt-2 text-xs text-muted">Ask the tree owner for a new link.</p>
-                  <A href={user() ? "/trees" : "/login"} class="btn btn-secondary mt-7">
+                  <p class="mt-2 text-xs text-muted-foreground">Ask the tree owner for a new link.</p>
+                  <A href={user() ? "/trees" : "/login"} class={buttonVariants({ variant: "secondary", class: "mt-7" })}>
                     {user() ? "Go to your trees" : "Sign in"}
                   </A>
                 </Match>
@@ -136,11 +138,11 @@ function InviteInner() {
             )}
           </Show>
           <Show when={preview() === undefined}>
-            <div class="skeleton mx-auto h-16 w-16 rounded-3xl" />
-            <div class="skeleton mx-auto mt-6 h-8 w-56" />
-            <div class="skeleton mx-auto mt-3 h-4 w-72" />
+            <Skeleton class="mx-auto size-16 rounded-3xl" />
+            <Skeleton class="mx-auto mt-6 h-8 w-56 rounded-lg" />
+            <Skeleton class="mx-auto mt-3 h-4 w-72 rounded-md" />
           </Show>
-        </div>
+        </Card>
       </div>
     </main>
   );

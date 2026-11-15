@@ -1,6 +1,15 @@
-import { Show, createEffect, onCleanup, type JSX } from "solid-js";
-import { Portal } from "solid-js/web";
+import { Show, type JSX } from "solid-js";
 import { X } from "lucide-solid";
+import { Button } from "./button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogPortal,
+  DialogTitle,
+} from "./dialog";
 
 type ModalProps = {
   open: boolean;
@@ -13,63 +22,71 @@ type ModalProps = {
 };
 
 export function Modal(props: ModalProps) {
-  createEffect(() => {
-    if (!props.open || typeof document === "undefined") return;
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") props.onClose();
-    };
-    document.addEventListener("keydown", onKeyDown);
-    onCleanup(() => {
-      document.body.style.overflow = previous;
-      document.removeEventListener("keydown", onKeyDown);
-    });
-  });
+  let body: HTMLDivElement | undefined;
+
+  function focusFirstField(event: Event) {
+    const target =
+      body?.querySelector<HTMLElement>("[autofocus]") ??
+      body?.querySelector<HTMLElement>("input:not([type=hidden]), textarea, select");
+    if (!target) return;
+    event.preventDefault();
+    target.focus();
+  }
 
   return (
-    <Show when={props.open}>
-      <Portal>
-        <div class="fixed inset-0 z-[70] flex items-end justify-center bg-[rgba(5,7,4,0.52)] p-0 backdrop-blur-[2px] sm:items-center sm:p-4">
-          <button
-            type="button"
-            class="absolute inset-0 cursor-default"
-            aria-label="Close dialog"
-            onClick={props.onClose}
-          />
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label={props.title}
-            class={`modal-panel relative z-10 ${props.wide ? "sm:!w-[min(48rem,calc(100vw-2rem))]" : ""}`}
-          >
-            <div class="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-line bg-raised/95 px-5 py-4 backdrop-blur">
-              <div>
-                <Show when={props.title}>
-                  <h2 class="font-display text-xl leading-tight">{props.title}</h2>
-                </Show>
-                <Show when={props.description}>
-                  <p class="mt-1 text-sm text-muted">{props.description}</p>
-                </Show>
-              </div>
-              <button
-                type="button"
-                class="btn btn-ghost btn-icon -mr-2 -mt-1"
-                aria-label="Close"
-                onClick={props.onClose}
+    <Dialog
+      open={props.open}
+      onOpenChange={open => {
+        if (!open) props.onClose();
+      }}
+    >
+      <DialogPortal>
+        <DialogContent
+          showCloseButton={false}
+          onOpenAutoFocus={focusFirstField}
+          class={`flex max-h-[min(88dvh,52rem)] flex-col gap-0 overflow-hidden rounded-[1.35rem] border-border bg-card p-0 shadow-[var(--shadow-soft)] ${
+            props.wide ? "sm:max-w-2xl" : "sm:max-w-lg"
+          }`}
+        >
+          <DialogHeader class="flex-row items-start justify-between gap-4 border-b border-border bg-card/95 px-5 py-4 text-left backdrop-blur">
+            <div class="min-w-0">
+              <Show
+                when={props.title}
+                fallback={<DialogTitle class="sr-only">Dialog</DialogTitle>}
               >
-                <X size={18} />
-              </button>
+                <DialogTitle class="font-display text-xl leading-tight tracking-tight">
+                  {props.title}
+                </DialogTitle>
+              </Show>
+              <Show when={props.description}>
+                <DialogDescription class="mt-1 text-sm text-muted-foreground">
+                  {props.description}
+                </DialogDescription>
+              </Show>
             </div>
-            <div class="px-5 py-5">{props.children}</div>
-            <Show when={props.footer}>
-              <div class="sticky bottom-0 flex justify-end gap-2 border-t border-line bg-raised/95 px-5 py-3 backdrop-blur">
-                {props.footer}
-              </div>
-            </Show>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              type="button"
+              aria-label="Close dialog"
+              class="-mr-1.5 -mt-1"
+              onClick={props.onClose}
+            >
+              <X />
+            </Button>
+          </DialogHeader>
+
+          <div ref={body} class="scroll-thin min-h-0 flex-1 overflow-y-auto px-5 py-5">
+            {props.children}
           </div>
-        </div>
-      </Portal>
-    </Show>
+
+          <Show when={props.footer}>
+            <DialogFooter class="border-t border-border bg-card/95 px-5 py-3 backdrop-blur">
+              {props.footer}
+            </DialogFooter>
+          </Show>
+        </DialogContent>
+      </DialogPortal>
+    </Dialog>
   );
 }

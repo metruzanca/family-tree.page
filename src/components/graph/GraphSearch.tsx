@@ -2,6 +2,7 @@ import { For, Show, createEffect, createMemo, createSignal } from "solid-js";
 import { FileText, Image as ImageIcon, Search } from "lucide-solid";
 import type { GraphFile, GraphPerson, TreeGraph } from "~/api/people-server";
 import { Avatar } from "../ui/Avatar";
+import { Kbd, KbdGroup } from "../ui/kbd";
 import { Modal } from "../ui/Modal";
 
 export function GraphSearch(props: {
@@ -43,11 +44,23 @@ export function GraphSearch(props: {
       onClose={props.onClose}
       title="Search the tree"
       description="Find a person or a file. Selecting a result opens its panel and brings it into view."
+      footer={
+        <div class="flex w-full items-center justify-between text-xs text-muted-foreground">
+          <span>
+            {people().length} {people().length === 1 ? "person" : "people"}
+            <Show when={files().length}> · {files().length} files</Show>
+          </span>
+          <span class="flex items-center gap-1.5">
+            Close
+            <Kbd>Esc</Kbd>
+          </span>
+        </div>
+      }
     >
       <label class="relative block">
-        <Search size={16} class="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+        <Search size={16} class="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
         <input
-          class="input pl-9"
+          class="input pl-10"
           value={query()}
           onInput={event => setQuery(event.currentTarget.value)}
           placeholder="Name, nickname, maiden name, file…"
@@ -55,16 +68,16 @@ export function GraphSearch(props: {
         />
       </label>
 
-      <div class="scroll-thin mt-3 max-h-[52dvh] space-y-4 overflow-y-auto">
+      <div class="scroll-thin mt-3 max-h-[52dvh] space-y-4 overflow-y-auto pr-1">
         <Show when={people().length}>
           <section>
-            <h3 class="label mb-1.5">People</h3>
+            <h3 class="field-label mb-1.5">People</h3>
             <div class="space-y-0.5">
               <For each={people()}>
                 {person => (
                   <button
                     type="button"
-                    class="flex w-full items-center gap-2.5 rounded-xl px-2 py-2 text-left hover:bg-moss/5"
+                    class="flex w-full items-center gap-2.5 rounded-xl px-2 py-2 text-left transition hover:bg-accent/70 focus-visible:bg-accent/70 focus-visible:outline-none"
                     onClick={() => {
                       props.onPerson(person);
                       props.onClose();
@@ -73,7 +86,7 @@ export function GraphSearch(props: {
                     <Avatar name={person.displayName} fileId={person.avatarFileId} size={32} />
                     <span class="min-w-0 flex-1">
                       <span class="block truncate text-sm font-medium">{person.displayName}</span>
-                      <span class="block truncate text-[0.7rem] text-muted">
+                      <span class="block truncate text-xs text-muted-foreground">
                         {[person.birthDate?.slice(0, 4), person.deathDate?.slice(0, 4)]
                           .filter(Boolean)
                           .join(" - ") || person.bio?.slice(0, 60) || "No dates yet"}
@@ -88,19 +101,19 @@ export function GraphSearch(props: {
 
         <Show when={files().length}>
           <section>
-            <h3 class="label mb-1.5">Files</h3>
+            <h3 class="field-label mb-1.5">Files</h3>
             <div class="space-y-0.5">
               <For each={files()}>
                 {file => (
                   <button
                     type="button"
-                    class="flex w-full items-center gap-2.5 rounded-xl px-2 py-2 text-left hover:bg-moss/5"
+                    class="flex w-full items-center gap-2.5 rounded-xl px-2 py-2 text-left transition hover:bg-accent/70 focus-visible:bg-accent/70 focus-visible:outline-none"
                     onClick={() => {
                       props.onFile(file);
                       props.onClose();
                     }}
                   >
-                    <span class="grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-lg border border-line bg-paper text-muted">
+                    <span class="grid size-8 shrink-0 place-items-center overflow-hidden rounded-lg border border-border bg-muted text-muted-foreground">
                       <Show
                         when={file.thumbUrl}
                         fallback={
@@ -109,12 +122,12 @@ export function GraphSearch(props: {
                           </Show>
                         }
                       >
-                        <img src={file.thumbUrl!} alt="" class="h-full w-full object-cover" />
+                        <img src={file.thumbUrl!} alt="" class="size-full object-cover" />
                       </Show>
                     </span>
                     <span class="min-w-0 flex-1">
                       <span class="block truncate text-sm font-medium">{file.name}</span>
-                      <span class="block truncate text-[0.7rem] text-muted">
+                      <span class="block truncate text-xs text-muted-foreground">
                         {personById().get(file.personId)?.displayName ?? "Unknown person"}
                       </span>
                     </span>
@@ -126,8 +139,17 @@ export function GraphSearch(props: {
         </Show>
 
         <Show when={!people().length && !files().length}>
-          <p class="py-10 text-center text-sm text-muted">Nothing matches “{query()}”.</p>
+          <p class="py-10 text-center text-sm text-muted-foreground">
+            Nothing matches “{query()}”.
+          </p>
         </Show>
+      </div>
+
+      <div class="mt-4 flex items-center justify-center gap-3 text-xs text-muted-foreground">
+        <KbdGroup>
+          <Kbd>/</Kbd>
+          <span>to search anywhere</span>
+        </KbdGroup>
       </div>
     </Modal>
   );

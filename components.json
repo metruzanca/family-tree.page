@@ -1,0 +1,18 @@
+{
+  "$schema": "https://shadcn-solid.com/schema.json",
+  "style": "default",
+  "tailwind": {
+    "config": "",
+    "css": "src/app.css",
+    "baseColor": "stone",
+    "cssVariables": true,
+    "prefix": ""
+  },
+  "aliases": {
+    "components": "@/components",
+    "ui": "@/components/ui",
+    "utils": "@/lib/utils",
+    "cn": "@/lib/utils"
+  },
+  "iconLibrary": "lucide"
+}

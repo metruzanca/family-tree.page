@@ -4,8 +4,10 @@ import { ArrowUpRight, Plus, Sprout, Users } from "lucide-solid";
 import { getMyTrees, requireUserPage } from "~/api";
 import { AppHeader } from "~/components/app/AppHeader";
 import { CreateTreeDialog } from "~/components/trees/CreateTreeDialog";
-import { Button } from "~/components/ui/Button";
-import { LoadingRows } from "~/components/ui/Loading";
+import { Badge } from "~/components/ui/badge";
+import { Button } from "~/components/ui/button";
+import { Card } from "~/components/ui/card";
+import { LoadingCards } from "~/components/ui/Loading";
 import { formatRelative, roleLabel } from "~/lib/format";
 
 export const route = {
@@ -29,7 +31,7 @@ export default function TreesPage() {
               user={currentUser()}
               actions={
                 <Button size="sm" onClick={() => setCreating(true)}>
-                  <Plus size={15} />
+                  <Plus />
                   New tree
                 </Button>
               }
@@ -37,29 +39,32 @@ export default function TreesPage() {
             <main class="mx-auto max-w-7xl px-4 pb-20 pt-10 sm:px-6">
               <section class="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
                 <div>
-                  <p class="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-moss">
-                    Your groves
-                  </p>
+                  <p class="eyebrow mb-2">Your groves</p>
                   <h1 class="font-display text-4xl tracking-tight sm:text-5xl">
                     The families you keep.
                   </h1>
-                  <p class="mt-3 max-w-xl text-sm leading-relaxed text-muted">
+                  <p class="mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground">
                     Each tree is a private graph. Invite relatives to add stories, photographs and
                     the connections between them.
                   </p>
                 </div>
-                <div class="hidden rounded-2xl border border-line bg-raised/60 px-4 py-3 text-sm sm:block">
-                  <p class="font-semibold">{currentUser().displayName}</p>
-                  <p class="text-xs text-muted">
-                    {trees()?.length ?? 0} {trees()?.length === 1 ? "tree" : "trees"}
-                  </p>
+                <div class="hidden items-center gap-3 rounded-2xl border border-border bg-card/70 px-4 py-3 text-sm shadow-xs sm:flex">
+                  <span class="grid size-9 place-items-center rounded-xl bg-accent text-accent-foreground">
+                    <Sprout size={17} />
+                  </span>
+                  <div>
+                    <p class="font-semibold leading-tight">{currentUser().displayName}</p>
+                    <p class="text-xs text-muted-foreground">
+                      {trees()?.length ?? 0} {trees()?.length === 1 ? "tree" : "trees"}
+                    </p>
+                  </div>
                 </div>
               </section>
 
               <Show
                 when={trees() && trees()!.length > 0}
                 fallback={
-                  <Show when={trees()} fallback={<div class="mt-10"><LoadingRows count={3} /></div>}>
+                  <Show when={trees()} fallback={<div class="mt-10"><LoadingCards count={3} /></div>}>
                     <EmptyTrees onCreate={() => setCreating(true)} />
                   </Show>
                 }
@@ -67,49 +72,50 @@ export default function TreesPage() {
                 <div class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   <For each={trees()}>
                     {tree => (
-                      <A
-                        href={`/trees/${tree.id}`}
-                        class="paper-card group relative flex min-h-56 flex-col justify-between p-5 transition hover:-translate-y-0.5 hover:border-moss/40 hover:shadow-lg"
-                      >
-                        <div>
-                          <div class="flex items-start justify-between gap-3">
-                            <div class="grid h-11 w-11 place-items-center rounded-2xl bg-moss-soft text-moss">
-                              <Sprout size={20} />
+                      <A href={`/trees/${tree.id}`} class="group block focus-visible:outline-none">
+                        <Card class="h-full min-h-56 justify-between gap-0 p-5 transition duration-200 group-hover:-translate-y-0.5 group-hover:border-primary/35 group-hover:shadow-[var(--shadow-card)] group-focus-visible:ring-[3px] group-focus-visible:ring-ring/35">
+                          <div>
+                            <div class="flex items-start justify-between gap-3">
+                              <span class="grid size-11 place-items-center rounded-2xl bg-accent text-accent-foreground">
+                                <Sprout size={20} />
+                              </span>
+                              <Badge variant="secondary" class="uppercase tracking-wide">
+                                {roleLabel(tree.role)}
+                              </Badge>
                             </div>
-                            <span class="badge">{roleLabel(tree.role)}</span>
+                            <h2 class="mt-5 font-display text-2xl leading-tight tracking-tight">
+                              {tree.name}
+                            </h2>
+                            <Show when={tree.description}>
+                              <p class="mt-2 line-clamp-2 text-sm leading-relaxed text-muted-foreground">
+                                {tree.description}
+                              </p>
+                            </Show>
                           </div>
-                          <h2 class="mt-5 font-display text-2xl leading-tight tracking-tight">
-                            {tree.name}
-                          </h2>
-                          <Show when={tree.description}>
-                            <p class="mt-2 line-clamp-2 text-sm leading-relaxed text-muted">
-                              {tree.description}
-                            </p>
-                          </Show>
-                        </div>
-                        <div class="mt-6 flex items-center justify-between border-t border-line pt-3 text-xs text-muted">
-                          <span class="flex items-center gap-1.5">
-                            <Users size={13} />
-                            {tree.memberCount} {tree.memberCount === 1 ? "member" : "members"}
-                          </span>
-                          <span>
-                            {tree.peopleCount} {tree.peopleCount === 1 ? "person" : "people"}
-                          </span>
-                          <span>{formatRelative(tree.updatedAt)}</span>
-                          <ArrowUpRight
-                            size={15}
-                            class="text-moss opacity-0 transition group-hover:opacity-100"
-                          />
-                        </div>
+                          <div class="mt-6 flex items-center justify-between border-t border-border pt-3 text-xs text-muted-foreground">
+                            <span class="flex items-center gap-1.5">
+                              <Users size={13} />
+                              {tree.memberCount} {tree.memberCount === 1 ? "member" : "members"}
+                            </span>
+                            <span>
+                              {tree.peopleCount} {tree.peopleCount === 1 ? "person" : "people"}
+                            </span>
+                            <span>{formatRelative(tree.updatedAt)}</span>
+                            <ArrowUpRight
+                              size={15}
+                              class="text-primary opacity-0 transition group-hover:opacity-100"
+                            />
+                          </div>
+                        </Card>
                       </A>
                     )}
                   </For>
                   <button
                     type="button"
                     onClick={() => setCreating(true)}
-                    class="group flex min-h-56 flex-col items-center justify-center gap-3 rounded-[1.25rem] border border-dashed border-line text-muted transition hover:border-moss/45 hover:bg-moss/5 hover:text-ink"
+                    class="group flex min-h-56 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border text-muted-foreground transition hover:border-primary/45 hover:bg-accent/40 hover:text-foreground"
                   >
-                    <span class="grid h-11 w-11 place-items-center rounded-full border border-line bg-raised transition group-hover:border-moss/40">
+                    <span class="grid size-11 place-items-center rounded-full border border-border bg-card transition group-hover:border-primary/40">
                       <Plus size={20} />
                     </span>
                     <span class="text-sm font-semibold">Start another tree</span>
@@ -130,19 +136,19 @@ export default function TreesPage() {
 
 function EmptyTrees(props: { onCreate: () => void }) {
   return (
-    <div class="paper-card mx-auto mt-14 max-w-2xl px-6 py-14 text-center">
-      <div class="mx-auto grid h-16 w-16 place-items-center rounded-3xl bg-moss-soft text-moss">
+    <Card class="mx-auto mt-14 max-w-2xl items-center gap-0 px-6 py-14 text-center">
+      <div class="grid size-16 place-items-center rounded-3xl bg-accent text-accent-foreground">
         <Sprout size={30} />
       </div>
       <h2 class="mt-6 font-display text-3xl tracking-tight">Plant your first tree</h2>
-      <p class="mx-auto mt-3 max-w-md text-sm leading-relaxed text-muted">
+      <p class="mx-auto mt-3 max-w-md text-sm leading-relaxed text-muted-foreground">
         Add the people you remember, connect parents and partners, then invite a relative to help
         fill in the branches.
       </p>
       <Button class="mt-7" onClick={props.onCreate}>
-        <Plus size={16} />
+        <Plus />
         Create a family tree
       </Button>
-    </div>
+    </Card>
   );
 }

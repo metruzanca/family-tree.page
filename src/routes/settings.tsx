@@ -4,7 +4,8 @@ import { KeyRound, UserRound } from "lucide-solid";
 import { changePassword, updateProfile } from "~/api/auth-server";
 import { getUser, requireUserPage } from "~/api";
 import { AppHeader } from "~/components/app/AppHeader";
-import { Button } from "~/components/ui/Button";
+import { Button } from "~/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Field } from "~/components/ui/Field";
 import { LoadingScreen } from "~/components/ui/Loading";
 import { useToast } from "~/components/ui/Toast";
@@ -73,83 +74,97 @@ function AccountSettingsInner() {
         <div class="page-shell min-h-[100dvh]">
           <AppHeader user={current()} back={{ href: "/trees", label: "Back to trees" }} />
           <main class="mx-auto max-w-2xl px-4 pb-20 pt-10 sm:px-6">
-            <p class="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-moss">Account</p>
+            <p class="eyebrow mb-2">Account</p>
             <h1 class="font-display text-4xl tracking-tight">Your details</h1>
-            <p class="mt-2 text-sm text-muted">
-              Signed in as <span class="font-medium text-ink">{current().email}</span>
+            <p class="mt-2 text-sm text-muted-foreground">
+              Signed in as <span class="font-medium text-foreground">{current().email}</span>
             </p>
 
-            <section class="paper-card mt-8 p-5 sm:p-6">
-              <div class="mb-4 flex items-center gap-3">
-                <span class="grid h-9 w-9 place-items-center rounded-xl bg-moss-soft text-moss">
-                  <UserRound size={17} />
-                </span>
-                <div>
-                  <h2 class="font-display text-xl">Profile</h2>
-                  <p class="text-xs text-muted">The name shown to people you share a tree with.</p>
+            <Card class="mt-8 gap-4 py-5 sm:py-6">
+              <CardHeader class="gap-1 px-5 sm:px-6">
+                <div class="flex items-center gap-3">
+                  <span class="grid size-9 place-items-center rounded-xl bg-accent text-accent-foreground">
+                    <UserRound size={17} />
+                  </span>
+                  <div>
+                    <CardTitle class="font-display text-xl">Profile</CardTitle>
+                    <CardDescription class="text-xs">
+                      The name shown to people you share a tree with.
+                    </CardDescription>
+                  </div>
                 </div>
-              </div>
-              <form class="space-y-4" onSubmit={saveProfile}>
-                <Field label="Display name" for="account-name">
-                  <input
-                    id="account-name"
-                    class="input"
-                    value={displayName()}
-                    onInput={event => setDisplayName(event.currentTarget.value)}
-                    maxlength={80}
-                    required
-                  />
-                </Field>
-                <Field label="Email" for="account-email" hint="Email changes are not available in this version.">
-                  <input id="account-email" class="input" value={current().email} disabled />
-                </Field>
-                <Button type="submit" disabled={profilePending()}>
-                  {profilePending() ? "Saving…" : "Save profile"}
-                </Button>
-              </form>
-            </section>
+              </CardHeader>
+              <CardContent class="px-5 sm:px-6">
+                <form class="space-y-4" onSubmit={saveProfile}>
+                  <Field label="Display name" for="account-name">
+                    <input
+                      id="account-name"
+                      class="input"
+                      value={displayName()}
+                      onInput={event => setDisplayName(event.currentTarget.value)}
+                      maxlength={80}
+                      required
+                    />
+                  </Field>
+                  <Field
+                    label="Email"
+                    for="account-email"
+                    hint="Email changes are not available in this version."
+                  >
+                    <input id="account-email" class="input" value={current().email} disabled />
+                  </Field>
+                  <Button type="submit" disabled={profilePending()}>
+                    {profilePending() ? "Saving…" : "Save profile"}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
 
-            <section class="paper-card mt-5 p-5 sm:p-6">
-              <div class="mb-4 flex items-center gap-3">
-                <span class="grid h-9 w-9 place-items-center rounded-xl bg-moss-soft text-moss">
-                  <KeyRound size={17} />
-                </span>
-                <div>
-                  <h2 class="font-display text-xl">Password</h2>
-                  <p class="text-xs text-muted">At least 10 characters.</p>
+            <Card class="mt-5 gap-4 py-5 sm:py-6">
+              <CardHeader class="gap-1 px-5 sm:px-6">
+                <div class="flex items-center gap-3">
+                  <span class="grid size-9 place-items-center rounded-xl bg-accent text-accent-foreground">
+                    <KeyRound size={17} />
+                  </span>
+                  <div>
+                    <CardTitle class="font-display text-xl">Password</CardTitle>
+                    <CardDescription class="text-xs">At least 10 characters.</CardDescription>
+                  </div>
                 </div>
-              </div>
-              <form class="space-y-4" onSubmit={savePassword}>
-                <Field label="Current password" for="current-password">
-                  <input
-                    id="current-password"
-                    type="password"
-                    class="input"
-                    autocomplete="current-password"
-                    value={currentPassword()}
-                    onInput={event => setCurrentPassword(event.currentTarget.value)}
-                    required
-                  />
-                </Field>
-                <Field label="New password" for="new-password">
-                  <input
-                    id="new-password"
-                    type="password"
-                    class="input"
-                    autocomplete="new-password"
-                    minlength={10}
-                    value={newPassword()}
-                    onInput={event => setNewPassword(event.currentTarget.value)}
-                    required
-                  />
-                </Field>
-                <Button type="submit" disabled={passwordPending()}>
-                  {passwordPending() ? "Changing…" : "Change password"}
-                </Button>
-              </form>
-            </section>
+              </CardHeader>
+              <CardContent class="px-5 sm:px-6">
+                <form class="space-y-4" onSubmit={savePassword}>
+                  <Field label="Current password" for="current-password">
+                    <input
+                      id="current-password"
+                      type="password"
+                      class="input"
+                      autocomplete="current-password"
+                      value={currentPassword()}
+                      onInput={event => setCurrentPassword(event.currentTarget.value)}
+                      required
+                    />
+                  </Field>
+                  <Field label="New password" for="new-password">
+                    <input
+                      id="new-password"
+                      type="password"
+                      class="input"
+                      autocomplete="new-password"
+                      minlength={10}
+                      value={newPassword()}
+                      onInput={event => setNewPassword(event.currentTarget.value)}
+                      required
+                    />
+                  </Field>
+                  <Button type="submit" disabled={passwordPending()}>
+                    {passwordPending() ? "Changing…" : "Change password"}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
 
-            <p class="mt-6 text-center text-[0.7rem] leading-relaxed text-muted">
+            <p class="mt-6 text-center text-xs leading-relaxed text-muted-foreground">
               Password reset by email is not available yet. If you forget your password, there is no
               self-service recovery in this version.
             </p>
