@@ -17,8 +17,10 @@ import {
   ZoomOut,
 } from "lucide-solid";
 import type { GenerationDirection } from "~/lib/graph";
+import type { PresencePeer, PresenceStatus } from "~/lib/presence-protocol";
 import type { TreeRole } from "~/server/guards";
 import { roleLabel } from "~/lib/format";
+import { PresenceBar } from "../presence/PresenceBar";
 import { Badge } from "./../ui/badge";
 import { Kbd } from "./../ui/kbd";
 import {
@@ -38,6 +40,12 @@ type ToolbarProps = {
   showMedia: boolean;
   layout: "generations" | "freeform";
   generationDirection: GenerationDirection;
+  presence: {
+    status: PresenceStatus;
+    peers: PresencePeer[];
+    selfPeerId: string | null;
+  };
+  resolveNode: (nodeId: string | null) => string | null;
   onToggleMedia: () => void;
   onToggleLayout: () => void;
   onFlipDirection: () => void;
@@ -75,6 +83,13 @@ export function GraphToolbar(props: ToolbarProps) {
             {roleLabel(props.role)}
           </Badge>
         </div>
+
+        <PresenceBar
+          status={props.presence.status}
+          peers={props.presence.peers}
+          selfPeerId={props.presence.selfPeerId}
+          resolveNode={props.resolveNode}
+        />
 
         <div class="ml-auto flex items-center gap-1.5">
           <ToolButton label="Search people and files" shortcut="/" onClick={props.onSearch}>

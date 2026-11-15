@@ -6,6 +6,12 @@ import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
   plugins: [solidStart(), tailwindcss(), nitro()],
+  nitro: {
+    serverDir: "./server",
+    features: {
+      websocket: true,
+    },
+  },
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),

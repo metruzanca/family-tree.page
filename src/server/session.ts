@@ -9,7 +9,7 @@ export type RootsSession = {
   userId?: string;
 };
 
-const sessionConfig = {
+export const sessionConfig = {
   name: SESSION_COOKIE_NAME,
   password: env("SESSION_SECRET"),
   maxAge: SESSION_MAX_AGE,

@@ -31,6 +31,7 @@ import { uploadPersonFile } from "~/lib/upload";
 import { mimeForFile } from "~/lib/image-thumb";
 import { fileNodeId, groupNodeId, type GenerationDirection } from "~/lib/graph";
 import { track } from "~/lib/analytics";
+import { createTreePresence } from "~/lib/presence";
 
 export const route = {
   preload: ({ params }: { params: { treeId: string } }) => getTreeGraph(params.treeId),
@@ -113,6 +114,25 @@ function TreePageInner() {
     return null;
   });
   const editable = () => data()?.role === "owner" || data()?.role === "editor";
+
+  const presence = createTreePresence({
+    treeId: params.treeId,
+    nodeId: () => selectedNodeId(),
+  });
+
+  function nodeLabel(nodeId: string | null) {
+    const graph = data();
+    if (!nodeId || !graph) return null;
+    if (nodeId.startsWith("file:")) {
+      const fileId = nodeId.slice("file:".length);
+      return graph.files.find(file => file.id === fileId)?.name ?? null;
+    }
+    if (nodeId.startsWith("group:")) {
+      const groupId = nodeId.slice("group:".length);
+      return graph.groups.find(group => group.id === groupId)?.name ?? null;
+    }
+    return graph.people.find(person => person.id === nodeId)?.displayName ?? null;
+  }
 
   onMount(() => {
     const storedLayout = localStorage.getItem("roots-layout");
@@ -398,6 +418,8 @@ function TreePageInner() {
             showMedia={showMedia()}
             layout={layout()}
             generationDirection={generationDirection()}
+            presence={presence.peers()}
+            selfPeerId={presence.selfPeerId()}
             onSelect={handleGraphSelection}
             onFileSelect={focusFile}
             onGroupSelect={focusGroup}
@@ -412,6 +434,12 @@ function TreePageInner() {
             showMedia={showMedia()}
             layout={layout()}
             generationDirection={generationDirection()}
+            presence={{
+              status: presence.status(),
+              peers: presence.peers(),
+              selfPeerId: presence.selfPeerId(),
+            }}
+            resolveNode={nodeLabel}
             onToggleMedia={toggleMedia}
             onToggleLayout={toggleLayout}
             onFlipDirection={flipGenerationDirection}

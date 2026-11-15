@@ -3,6 +3,9 @@ import { and, eq } from "drizzle-orm";
 import { db } from "./db";
 import { trees, treeMembers, type Tree } from "../../drizzle/schema";
 import { requireUser, type PublicUser } from "./auth-service";
+import { isUuid } from "./ids";
+
+export { isUuid };
 
 export type TreeRole = "owner" | "editor" | "viewer";
 
@@ -17,12 +20,6 @@ export type TreeAccess = {
   tree: Tree;
   role: TreeRole;
 };
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-export function isUuid(value: string): boolean {
-  return UUID_RE.test(value);
-}
 
 export async function requireTreeMember(
   treeId: string,

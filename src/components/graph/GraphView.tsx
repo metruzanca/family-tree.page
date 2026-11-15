@@ -2,6 +2,8 @@ import { createEffect, createMemo, createSignal, onCleanup, onMount, Show } from
 import { forceCollide, forceY } from "d3-force";
 import type { TreeGraph } from "~/api/people-server";
 import type { TreeRole } from "~/server/guards";
+import type { PresencePeer } from "~/lib/presence-protocol";
+import { avatarColors } from "~/lib/avatar-color";
 import {
   branchColor,
   buildGraphModel,
@@ -31,6 +33,8 @@ type GraphViewProps = {
   showMedia: boolean;
   layout: "generations" | "freeform";
   generationDirection: GenerationDirection;
+  presence?: PresencePeer[];
+  selfPeerId?: string | null;
   onSelect: (id: string | null) => void;
   onFileSelect: (fileId: string) => void;
   onGroupSelect: (groupId: string) => void;
@@ -388,6 +392,34 @@ export function GraphView(props: GraphViewProps) {
         );
       }
     }
+
+    const viewers = props.presence?.filter(
+      peer => peer.nodeId === node.id && peer.peerId !== props.selfPeerId,
+    );
+    if (viewers?.length) {
+      const x = node.x ?? 0;
+      const y = node.y ?? 0;
+      viewers.slice(0, 4).forEach((peer, index) => {
+        const gap = (5 + index * 3.5) / globalScale;
+        context.beginPath();
+        if (node.kind === "person") {
+          context.arc(x, y, radius + gap, 0, Math.PI * 2);
+        } else {
+          const half = radius + gap;
+          context.roundRect(
+            x - half,
+            y - half,
+            half * 2,
+            half * 2,
+            (6 + index * 2) / globalScale,
+          );
+        }
+        context.lineWidth = 2.2 / globalScale;
+        context.strokeStyle = avatarColors(peer.displayName)[1];
+        context.stroke();
+      });
+    }
+
     context.restore();
   }
 
@@ -774,6 +806,8 @@ export function GraphView(props: GraphViewProps) {
     props.selectedId;
     hovered();
     paintVersion();
+    props.presence;
+    props.selfPeerId;
     if (graph) {
       graph.nodeCanvasObject(drawNode);
       graph.linkColor(linkColor);

@@ -23,6 +23,9 @@ importers:
       '@solid-primitives/resize-observer':
         specifier: ^2.2.0
         version: 2.2.0(solid-js@1.9.19)
+      '@solid-primitives/websocket':
+        specifier: ^1.4.0
+        version: 1.4.0(solid-js@1.9.19)
       '@solidjs/router':
         specifier: ^1.0.0
         version: 1.0.3(solid-js@1.9.19)
@@ -1284,6 +1287,11 @@ packages:
 
   '@solid-primitives/utils@6.4.1':
     resolution: {integrity: sha512-ISSB5QX1qP2ynrheIpYwc4oKR5Ny4siNuUyf1qZniy+Il+p/PtDB0QK1Dnle8noiHpwRD3gpPdubOC3qI/Zamg==}
+    peerDependencies:
+      solid-js: ^1.6.12
+
+  '@solid-primitives/websocket@1.4.0':
+    resolution: {integrity: sha512-XJIObSUrg6oBvBP1z8CF1lg3npWEgOYc08CbGv9SIIpruG0ROa1cAwEuVLksF3oqZl8NIMKbDFWttD45q0LpIg==}
     peerDependencies:
       solid-js: ^1.6.12
 
@@ -3942,6 +3950,10 @@ snapshots:
       solid-js: 1.9.19
 
   '@solid-primitives/utils@6.4.1(solid-js@1.9.19)':
+    dependencies:
+      solid-js: 1.9.19
+
+  '@solid-primitives/websocket@1.4.0(solid-js@1.9.19)':
     dependencies:
       solid-js: 1.9.19
 

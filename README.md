@@ -27,6 +27,7 @@ The graph is the main view. People are nodes, parent and partner relationships a
 - Parent pairs join at one small junction before branching to their children, so each child gets one parent-line arrow
 - Direction flip for oldest-at-top or oldest-at-bottom layouts
 - Search, neighbor highlighting, zoom and pan
+- Live presence: see who else has the tree open, which person, file, or album they are looking at, and a colored ring around that node
 - Pointer cursor only over nodes, not links or empty canvas
 - Person and document info panels on desktop and mobile
 - Production Umami analytics with page views and product events
@@ -106,6 +107,15 @@ On Railway, invite links use `RAILWAY_PUBLIC_DOMAIN` (the assigned public domain
 
 The bucket stays private. Browsers never receive storage credentials. SVG, HTML, JavaScript, and executable files are rejected.
 
+## How presence works
+
+1. The browser opens `wss://<host>/presence?treeId=...` with `@solid-primitives/websocket`, which buffers the first focus message and reconnects with a fixed delay after deploys, sleeps, and network drops.
+2. Nitro's WebSocket route in `server/routes/presence.ts` unseals the same `roots_session` cookie SolidStart uses and checks tree membership before the upgrade completes. Because the session is a sealed cookie with no server-side state, reconnects survive deploys.
+3. Each socket joins a namespace per tree and a presence topic. The client sends `{ type: "focus", nodeId }` when the open person, file, or album changes; the server broadcasts a full snapshot of who is present and what each peer has open.
+4. The avatar stack dedupes by user, while the graph draws one ring per connected tab, colored from the same palette as that person's initials avatar.
+
+Presence is ephemeral. Nothing is written to Postgres, and a closed tab removes the peer immediately. State lives in the app process, which matches a single Railway replica.
+
 ## Railway deployment
 
 Create a Railway project with:
@@ -163,10 +173,13 @@ drizzle/            schema and SQL migrations
 scripts/            migration, seed, storage, dev-service scripts
 src/api/            server functions and query wrappers
 src/components/     graph, people, files, trees, UI primitives
-src/lib/            pure client helpers: graph model, thumbnails, uploads, formatting
+src/lib/            pure client helpers: graph model, thumbnails, uploads, formatting, presence socket
 src/routes/         file-based routes and API handlers
-src/server/         auth, guards, storage, file service, config
+src/server/         auth, guards, storage, file service, config, presence state
+server/routes/      Nitro server routes for WebSocket endpoints (not SolidStart routes)
 ```
+
+The WebSocket endpoint lives in `server/` because SolidStart's `src/routes` only handles `GET`/`POST` handlers. `vite.config.ts` points Nitro at `./server` and enables `features.websocket`.
 
 ### UI conventions
 
@@ -181,7 +194,8 @@ The interface uses [shadcn-solid](https://shadcn-solid.com) components on top of
 ## Known limitations
 
 - No email verification, password reset, or email invites yet. Invite links are shared manually.
-- No realtime co-editing. The graph refreshes after changes.
+- No realtime co-editing. Presence is live, but the graph still refreshes after changes.
+- Presence is held in the app process. It works as-is on a single Railway replica. Running more than one replica needs a shared presence store, such as Redis or Postgres `LISTEN`/`NOTIFY`.
 - HEIC photos work only when the browser can decode them; otherwise the user is asked to export as JPEG.
 - Railway buckets do not have automatic backups. PostgreSQL point-in-time recovery should be enabled on the database.
 - No GEDCOM import/export, public share links, OCR, or face tagging yet.
