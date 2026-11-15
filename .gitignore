@@ -12,10 +12,6 @@ app.config.timestamp_*.js
 
 # Local services and scratch files
 .dev/
-test-results/
-playwright-report/
-blob-report/
-playwright/.cache/
 
 # dependencies
 /node_modules

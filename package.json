@@ -10,7 +10,6 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "e2e": "playwright test",
     "dev:services": "bash scripts/dev-services.sh start",
     "dev:stop": "bash scripts/dev-services.sh stop",
     "dev:status": "bash scripts/dev-services.sh status",
@@ -20,7 +19,6 @@
     "storage:cors": "tsx scripts/storage-cors.ts"
   },
   "devDependencies": {
-    "@playwright/test": "1.65.1",
     "@types/d3-force": "^3.0.10",
     "@types/node": "^24.7.0",
     "@types/pg": "^8.23.1",

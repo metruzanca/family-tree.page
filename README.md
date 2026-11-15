@@ -12,7 +12,7 @@ The graph is the main view. People are nodes, parent and partner relationships a
 - `force-graph` + `d3-force` for the canvas graph
 - Tailwind CSS v4
 - Zod for server input validation
-- Vitest for unit tests, Playwright for browser tests
+- Vitest for unit tests
 
 ## Features in this version
 
@@ -138,7 +138,6 @@ pnpm build          production build
 pnpm start          run the production server
 pnpm typecheck      TypeScript check
 pnpm test           Vitest unit tests
-pnpm e2e            Playwright browser tests
 pnpm db:generate    generate a Drizzle migration
 pnpm db:migrate     apply migrations
 pnpm db:seed        seed the demo tree
@@ -146,11 +145,7 @@ pnpm storage:cors   set bucket CORS from APP_URL and CORS_ORIGINS
 pnpm dev:services   start local Postgres and S3
 ```
 
-The Playwright test needs the dev server and local services running. On NixOS, point Playwright at an installed Chromium or Brave binary:
-
-```bash
-PLAYWRIGHT_BROWSER_PATH=/path/to/chrome pnpm e2e
-```
+UI checks are done manually with the agent-browser tool against the local or production app. The project does not include a browser test runner.
 
 ## Project layout
 
