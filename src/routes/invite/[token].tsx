@@ -39,7 +39,7 @@ function InviteInner() {
       toast.show(result.error, "error");
       return;
     }
-    await revalidate(getMyTrees.key);
+    await revalidate([getMyTrees.key, getInvitePreview.key]);
     toast.show("You joined the tree.", "success");
     navigate(`/trees/${result.data.treeId}`);
   }

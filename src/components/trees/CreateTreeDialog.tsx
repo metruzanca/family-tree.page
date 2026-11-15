@@ -1,6 +1,7 @@
 import { createSignal } from "solid-js";
-import { useNavigate } from "@solidjs/router";
+import { revalidate, useNavigate } from "@solidjs/router";
 import { createTree } from "~/api/trees-server";
+import { getMyTrees } from "~/api";
 import { Button } from "../ui/Button";
 import { Field } from "../ui/Field";
 import { Modal } from "../ui/Modal";
@@ -28,6 +29,7 @@ export function CreateTreeDialog(props: {
       setError(result.error);
       return;
     }
+    await revalidate(getMyTrees.key);
     toast.show("Tree created. Add your first person.", "success");
     props.onClose();
     navigate(`/trees/${result.data.id}`);

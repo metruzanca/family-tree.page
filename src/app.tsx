@@ -1,11 +1,21 @@
 // @refresh reload
-import { Router } from "@solidjs/router";
+import { Router, query, useLocation } from "@solidjs/router";
 import { FileRoutes } from "@solidjs/start/router";
-import { Suspense } from "solid-js";
+import { Suspense, createEffect, type ParentProps } from "solid-js";
 import "./app.css";
 import { ThemeProvider } from "./components/ui/Theme";
 import { ToastProvider } from "./components/ui/Toast";
 import { LoadingScreen } from "./components/ui/Loading";
+
+function CacheBoundary(props: ParentProps) {
+  const location = useLocation();
+  createEffect(() => {
+    if (location.pathname === "/login" || location.pathname === "/register") {
+      query.clear();
+    }
+  });
+  return <>{props.children}</>;
+}
 
 export default function App() {
   return (
@@ -13,9 +23,11 @@ export default function App() {
       <ToastProvider>
         <Router
           root={props => (
-            <Suspense fallback={<LoadingScreen />}>
-              {props.children}
-            </Suspense>
+            <CacheBoundary>
+              <Suspense fallback={<LoadingScreen />}>
+                {props.children}
+              </Suspense>
+            </CacheBoundary>
           )}
         >
           <FileRoutes />

@@ -45,7 +45,7 @@ function AccountSettingsInner() {
       toast.show(result.error, "error");
       return;
     }
-    await revalidate(getUser.key);
+    await revalidate([getUser.key, requireUserPage.key]);
     toast.show("Profile updated.", "success");
   }
 

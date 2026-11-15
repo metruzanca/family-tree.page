@@ -157,12 +157,14 @@ function TreeSettingsInner() {
       } else if (action.kind === "leave") {
         const result = await leaveTree(params.treeId);
         if (!result.ok) return toast.show(result.error, "error");
+        await revalidate(getMyTrees.key);
         toast.show("You left the tree.", "success");
         navigate("/trees");
         return;
       } else if (action.kind === "delete") {
         const result = await deleteTree(params.treeId);
         if (!result.ok) return toast.show(result.error, "error");
+        await revalidate(getMyTrees.key);
         toast.show("Tree deleted.", "success");
         navigate("/trees");
         return;
