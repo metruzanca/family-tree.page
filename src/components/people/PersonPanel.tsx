@@ -3,6 +3,7 @@ import {
   CalendarDays,
   FileText,
   Image as ImageIcon,
+  Layers,
   MapPin,
   Pencil,
   Plus,
@@ -13,6 +14,7 @@ import {
 } from "lucide-solid";
 import type {
   GraphFile,
+  GraphFileGroup,
   GraphPerson,
   GraphRelationship,
   TreeGraph,
@@ -35,6 +37,7 @@ type PersonPanelProps = {
   onAddRelative: () => void;
   onSelectPerson: (id: string) => void;
   onSelectFile: (file: GraphFile) => void;
+  onSelectGroup: (groupId: string) => void;
   onSetAvatar: (fileId: string | null) => void;
   onDeleteFile: (file: GraphFile) => void;
   onUpload: (files: File[]) => void;
@@ -44,9 +47,15 @@ type PersonPanelProps = {
 export function PersonPanel(props: PersonPanelProps) {
   const editable = () => props.role === "owner" || props.role === "editor";
   const people = createMemo(() => new Map(props.data.people.map(person => [person.id, person])));
-  const files = createMemo(() =>
-    props.data.files.filter(file => file.personId === props.person.id),
+  const groups = createMemo(() =>
+    props.data.groups.filter(group => group.personId === props.person.id),
   );
+  const files = createMemo(() =>
+    props.data.files.filter(
+      file => file.personId === props.person.id && !file.groupId,
+    ),
+  );
+  const mediaCount = () => groups().length + files().length;
   const parents = createMemo(() =>
     props.data.relationships
       .filter(
@@ -230,10 +239,10 @@ export function PersonPanel(props: PersonPanelProps) {
         <section>
           <div class="flex items-center justify-between">
             <h3 class="label">Photos and files</h3>
-            <span class="text-[0.7rem] text-muted">{files().length}</span>
+            <span class="text-[0.7rem] text-muted">{mediaCount()}</span>
           </div>
           <Show
-            when={files().length}
+            when={mediaCount()}
             fallback={
               <p class="mt-2 rounded-xl border border-dashed border-line px-3 py-5 text-center text-xs leading-relaxed text-muted">
                 No files yet. Add a portrait or a document about {firstName(props.person)}.
@@ -241,6 +250,14 @@ export function PersonPanel(props: PersonPanelProps) {
             }
           >
             <div class="mt-2 grid grid-cols-3 gap-2">
+              <For each={groups()}>
+                {group => (
+                  <GroupTile
+                    group={group}
+                    onOpen={() => props.onSelectGroup(group.id)}
+                  />
+                )}
+              </For>
               <For each={files()}>
                 {file => (
                   <FileTile
@@ -311,6 +328,41 @@ function RelationGroup(props: {
         </ul>
       </Show>
     </div>
+  );
+}
+
+function GroupTile(props: { group: GraphFileGroup; onOpen: () => void }) {
+  const cover = () =>
+    props.group.coverFileId ? `/api/files/${props.group.coverFileId}/thumb` : null;
+  return (
+    <button
+      type="button"
+      class="group relative aspect-square overflow-hidden rounded-xl border border-line bg-paper text-left"
+      title={props.group.name}
+      aria-label={`Open ${props.group.name}`}
+      onClick={props.onOpen}
+    >
+      <span class="absolute left-2 top-2 h-[calc(100%-0.4rem)] w-[calc(100%-0.4rem)] rounded-lg border border-line bg-raised/80" />
+      <span class="absolute left-1 top-1 h-[calc(100%-0.4rem)] w-[calc(100%-0.4rem)] rounded-lg border border-line bg-raised" />
+      <span class="absolute inset-0 overflow-hidden rounded-xl">
+        <Show
+          when={cover()}
+          fallback={
+            <span class="flex h-full w-full items-center justify-center text-muted">
+              <Layers size={24} />
+            </span>
+          }
+        >
+          <img src={cover()!} alt="" class="h-full w-full object-cover" loading="lazy" />
+        </Show>
+      </span>
+      <span class="absolute left-1.5 top-1.5 grid h-5 min-w-5 place-items-center rounded-full bg-gold px-1 text-[0.62rem] font-bold text-[#161a12]">
+        {props.group.count}
+      </span>
+      <span class="absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/80 to-transparent px-2 pb-1 pt-4 text-[0.62rem] font-semibold text-white">
+        {props.group.name}
+      </span>
+    </button>
   );
 }
 

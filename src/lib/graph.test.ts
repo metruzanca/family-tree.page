@@ -121,6 +121,7 @@ describe("buildGraphModel", () => {
       {
         id: "avatar",
         personId: "a",
+        groupId: null,
         name: "portrait.jpg",
         mimeType: "image/jpeg",
         kind: "image",
@@ -134,6 +135,7 @@ describe("buildGraphModel", () => {
       {
         id: "doc",
         personId: "b",
+        groupId: null,
         name: "letter.pdf",
         mimeType: "application/pdf",
         kind: "document",
@@ -145,6 +147,7 @@ describe("buildGraphModel", () => {
         isAvatar: false,
       },
     ],
+    groups: [],
   };
 
   it("adds non-avatar files when media is visible", () => {
@@ -158,6 +161,45 @@ describe("buildGraphModel", () => {
     const model = buildGraphModel(data, false, "oldest-top");
     expect(model.nodes.map(node => node.id)).toEqual(["a", "b"]);
     expect(model.links.some(link => link.kind === "media")).toBe(false);
+  });
+
+  it("renders one stack node for an uploaded album", () => {
+    const albumData: TreeGraph = {
+      ...data,
+      files: [
+        data.files[0],
+        {
+          ...data.files[1],
+          id: "group-one",
+          groupId: "album-1",
+          thumbUrl: "/api/files/group-one/thumb",
+          isAvatar: false,
+        },
+        {
+          ...data.files[1],
+          id: "group-two",
+          groupId: "album-1",
+          thumbUrl: "/api/files/group-two/thumb",
+          isAvatar: false,
+        },
+      ],
+      groups: [
+        {
+          id: "album-1",
+          personId: "b",
+          name: "Summer",
+          count: 2,
+          coverFileId: "group-one",
+          createdAt: new Date(),
+        },
+      ],
+    };
+    const model = buildGraphModel(albumData, true, "oldest-top");
+    const groupNodes = model.nodes.filter(node => node.kind === "group");
+    expect(groupNodes).toHaveLength(1);
+    expect(groupNodes[0].group?.name).toBe("Summer");
+    expect(model.nodes.filter(node => node.kind === "file")).toHaveLength(0);
+    expect(model.links.filter(link => link.kind === "media")).toHaveLength(1);
   });
 
   it("keeps single-parent links direct", () => {
@@ -183,6 +225,7 @@ describe("buildGraphModel", () => {
         people: familyPeople,
         relationships: familyRelationships,
         files: [],
+        groups: [],
       },
       false,
       "oldest-top",

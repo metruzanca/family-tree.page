@@ -30,7 +30,7 @@ export function Modal(props: ModalProps) {
   return (
     <Show when={props.open}>
       <Portal>
-        <div class="fixed inset-0 z-50 flex items-end justify-center bg-[rgba(5,7,4,0.52)] p-0 backdrop-blur-[2px] sm:items-center sm:p-4">
+        <div class="fixed inset-0 z-[70] flex items-end justify-center bg-[rgba(5,7,4,0.52)] p-0 backdrop-blur-[2px] sm:items-center sm:p-4">
           <button
             type="button"
             class="absolute inset-0 cursor-default"

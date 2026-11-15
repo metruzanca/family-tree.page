@@ -1,4 +1,10 @@
-import type { GraphFile, GraphPerson, GraphRelationship, TreeGraph } from "~/api/people-server";
+import type {
+  GraphFile,
+  GraphFileGroup,
+  GraphPerson,
+  GraphRelationship,
+  TreeGraph,
+} from "~/api/people-server";
 
 export type GenerationDirection = "oldest-top" | "oldest-bottom";
 export const GENERATION_SPACING = 190;
@@ -6,10 +12,11 @@ export const GENERATION_BAND = 58;
 
 export type GraphNode = {
   id: string;
-  kind: "person" | "file" | "union";
+  kind: "person" | "file" | "group" | "union";
   name: string;
   person?: GraphPerson;
   file?: GraphFile;
+  group?: GraphFileGroup;
   memberIds?: string[];
   parentIds?: string[];
   childIds?: string[];
@@ -43,6 +50,10 @@ export type GraphModel = {
 
 export function fileNodeId(fileId: string) {
   return `file:${fileId}`;
+}
+
+export function groupNodeId(groupId: string) {
+  return `group:${groupId}`;
 }
 
 export function buildGraphModel(
@@ -207,8 +218,33 @@ export function buildGraphModel(
 
   if (showMedia) {
     const byPerson = new Map(nodes.map(node => [node.id, node]));
+    for (const group of data.groups) {
+      const parent = byPerson.get(group.personId);
+      if (!parent) continue;
+      const level = parent.level;
+      const offset = initialSpot(group.id, level, direction);
+      nodes.push({
+        id: groupNodeId(group.id),
+        kind: "group",
+        name: group.name,
+        group,
+        degree: 1,
+        val: 0.7,
+        level,
+        x: (parent.x ?? 0) + offset.x * 0.4,
+        y: (parent.y ?? 0) + offset.y * 0.4,
+      });
+      const link: GraphLink = {
+        id: `group-media:${group.id}`,
+        source: parent.id,
+        target: groupNodeId(group.id),
+        kind: "media",
+      };
+      links.push(link);
+      semanticLinks.push({ ...link });
+    }
     for (const file of data.files) {
-      if (file.isAvatar) continue;
+      if (file.isAvatar || file.groupId) continue;
       const parent = byPerson.get(file.personId);
       if (!parent) continue;
       const level = parent.level;
@@ -369,6 +405,7 @@ export function neighborsOf(links: GraphLink[], id: string): Set<string> {
 export function nodeRadius(node: GraphNode) {
   if (node.kind === "union") return 6;
   if (node.kind === "file") return 11;
+  if (node.kind === "group") return 16;
   return Math.min(28, 12 + Math.sqrt(node.degree) * 4.2);
 }
 

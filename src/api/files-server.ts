@@ -3,14 +3,19 @@
 import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { db } from "../server/db";
-import { files, people } from "../../drizzle/schema";
+import { fileGroups, files, people, trees } from "../../drizzle/schema";
 import { requireTreeMember } from "../server/guards";
 import { requireUser } from "../server/auth-service";
 import { AppError, runAction, type ActionResult } from "../server/errors";
-import { prepareUploadSchema } from "../server/validation";
+import {
+  fileGroupSchema,
+  prepareUploadSchema,
+  renameFileGroupSchema,
+} from "../server/validation";
 import {
   assertAllowedUpload,
   cleanupFile,
+  deleteFileGroup as deleteFileGroupRecord,
   deleteFileRecord,
   finalizeFile,
   getFileById,
@@ -32,6 +37,7 @@ export type PreparedUpload = {
 export async function prepareUpload(input: {
   treeId: string;
   personId: string;
+  groupId?: string | null;
   fileName: string;
   mimeType: string;
   sizeBytes: number;
@@ -53,6 +59,21 @@ export async function prepareUpload(input: {
       .limit(1);
     if (!personRows.length) throw new AppError("That person could not be found.");
 
+    if (parsed.groupId) {
+      const groupRows = await db
+        .select({ id: fileGroups.id })
+        .from(fileGroups)
+        .where(
+          and(
+            eq(fileGroups.id, parsed.groupId),
+            eq(fileGroups.treeId, access.tree.id),
+            eq(fileGroups.personId, parsed.personId),
+          ),
+        )
+        .limit(1);
+      if (!groupRows.length) throw new AppError("That album could not be found.");
+    }
+
     const fileId = randomUUID();
     const keys = storageKeys(access.tree.id, parsed.personId, fileId);
     const kind = kindForMime(mimeType);
@@ -61,6 +82,7 @@ export async function prepareUpload(input: {
       id: fileId,
       treeId: access.tree.id,
       personId: parsed.personId,
+      groupId: parsed.groupId ?? null,
       storageKey: keys.original,
       thumbKey: thumbMime ? keys.thumb : null,
       thumbMime,
@@ -124,6 +146,75 @@ export async function deleteFile(input: {
     const file = await getFileById(input.fileId);
     if (!file || file.treeId !== access.tree.id) throw new AppError("That file could not be found.");
     await deleteFileRecord(input.fileId, access.user.id);
+    return undefined;
+  });
+}
+
+export async function createFileGroup(input: {
+  treeId: string;
+  personId: string;
+  name: string;
+}): Promise<ActionResult<{ id: string; name: string }>> {
+  return runAction(async () => {
+    const access = await requireTreeMember(input.treeId, "editor");
+    const parsed = fileGroupSchema.parse(input);
+    const personRows = await db
+      .select({ id: people.id })
+      .from(people)
+      .where(and(eq(people.id, parsed.personId), eq(people.treeId, access.tree.id)))
+      .limit(1);
+    if (!personRows.length) throw new AppError("That person could not be found.");
+    const [group] = await db
+      .insert(fileGroups)
+      .values({
+        treeId: access.tree.id,
+        personId: parsed.personId,
+        name: parsed.name,
+        createdBy: access.user.id,
+      })
+      .returning();
+    return { id: group.id, name: group.name };
+  });
+}
+
+export async function renameFileGroup(input: {
+  groupId: string;
+  name: string;
+}): Promise<ActionResult<{ id: string; name: string }>> {
+  return runAction(async () => {
+    const parsed = renameFileGroupSchema.parse(input);
+    const rows = await db
+      .select()
+      .from(fileGroups)
+      .where(eq(fileGroups.id, parsed.groupId))
+      .limit(1);
+    const group = rows[0];
+    if (!group) throw new AppError("That album could not be found.");
+    const access = await requireTreeMember(group.treeId, "editor");
+    const [updated] = await db
+      .update(fileGroups)
+      .set({ name: parsed.name, updatedAt: new Date() })
+      .where(and(eq(fileGroups.id, group.id), eq(fileGroups.treeId, access.tree.id)))
+      .returning();
+    await db
+      .update(trees)
+      .set({ updatedAt: new Date() })
+      .where(eq(trees.id, access.tree.id));
+    return { id: updated.id, name: updated.name };
+  });
+}
+
+export async function deleteFileGroup(groupId: string): Promise<ActionResult<undefined>> {
+  return runAction(async () => {
+    const rows = await db
+      .select()
+      .from(fileGroups)
+      .where(eq(fileGroups.id, groupId))
+      .limit(1);
+    const group = rows[0];
+    if (!group) throw new AppError("That album could not be found.");
+    const access = await requireTreeMember(group.treeId, "editor");
+    await deleteFileGroupRecord(group.id, access.tree.id);
     return undefined;
   });
 }

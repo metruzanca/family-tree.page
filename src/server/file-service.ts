@@ -1,7 +1,13 @@
 import { and, eq } from "drizzle-orm";
 import { fileTypeFromBuffer } from "file-type";
 import { db } from "./db";
-import { files, treeMembers, trees, type StoredFile } from "../../drizzle/schema";
+import {
+  fileGroups,
+  files,
+  treeMembers,
+  trees,
+  type StoredFile,
+} from "../../drizzle/schema";
 import { AppError } from "./errors";
 import {
   deleteKeys,
@@ -206,8 +212,49 @@ export async function deleteFileRecord(fileId: string, userId: string) {
   if (!memberships.length || memberships[0].role === "viewer") {
     throw new AppError("You do not have permission to delete this file.");
   }
+  const groupId = file.groupId;
   await cleanupFile(file);
+  if (groupId) {
+    const remaining = await db
+      .select({ id: files.id })
+      .from(files)
+      .where(and(eq(files.groupId, groupId), eq(files.treeId, file.treeId)))
+      .limit(1);
+    if (!remaining.length) {
+      await db
+        .delete(fileGroups)
+        .where(and(eq(fileGroups.id, groupId), eq(fileGroups.treeId, file.treeId)));
+    }
+  }
   await touchTree(file.treeId);
+}
+
+export async function deleteFileGroup(groupId: string, treeId: string) {
+  const groupRows = await db
+    .select()
+    .from(fileGroups)
+    .where(and(eq(fileGroups.id, groupId), eq(fileGroups.treeId, treeId)))
+    .limit(1);
+  const group = groupRows[0];
+  if (!group) throw new AppError("That album could not be found.");
+  const groupFiles = await db
+    .select()
+    .from(files)
+    .where(and(eq(files.groupId, groupId), eq(files.treeId, treeId)));
+  const keys = groupFiles
+    .flatMap(file => [file.storageKey, file.thumbKey])
+    .filter((key): key is string => Boolean(key));
+  if (keys.length) {
+    try {
+      await deleteKeys(keys);
+    } catch (error) {
+      console.error("Could not remove album objects", error);
+    }
+  }
+  await db
+    .delete(fileGroups)
+    .where(and(eq(fileGroups.id, groupId), eq(fileGroups.treeId, treeId)));
+  await touchTree(treeId);
 }
 
 export async function setAvatarRecord(input: {

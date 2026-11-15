@@ -117,6 +117,31 @@ export const people = pgTable(
   ],
 );
 
+export const fileGroups = pgTable(
+  "file_groups",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    treeId: uuid("tree_id")
+      .notNull()
+      .references(() => trees.id, { onDelete: "cascade" }),
+    personId: uuid("person_id").notNull(),
+    name: text("name").notNull().default("Album"),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  t => [
+    index("file_groups_tree_idx").on(t.treeId),
+    index("file_groups_person_idx").on(t.personId),
+    unique("file_groups_id_tree_unique").on(t.id, t.treeId),
+    foreignKey({
+      columns: [t.personId, t.treeId],
+      foreignColumns: [people.id, people.treeId],
+      name: "file_groups_person_fk",
+    }).onDelete("cascade"),
+  ],
+);
+
 export const parentChild = pgTable(
   "parent_child",
   {
@@ -185,6 +210,7 @@ export const files = pgTable(
       .notNull()
       .references(() => trees.id, { onDelete: "cascade" }),
     personId: uuid("person_id").notNull(),
+    groupId: uuid("group_id"),
     storageKey: text("storage_key").notNull().unique(),
     thumbKey: text("thumb_key"),
     thumbMime: text("thumb_mime"),
@@ -208,6 +234,11 @@ export const files = pgTable(
       foreignColumns: [people.id, people.treeId],
       name: "files_person_fk",
     }).onDelete("cascade"),
+    foreignKey({
+      columns: [t.groupId, t.treeId],
+      foreignColumns: [fileGroups.id, fileGroups.treeId],
+      name: "files_group_fk",
+    }).onDelete("cascade"),
     uniqueIndex("files_one_avatar_per_person")
       .on(t.personId)
       .where(sql`${t.isAvatar} = true`),
@@ -220,4 +251,5 @@ export type TreeMember = typeof treeMembers.$inferSelect;
 export type Person = typeof people.$inferSelect;
 export type ParentChild = typeof parentChild.$inferSelect;
 export type Partnership = typeof partnerships.$inferSelect;
+export type FileGroup = typeof fileGroups.$inferSelect;
 export type StoredFile = typeof files.$inferSelect;

@@ -4,6 +4,7 @@ import { makeThumbnail, mimeForFile } from "./image-thumb";
 export type UploadOptions = {
   treeId: string;
   personId: string;
+  groupId?: string | null;
   file: File;
   onProgress?: (fraction: number) => void;
 };
@@ -28,6 +29,7 @@ export async function uploadPersonFile(options: UploadOptions): Promise<UploadRe
   const prepared = await prepareUpload({
     treeId: options.treeId,
     personId: options.personId,
+    groupId: options.groupId ?? null,
     fileName: options.file.name,
     mimeType,
     sizeBytes: options.file.size,

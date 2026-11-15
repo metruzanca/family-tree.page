@@ -33,6 +33,7 @@ type GraphViewProps = {
   generationDirection: GenerationDirection;
   onSelect: (id: string | null) => void;
   onFileSelect: (fileId: string) => void;
+  onGroupSelect: (groupId: string) => void;
   onReady?: (handle: GraphHandle) => void;
 };
 
@@ -126,6 +127,8 @@ export function GraphView(props: GraphViewProps) {
     suppressClickUntil = Date.now() + 400;
     if (node.kind === "person") {
       props.onSelect(node.id);
+    } else if (node.kind === "group" && node.group) {
+      props.onGroupSelect(node.group.id);
     } else if (node.file) {
       props.onFileSelect(node.file.id);
     }
@@ -252,7 +255,7 @@ export function GraphView(props: GraphViewProps) {
           context.fillText(years, node.x ?? 0, labelY + 13.5 / globalScale);
         }
       }
-    } else {
+    } else if (node.kind === "file") {
       const size = radius * 2;
       const x = (node.x ?? 0) - radius;
       const y = (node.y ?? 0) - radius;
@@ -296,6 +299,93 @@ export function GraphView(props: GraphViewProps) {
         context.strokeText(node.name, node.x ?? 0, (node.y ?? 0) + radius + 4 / globalScale);
         context.fillStyle = "rgba(243,238,227,0.82)";
         context.fillText(node.name, node.x ?? 0, (node.y ?? 0) + radius + 4 / globalScale);
+      }
+    } else if (node.kind === "group") {
+      const size = radius * 2;
+      const x = (node.x ?? 0) - radius;
+      const y = (node.y ?? 0) - radius;
+      const coverUrl = node.group?.coverFileId
+        ? `/api/files/${node.group.coverFileId}/thumb`
+        : null;
+      const image = coverUrl ? imageFor(coverUrl) : null;
+
+      context.beginPath();
+      context.roundRect(x - 6, y - 6, size, size, 6 / globalScale);
+      context.fillStyle = "#20261d";
+      context.fill();
+      context.lineWidth = 1 / globalScale;
+      context.strokeStyle = "rgba(243,238,227,0.18)";
+      context.stroke();
+
+      context.beginPath();
+      context.roundRect(x - 3, y - 3, size, size, 6 / globalScale);
+      context.fillStyle = "#283026";
+      context.fill();
+      context.stroke();
+
+      context.beginPath();
+      context.roundRect(x, y, size, size, 6 / globalScale);
+      context.fillStyle = image?.complete && image.naturalWidth > 0 ? "#20261d" : "#2b3027";
+      context.fill();
+
+      if (image?.complete && image.naturalWidth > 0) {
+        context.save();
+        context.clip();
+        context.drawImage(image, x, y, size, size);
+        context.restore();
+      } else {
+        context.strokeStyle = "#c49a45";
+        context.lineWidth = 1.2 / globalScale;
+        for (let index = 0; index < 3; index += 1) {
+          context.strokeRect(
+            x + size * 0.24,
+            y + size * (0.2 + index * 0.2),
+            size * 0.52,
+            size * 0.1,
+          );
+        }
+      }
+
+      context.beginPath();
+      context.roundRect(x, y, size, size, 6 / globalScale);
+      context.lineWidth = (isSelected ? 2.2 : 1.1) / globalScale;
+      context.strokeStyle = isSelected ? "#e3bb68" : "rgba(243,238,227,0.4)";
+      context.stroke();
+
+      const count = node.group?.count ?? 0;
+      if (count > 1) {
+        const badgeRadius = 9 / globalScale;
+        const badgeX = x + size - 2 / globalScale;
+        const badgeY = y + size - 2 / globalScale;
+        context.beginPath();
+        context.arc(badgeX, badgeY, badgeRadius, 0, Math.PI * 2);
+        context.fillStyle = "#c49a45";
+        context.fill();
+        context.fillStyle = "#161a12";
+        context.font = `700 ${10 / globalScale}px ui-sans-serif, system-ui, sans-serif`;
+        context.textAlign = "center";
+        context.textBaseline = "middle";
+        context.fillText(String(count), badgeX, badgeY + 0.5);
+      }
+
+      if (globalScale > 1.2 || isSelected || isHovered) {
+        const fontSize = 10 / globalScale;
+        context.font = `600 ${fontSize}px ui-sans-serif, system-ui, sans-serif`;
+        context.textAlign = "center";
+        context.textBaseline = "top";
+        context.lineWidth = 2.8 / globalScale;
+        context.strokeStyle = "rgba(17,20,16,0.92)";
+        context.strokeText(
+          node.name,
+          node.x ?? 0,
+          (node.y ?? 0) + radius + 5 / globalScale,
+        );
+        context.fillStyle = "rgba(243,238,227,0.9)";
+        context.fillText(
+          node.name,
+          node.x ?? 0,
+          (node.y ?? 0) + radius + 5 / globalScale,
+        );
       }
     }
     context.restore();

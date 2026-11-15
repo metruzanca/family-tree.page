@@ -3,6 +3,7 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "../server/db";
 import {
+  fileGroups,
   files,
   parentChild,
   partnerships,
@@ -28,6 +29,7 @@ import { deletePrefix, TREE_PREFIX } from "../server/storage";
 export type GraphFile = {
   id: string;
   personId: string;
+  groupId: string | null;
   name: string;
   mimeType: string;
   kind: "image" | "document" | "other";
@@ -37,6 +39,15 @@ export type GraphFile = {
   sizeBytes: number;
   createdAt: Date;
   isAvatar: boolean;
+};
+
+export type GraphFileGroup = {
+  id: string;
+  personId: string;
+  name: string;
+  count: number;
+  coverFileId: string | null;
+  createdAt: Date;
 };
 
 export type GraphPerson = {
@@ -78,6 +89,7 @@ export type TreeGraph = {
   people: GraphPerson[];
   relationships: GraphRelationship[];
   files: GraphFile[];
+  groups: GraphFileGroup[];
 };
 
 export function personDisplayName(person: Pick<Person, "firstName" | "lastName" | "nickname">) {
@@ -87,7 +99,7 @@ export function personDisplayName(person: Pick<Person, "firstName" | "lastName" 
 
 export async function getTreeGraph(treeId: string): Promise<TreeGraph> {
   const access = await requireTreeMember(treeId);
-  const [peopleRows, parentRows, partnerRows, fileRows] = await Promise.all([
+  const [peopleRows, parentRows, partnerRows, fileRows, groupRows] = await Promise.all([
     db.select().from(people).where(eq(people.treeId, treeId)),
     db.select().from(parentChild).where(eq(parentChild.treeId, treeId)),
     db.select().from(partnerships).where(eq(partnerships.treeId, treeId)),
@@ -95,12 +107,31 @@ export async function getTreeGraph(treeId: string): Promise<TreeGraph> {
       .select()
       .from(files)
       .where(and(eq(files.treeId, treeId), eq(files.status, "ready"))),
+    db.select().from(fileGroups).where(eq(fileGroups.treeId, treeId)),
   ]);
 
   const avatarByPerson = new Map<string, string>();
   for (const file of fileRows) {
     if (file.isAvatar) avatarByPerson.set(file.personId, file.id);
   }
+
+  const groupViews: GraphFileGroup[] = groupRows
+    .map(group => {
+      const groupFiles = fileRows.filter(file => file.groupId === group.id);
+      const cover =
+        groupFiles.find(file => file.kind === "image" && file.thumbKey) ??
+        groupFiles.find(file => file.kind === "image") ??
+        groupFiles[0];
+      return {
+        id: group.id,
+        personId: group.personId,
+        name: group.name,
+        count: groupFiles.length,
+        coverFileId: cover?.id ?? null,
+        createdAt: group.createdAt,
+      };
+    })
+    .filter(group => group.count > 0);
 
   return {
     tree: {
@@ -142,6 +173,7 @@ export async function getTreeGraph(treeId: string): Promise<TreeGraph> {
       })),
     ],
     files: fileRows.map(toGraphFile),
+    groups: groupViews,
   };
 }
 
@@ -149,6 +181,7 @@ function toGraphFile(file: StoredFile): GraphFile {
   return {
     id: file.id,
     personId: file.personId,
+    groupId: file.groupId,
     name: file.originalName,
     mimeType: file.mimeType,
     kind: file.kind,

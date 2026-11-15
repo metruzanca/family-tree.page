@@ -1,9 +1,20 @@
 import { Show, Suspense, createMemo, createSignal, onCleanup, onMount } from "solid-js";
 import { createAsync, revalidate, useParams, useSearchParams } from "@solidjs/router";
 import { Plus, Sprout } from "lucide-solid";
-import type { GraphFile, GraphPerson, GraphRelationship } from "~/api/people-server";
+import type {
+  GraphFile,
+  GraphFileGroup,
+  GraphPerson,
+  GraphRelationship,
+} from "~/api/people-server";
 import { deleteParentChild, deletePartnership, deletePerson } from "~/api/people-server";
-import { deleteFile, setAvatar } from "~/api/files-server";
+import {
+  createFileGroup,
+  deleteFile,
+  deleteFileGroup,
+  renameFileGroup,
+  setAvatar,
+} from "~/api/files-server";
 import { getMyTrees, getTreeGraph, getTreeOverview } from "~/api";
 import { GraphView, type GraphHandle } from "~/components/graph/GraphView";
 import { GraphToolbar } from "~/components/graph/GraphToolbar";
@@ -12,13 +23,13 @@ import { PersonPanel } from "~/components/people/PersonPanel";
 import { PersonFormDialog } from "~/components/people/PersonFormDialog";
 import { AddRelativeDialog } from "~/components/people/AddRelativeDialog";
 import { FilePanel } from "~/components/files/FilePanel";
-import { FilePreviewDialog } from "~/components/files/FilePreviewDialog";
+import { MediaLightbox } from "~/components/files/MediaLightbox";
 import { ConfirmDialog } from "~/components/ui/ConfirmDialog";
 import { Button } from "~/components/ui/Button";
 import { useToast } from "~/components/ui/Toast";
 import { uploadPersonFile } from "~/lib/upload";
 import { mimeForFile } from "~/lib/image-thumb";
-import { fileNodeId, type GenerationDirection } from "~/lib/graph";
+import { fileNodeId, groupNodeId, type GenerationDirection } from "~/lib/graph";
 
 export const route = {
   preload: ({ params }: { params: { treeId: string } }) => getTreeGraph(params.treeId),
@@ -48,8 +59,8 @@ function TreePageInner() {
   const [editPersonOpen, setEditPersonOpen] = createSignal(false);
   const [addRelativeOpen, setAddRelativeOpen] = createSignal(false);
   const [deletePersonOpen, setDeletePersonOpen] = createSignal(false);
-  const [previewFile, setPreviewFile] = createSignal<GraphFile | null>(null);
   const [deleteFileTarget, setDeleteFileTarget] = createSignal<GraphFile | null>(null);
+  const [deleteGroupTarget, setDeleteGroupTarget] = createSignal<GraphFileGroup | null>(null);
   const [pendingDelete, setPendingDelete] = createSignal(false);
   const [uploading, setUploading] = createSignal(false);
   const [uploadProgress, setUploadProgress] = createSignal(0);
@@ -62,18 +73,44 @@ function TreePageInner() {
     const value = searchParams.file;
     return typeof value === "string" ? value : null;
   });
+  const selectedGroupId = createMemo(() => {
+    const value = searchParams.album;
+    return typeof value === "string" ? value : null;
+  });
   const selectedPerson = createMemo(() =>
-    selectedFileId() ? null : (data()?.people.find(person => person.id === selectedId()) ?? null),
+    selectedFileId() || selectedGroupId()
+      ? null
+      : (data()?.people.find(person => person.id === selectedId()) ?? null),
   );
   const selectedFile = createMemo(
     () => data()?.files.find(file => file.id === selectedFileId()) ?? null,
   );
-  const selectedFilePerson = createMemo(
-    () => data()?.people.find(person => person.id === selectedFile()?.personId) ?? undefined,
+  const selectedGroup = createMemo(
+    () => data()?.groups.find(group => group.id === selectedGroupId()) ?? null,
   );
-  const selectedNodeId = createMemo(
-    () => selectedPerson()?.id ?? (selectedFile() ? fileNodeId(selectedFile()!.id) : null),
+  const effectiveGroup = createMemo(
+    () =>
+      selectedGroup() ??
+      (selectedFile()?.groupId
+        ? (data()?.groups.find(group => group.id === selectedFile()!.groupId) ?? null)
+        : null),
   );
+  const groupFiles = createMemo(() => {
+    const group = effectiveGroup();
+    if (!group) return [];
+    return data()?.files.filter(file => file.groupId === group.id) ?? [];
+  });
+  const activeMediaPerson = createMemo(() => {
+    const personId = effectiveGroup()?.personId ?? selectedFile()?.personId;
+    return data()?.people.find(person => person.id === personId) ?? undefined;
+  });
+  const selectedNodeId = createMemo(() => {
+    const group = effectiveGroup();
+    if (group) return groupNodeId(group.id);
+    if (selectedPerson()) return selectedPerson()!.id;
+    if (selectedFile()) return fileNodeId(selectedFile()!.id);
+    return null;
+  });
   const editable = () => data()?.role === "owner" || data()?.role === "editor";
 
   onMount(() => {
@@ -104,13 +141,20 @@ function TreePageInner() {
 
   function selectPerson(id: string | null) {
     setSearchParams(
-      { person: id ?? undefined, file: undefined },
+      { person: id ?? undefined, file: undefined, album: undefined },
       { replace: true },
     );
   }
 
   function selectFile(id: string) {
-    setSearchParams({ file: id, person: undefined }, { replace: true });
+    setSearchParams({ file: id, person: undefined, album: undefined }, { replace: true });
+  }
+
+  function selectGroup(id: string, fileId?: string | null) {
+    setSearchParams(
+      { album: id, file: fileId ?? undefined, person: undefined },
+      { replace: true },
+    );
   }
 
   function focusPerson(id: string) {
@@ -118,7 +162,17 @@ function TreePageInner() {
     setTimeout(() => handle()?.focus(id), 50);
   }
 
+  function focusGroup(id: string, fileId?: string | null) {
+    selectGroup(id, fileId);
+    setTimeout(() => handle()?.focus(groupNodeId(id)), 50);
+  }
+
   function focusFile(id: string) {
+    const file = data()?.files.find(candidate => candidate.id === id);
+    if (file?.groupId) {
+      focusGroup(file.groupId, file.id);
+      return;
+    }
     selectFile(id);
     setTimeout(() => handle()?.focus(fileNodeId(id)), 50);
   }
@@ -153,6 +207,23 @@ function TreePageInner() {
   async function handleUpload(files: File[]) {
     const person = selectedPerson();
     if (!person) return;
+    let groupId: string | null = null;
+    if (files.length > 1) {
+      const albumName = `Album · ${new Intl.DateTimeFormat(undefined, {
+        month: "short",
+        day: "numeric",
+      }).format(new Date())}`;
+      const groupResult = await createFileGroup({
+        treeId: params.treeId,
+        personId: person.id,
+        name: albumName,
+      });
+      if (!groupResult.ok) {
+        toast.show(groupResult.error, "error");
+        return;
+      }
+      groupId = groupResult.data.id;
+    }
     setUploading(true);
     setUploadProgress(0);
     let uploaded = 0;
@@ -163,6 +234,7 @@ function TreePageInner() {
         const result = await uploadPersonFile({
           treeId: params.treeId,
           personId: person.id,
+          groupId,
           file,
           onProgress: fraction => {
             setUploadProgress((index + fraction) / files.length);
@@ -187,9 +259,17 @@ function TreePageInner() {
       setUploading(false);
       setUploadProgress(0);
     }
+    if (!uploaded && groupId) {
+      await deleteFileGroup(groupId);
+    }
     await revalidate([getTreeGraph.key, getTreeOverview.key, getMyTrees.key]);
     if (uploaded) {
-      toast.show(`${uploaded} file${uploaded === 1 ? "" : "s"} added.`, "success");
+      toast.show(
+        groupId
+          ? `${uploaded} files added to an album.`
+          : `${uploaded} file${uploaded === 1 ? "" : "s"} added.`,
+        "success",
+      );
     }
   }
 
@@ -213,11 +293,45 @@ function TreePageInner() {
       toast.show(result.error, "error");
       return;
     }
-    if (selectedFileId() === file.id) selectPerson(null);
+    if (selectedFileId() === file.id) {
+      const group = effectiveGroup();
+      if (group) {
+        selectGroup(group.id);
+      } else {
+        selectPerson(null);
+      }
+    }
     setDeleteFileTarget(null);
-    setPreviewFile(null);
     await revalidate([getTreeGraph.key, getTreeOverview.key, getMyTrees.key]);
     toast.show("File deleted.", "success");
+  }
+
+  async function handleDeleteGroup() {
+    const group = deleteGroupTarget();
+    if (!group) return;
+    setPendingDelete(true);
+    const result = await deleteFileGroup(group.id);
+    setPendingDelete(false);
+    if (!result.ok) {
+      toast.show(result.error, "error");
+      return;
+    }
+    setDeleteGroupTarget(null);
+    selectPerson(null);
+    await revalidate([getTreeGraph.key, getTreeOverview.key, getMyTrees.key]);
+    toast.show("Album deleted.", "success");
+  }
+
+  async function handleRenameGroup(name: string) {
+    const group = effectiveGroup();
+    if (!group) return;
+    const result = await renameFileGroup({ groupId: group.id, name });
+    if (!result.ok) {
+      toast.show(result.error, "error");
+      return;
+    }
+    await revalidate(getTreeGraph.key);
+    toast.show("Album renamed.", "success");
   }
 
   async function handleDeletePerson() {
@@ -249,9 +363,18 @@ function TreePageInner() {
     toast.show("Connection removed.", "success");
   }
 
-  function openFilePreview(file: GraphFile) {
-    setPreviewFile(file);
-  }
+  const lightboxFiles = createMemo(() => {
+    if (effectiveGroup()) return groupFiles();
+    const file = selectedFile();
+    return file ? [file] : [];
+  });
+  const lightboxTitle = createMemo(
+    () => effectiveGroup()?.name ?? selectedFile()?.name ?? "",
+  );
+  const showLightbox = () =>
+    Boolean(effectiveGroup() || (selectedFile() && selectedFile()!.kind === "image"));
+  const showFilePanel = () =>
+    Boolean(selectedFile() && !effectiveGroup() && selectedFile()!.kind !== "image");
 
   return (
     <Show when={data()} fallback={<GraphLoading />}>
@@ -266,6 +389,7 @@ function TreePageInner() {
             generationDirection={generationDirection()}
             onSelect={handleGraphSelection}
             onFileSelect={focusFile}
+            onGroupSelect={focusGroup}
             onReady={setHandle}
           />
 
@@ -324,6 +448,7 @@ function TreePageInner() {
                 onAddRelative={() => setAddRelativeOpen(true)}
                 onSelectPerson={focusPerson}
                 onSelectFile={file => focusFile(file.id)}
+                onSelectGroup={groupId => focusGroup(groupId)}
                 onSetAvatar={fileId => handleSetAvatar(person().id, fileId)}
                 onDeleteFile={file => setDeleteFileTarget(file)}
                 onUpload={handleUpload}
@@ -332,14 +457,34 @@ function TreePageInner() {
             )}
           </Show>
 
-          <Show when={selectedFile()}>
+          <Show when={showLightbox()}>
+            <MediaLightbox
+              files={lightboxFiles()}
+              initialFileId={selectedFileId()}
+              title={lightboxTitle()}
+              group={effectiveGroup()}
+              person={activeMediaPerson()}
+              role={graph().role}
+              onClose={() => selectPerson(null)}
+              onSelectPerson={focusPerson}
+              onSetAvatar={handleSetAvatar}
+              onDeleteFile={file => setDeleteFileTarget(file)}
+              onRenameGroup={handleRenameGroup}
+              onDeleteGroup={() => {
+                const group = effectiveGroup();
+                if (group) setDeleteGroupTarget(group);
+              }}
+            />
+          </Show>
+
+          <Show when={showFilePanel() ? selectedFile() : null}>
             {file => (
               <FilePanel
                 file={file()}
-                person={selectedFilePerson()}
+                person={activeMediaPerson()}
                 role={graph().role}
                 onClose={() => selectPerson(null)}
-                onPreview={() => openFilePreview(file())}
+                onPreview={() => undefined}
                 onSelectPerson={focusPerson}
                 onSetAvatar={fileId => handleSetAvatar(file().personId, fileId)}
                 onDelete={() => setDeleteFileTarget(file())}
@@ -408,17 +553,6 @@ function TreePageInner() {
             onAdded={focusPerson}
           />
 
-          <FilePreviewDialog
-            file={previewFile()}
-            editable={editable()}
-            onClose={() => setPreviewFile(null)}
-            onSetAvatar={fileId => {
-              const personId = previewFile()?.personId ?? selectedFilePerson()?.id;
-              if (personId) handleSetAvatar(personId, fileId);
-            }}
-            onDelete={file => setDeleteFileTarget(file)}
-          />
-
           <ConfirmDialog
             open={deletePersonOpen()}
             onClose={() => setDeletePersonOpen(false)}
@@ -444,6 +578,17 @@ function TreePageInner() {
             danger
             pending={pendingDelete()}
             onConfirm={handleDeleteFile}
+          />
+
+          <ConfirmDialog
+            open={Boolean(deleteGroupTarget())}
+            onClose={() => setDeleteGroupTarget(null)}
+            title={`Delete ${deleteGroupTarget()?.name ?? "this album"}?`}
+            message="Every file in this album will be removed from storage. This cannot be undone."
+            confirmLabel="Delete album"
+            danger
+            pending={pendingDelete()}
+            onConfirm={handleDeleteGroup}
           />
         </div>
       )}

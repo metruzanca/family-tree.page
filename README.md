@@ -27,7 +27,10 @@ The graph is the main view. People are nodes, parent and partner relationships a
 - Direction flip for oldest-at-top or oldest-at-bottom layouts
 - Search, neighbor highlighting, zoom and pan
 - Pointer cursor only over nodes, not links or empty canvas
-- Person and file info panels on desktop and mobile
+- Person and document info panels on desktop and mobile
+- Full-screen image lightbox with a details sidebar
+- Multi-file uploads become albums rendered as stacked nodes on the graph
+- Portraits stay on the person node and are not duplicated as file nodes
 - Person profiles with parents, partners, children, and life notes
 - Image, PDF, and document uploads attached to people
 - Client-generated thumbnails, server-side content validation, and private file access

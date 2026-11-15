@@ -146,9 +146,21 @@ export const addRelativeSchema = z.discriminatedUnion("mode", [
   }),
 ]);
 
+export const fileGroupSchema = z.object({
+  treeId: z.string().uuid(),
+  personId: z.string().uuid(),
+  name: z.string().trim().min(1, "Give the album a name.").max(80, "That name is too long."),
+});
+
+export const renameFileGroupSchema = z.object({
+  groupId: z.string().uuid(),
+  name: z.string().trim().min(1, "Give the album a name.").max(80, "That name is too long."),
+});
+
 export const prepareUploadSchema = z.object({
   treeId: z.string().uuid(),
   personId: z.string().uuid(),
+  groupId: z.string().uuid().optional().nullable(),
   fileName: z.string().trim().min(1).max(255),
   mimeType: z.string().trim().min(1).max(120),
   sizeBytes: z.number().int().positive(),
