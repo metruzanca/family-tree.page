@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   emailSchema,
+  fileTagsSchema,
+  fileTakenAtSchema,
   forgotPasswordSchema,
   inviteEmailSchema,
   parentChildSchema,
@@ -95,5 +97,53 @@ describe("validation", () => {
       resetPasswordSchema.safeParse({ ...base, password: "short", confirmPassword: "short" })
         .success,
     ).toBe(false);
+  });
+
+  it("dedupes tagged people", () => {
+    const parsed = fileTagsSchema.parse({
+      treeId: "00000000-0000-4000-8000-000000000000",
+      fileId: "00000000-0000-4000-8000-000000000001",
+      personIds: [
+        "00000000-0000-4000-8000-000000000002",
+        "00000000-0000-4000-8000-000000000002",
+        "00000000-0000-4000-8000-000000000003",
+      ],
+    });
+    expect(parsed.personIds).toEqual([
+      "00000000-0000-4000-8000-000000000002",
+      "00000000-0000-4000-8000-000000000003",
+    ]);
+  });
+
+  it("allows clearing photo tags", () => {
+    const parsed = fileTagsSchema.parse({
+      treeId: "00000000-0000-4000-8000-000000000000",
+      fileId: "00000000-0000-4000-8000-000000000001",
+    });
+    expect(parsed.personIds).toEqual([]);
+  });
+
+  it("rejects non-uuid tagged people", () => {
+    expect(
+      fileTagsSchema.safeParse({
+        treeId: "00000000-0000-4000-8000-000000000000",
+        fileId: "00000000-0000-4000-8000-000000000001",
+        personIds: ["grandma"],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("accepts and clears a photo date taken", () => {
+    const base = {
+      treeId: "00000000-0000-4000-8000-000000000000",
+      fileId: "00000000-0000-4000-8000-000000000001",
+    };
+    expect(fileTakenAtSchema.parse({ ...base, takenAt: "1962-04-18" }).takenAt).toBe(
+      "1962-04-18",
+    );
+    expect(fileTakenAtSchema.parse({ ...base, takenAt: "" }).takenAt).toBeNull();
+    expect(fileTakenAtSchema.safeParse({ ...base, takenAt: "spring 1962" }).success).toBe(
+      false,
+    );
   });
 });

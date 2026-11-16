@@ -192,6 +192,23 @@ export const prepareUploadSchema = z.object({
   thumbMime: z.enum(["image/webp", "image/jpeg"]).optional().nullable(),
   width: z.number().int().positive().max(50_000).optional().nullable(),
   height: z.number().int().positive().max(50_000).optional().nullable(),
+  takenAt: optionalDate,
+});
+
+export const fileTagsSchema = z.object({
+  treeId: z.string().uuid(),
+  fileId: z.string().uuid(),
+  personIds: z
+    .array(z.string().uuid())
+    .max(50, "That is too many people for one photo.")
+    .default([])
+    .transform(ids => [...new Set(ids)]),
+});
+
+export const fileTakenAtSchema = z.object({
+  treeId: z.string().uuid(),
+  fileId: z.string().uuid(),
+  takenAt: optionalDate,
 });
 
 export type PersonInput = z.infer<typeof personUpdateSchema>;

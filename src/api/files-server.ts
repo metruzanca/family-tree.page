@@ -1,14 +1,16 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db } from "../server/db";
-import { fileGroups, files, people, trees } from "../../drizzle/schema";
+import { fileGroups, fileTags, files, people, trees } from "../../drizzle/schema";
 import { requireTreeMember } from "../server/guards";
 import { requireUser } from "../server/auth-service";
 import { AppError, runAction, type ActionResult } from "../server/errors";
 import {
   fileGroupSchema,
+  fileTagsSchema,
+  fileTakenAtSchema,
   prepareUploadSchema,
   renameFileGroupSchema,
 } from "../server/validation";
@@ -44,6 +46,7 @@ export async function prepareUpload(input: {
   thumbMime?: string | null;
   width?: number | null;
   height?: number | null;
+  takenAt?: string | null;
 }): Promise<ActionResult<PreparedUpload>> {
   return runAction(async () => {
     const access = await requireTreeMember(input.treeId, "editor");
@@ -92,6 +95,7 @@ export async function prepareUpload(input: {
       sizeBytes: parsed.sizeBytes,
       width: parsed.width ?? null,
       height: parsed.height ?? null,
+      takenAt: parsed.takenAt,
       status: "uploading",
       uploadedBy: access.user.id,
     });
@@ -238,6 +242,97 @@ export async function setAvatar(input: {
       fileId: input.fileId,
       userId: access.user.id,
     });
+    return undefined;
+  });
+}
+
+export async function updateFileTags(input: {
+  treeId: string;
+  fileId: string;
+  personIds: string[];
+}): Promise<ActionResult<string[]>> {
+  return runAction(async () => {
+    const access = await requireTreeMember(input.treeId, "editor");
+    const parsed = fileTagsSchema.parse(input);
+
+    const fileRows = await db
+      .select({ id: files.id, personId: files.personId })
+      .from(files)
+      .where(and(eq(files.id, parsed.fileId), eq(files.treeId, access.tree.id)))
+      .limit(1);
+    const file = fileRows[0];
+    if (!file) throw new AppError("That file could not be found.");
+
+    const desired = parsed.personIds.filter(personId => personId !== file.personId);
+    if (desired.length) {
+      const personRows = await db
+        .select({ id: people.id })
+        .from(people)
+        .where(and(eq(people.treeId, access.tree.id), inArray(people.id, desired)));
+      if (personRows.length !== desired.length) {
+        throw new AppError("One of those people could not be found.");
+      }
+    }
+
+    await db.transaction(async tx => {
+      const existing = await tx
+        .select({ personId: fileTags.personId })
+        .from(fileTags)
+        .where(and(eq(fileTags.fileId, file.id), eq(fileTags.treeId, access.tree.id)));
+      const currentIds = existing.map(row => row.personId);
+      const toRemove = currentIds.filter(personId => !desired.includes(personId));
+      const toAdd = desired.filter(personId => !currentIds.includes(personId));
+
+      if (toRemove.length) {
+        await tx
+          .delete(fileTags)
+          .where(
+            and(
+              eq(fileTags.fileId, file.id),
+              eq(fileTags.treeId, access.tree.id),
+              inArray(fileTags.personId, toRemove),
+            ),
+          );
+      }
+      if (toAdd.length) {
+        await tx.insert(fileTags).values(
+          toAdd.map(personId => ({
+            treeId: access.tree.id,
+            fileId: file.id,
+            personId,
+            source: "manual" as const,
+            createdBy: access.user.id,
+          })),
+        );
+      }
+      await tx
+        .update(trees)
+        .set({ updatedAt: new Date() })
+        .where(eq(trees.id, access.tree.id));
+    });
+
+    return desired;
+  });
+}
+
+export async function updateFileTakenAt(input: {
+  treeId: string;
+  fileId: string;
+  takenAt: string | null;
+}): Promise<ActionResult<undefined>> {
+  return runAction(async () => {
+    const access = await requireTreeMember(input.treeId, "editor");
+    const parsed = fileTakenAtSchema.parse(input);
+    const updated = await db
+      .update(files)
+      .set({ takenAt: parsed.takenAt, updatedAt: new Date() })
+      .where(and(eq(files.id, parsed.fileId), eq(files.treeId, access.tree.id)))
+      .returning({ id: files.id });
+    if (!updated.length) throw new AppError("That file could not be found.");
+    await db
+      .update(trees)
+      .set({ updatedAt: new Date() })
+      .where(eq(trees.id, access.tree.id));
     return undefined;
   });
 }

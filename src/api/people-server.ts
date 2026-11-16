@@ -4,6 +4,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { db } from "../server/db";
 import {
   fileGroups,
+  fileTags,
   files,
   parentChild,
   partnerships,
@@ -45,6 +46,8 @@ export type GraphFile = {
   width: number | null;
   height: number | null;
   sizeBytes: number;
+  takenAt: string | null;
+  taggedPersonIds: string[];
   createdAt: Date;
   isAvatar: boolean;
 };
@@ -109,7 +112,7 @@ export function personDisplayName(person: Pick<Person, "firstName" | "lastName" 
 
 export async function getTreeGraph(treeId: string): Promise<TreeGraph> {
   const access = await requireTreeMember(treeId);
-  const [peopleRows, parentRows, partnerRows, fileRows, groupRows] = await Promise.all([
+  const [peopleRows, parentRows, partnerRows, fileRows, groupRows, tagRows] = await Promise.all([
     db.select().from(people).where(eq(people.treeId, treeId)),
     db.select().from(parentChild).where(eq(parentChild.treeId, treeId)),
     db.select().from(partnerships).where(eq(partnerships.treeId, treeId)),
@@ -118,7 +121,18 @@ export async function getTreeGraph(treeId: string): Promise<TreeGraph> {
       .from(files)
       .where(and(eq(files.treeId, treeId), eq(files.status, "ready"))),
     db.select().from(fileGroups).where(eq(fileGroups.treeId, treeId)),
+    db
+      .select({ fileId: fileTags.fileId, personId: fileTags.personId })
+      .from(fileTags)
+      .where(eq(fileTags.treeId, treeId)),
   ]);
+
+  const tagsByFile = new Map<string, string[]>();
+  for (const tag of tagRows) {
+    const list = tagsByFile.get(tag.fileId) ?? [];
+    list.push(tag.personId);
+    tagsByFile.set(tag.fileId, list);
+  }
 
   const avatarByPerson = new Map<string, string>();
   for (const file of fileRows) {
@@ -184,12 +198,12 @@ export async function getTreeGraph(treeId: string): Promise<TreeGraph> {
         endDate: row.endDate,
       })),
     ],
-    files: fileRows.map(toGraphFile),
+    files: fileRows.map(file => toGraphFile(file, tagsByFile.get(file.id) ?? [])),
     groups: groupViews,
   };
 }
 
-function toGraphFile(file: StoredFile): GraphFile {
+function toGraphFile(file: StoredFile, taggedPersonIds: string[]): GraphFile {
   return {
     id: file.id,
     personId: file.personId,
@@ -201,6 +215,8 @@ function toGraphFile(file: StoredFile): GraphFile {
     width: file.width,
     height: file.height,
     sizeBytes: file.sizeBytes,
+    takenAt: file.takenAt,
+    taggedPersonIds,
     createdAt: file.createdAt,
     isAvatar: file.isAvatar,
   };
