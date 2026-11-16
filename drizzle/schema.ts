@@ -38,6 +38,11 @@ export const authTokenKind = pgEnum("auth_token_kind", [
   "email_verification",
   "password_reset",
 ]);
+export const birthdayEmailKind = pgEnum("birthday_email_kind", [
+  "week_before",
+  "day_before",
+  "day_of",
+]);
 
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -46,9 +51,30 @@ export const users = pgTable("users", {
   passwordHash: text("password_hash").notNull(),
   emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
   sessionVersion: integer("session_version").notNull().default(0),
+  notifyBirthdayWeekBefore: boolean("notify_birthday_week_before")
+    .notNull()
+    .default(false),
+  notifyBirthdayDayBefore: boolean("notify_birthday_day_before")
+    .notNull()
+    .default(false),
+  notifyBirthdayDayOf: boolean("notify_birthday_day_of").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+export const birthdayEmailLog = pgTable(
+  "birthday_email_log",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    kind: birthdayEmailKind("kind").notNull(),
+    sentOn: date("sent_on", { mode: "string" }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  t => [uniqueIndex("birthday_email_log_unique").on(t.userId, t.kind, t.sentOn)],
+);
 
 export const authTokens = pgTable(
   "auth_tokens",

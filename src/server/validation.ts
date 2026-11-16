@@ -58,6 +58,12 @@ export const updateProfileSchema = z.object({
   displayName: displayNameSchema,
 });
 
+export const updateNotificationSettingsSchema = z.object({
+  notifyBirthdayWeekBefore: z.boolean(),
+  notifyBirthdayDayBefore: z.boolean(),
+  notifyBirthdayDayOf: z.boolean(),
+});
+
 export const treeSchema = z.object({
   name: z.string().trim().min(1, "Give your tree a name.").max(80, "That name is too long."),
   description: z

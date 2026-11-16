@@ -29,6 +29,7 @@ import {
   loginSchema,
   registerSchema,
   resetPasswordSchema,
+  updateNotificationSettingsSchema,
   updateProfileSchema,
 } from "../server/validation";
 import { markTokenUsed, validateAuthToken } from "../server/tokens";
@@ -206,6 +207,29 @@ export async function updateProfile(input: {
     const [updated] = await db
       .update(users)
       .set({ displayName: parsed.displayName, updatedAt: new Date() })
+      .where(eq(users.id, current.id))
+      .returning();
+    if (!updated) throw new Error("Account not found.");
+    return toPublicUser(updated);
+  });
+}
+
+export async function updateNotificationSettings(input: {
+  notifyBirthdayWeekBefore: boolean;
+  notifyBirthdayDayBefore: boolean;
+  notifyBirthdayDayOf: boolean;
+}): Promise<ActionResult<PublicUser>> {
+  return runAction(async () => {
+    const current = await requireUser();
+    const parsed = updateNotificationSettingsSchema.parse(input);
+    const [updated] = await db
+      .update(users)
+      .set({
+        notifyBirthdayWeekBefore: parsed.notifyBirthdayWeekBefore,
+        notifyBirthdayDayBefore: parsed.notifyBirthdayDayBefore,
+        notifyBirthdayDayOf: parsed.notifyBirthdayDayOf,
+        updatedAt: new Date(),
+      })
       .where(eq(users.id, current.id))
       .returning();
     if (!updated) throw new Error("Account not found.");

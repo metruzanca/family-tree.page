@@ -1,7 +1,11 @@
 import { Show, createEffect, createSignal } from "solid-js";
 import { createAsync, revalidate } from "@solidjs/router";
-import { CircleCheck, KeyRound, UserRound } from "lucide-solid";
-import { changePassword, updateProfile } from "~/api/auth-server";
+import { BellRing, CircleCheck, KeyRound, UserRound } from "lucide-solid";
+import {
+  changePassword,
+  updateNotificationSettings,
+  updateProfile,
+} from "~/api/auth-server";
 import { getUser, requireUserPage } from "~/api";
 import { AppHeader } from "~/components/app/AppHeader";
 import { VerifyEmailNotice } from "~/components/auth/VerifyEmailNotice";
@@ -9,6 +13,14 @@ import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Field } from "~/components/ui/Field";
 import { LoadingScreen } from "~/components/ui/Loading";
+import {
+  Switch,
+  SwitchControl,
+  SwitchDescription,
+  SwitchInput,
+  SwitchLabel,
+  SwitchThumb,
+} from "~/components/ui/switch";
 import { useToast } from "~/components/ui/Toast";
 
 export const route = {
@@ -31,10 +43,26 @@ function AccountSettingsInner() {
   const [currentPassword, setCurrentPassword] = createSignal("");
   const [newPassword, setNewPassword] = createSignal("");
   const [passwordPending, setPasswordPending] = createSignal(false);
+  const [notifications, setNotifications] = createSignal({
+    weekBefore: false,
+    dayBefore: false,
+    dayOf: true,
+  });
+  const [notificationsPending, setNotificationsPending] = createSignal(false);
 
   createEffect(() => {
     const current = user();
     if (current) setDisplayName(current.displayName);
+  });
+
+  createEffect(() => {
+    const current = user();
+    if (!current) return;
+    setNotifications({
+      weekBefore: current.notifyBirthdayWeekBefore,
+      dayBefore: current.notifyBirthdayDayBefore,
+      dayOf: current.notifyBirthdayDayOf,
+    });
   });
 
   async function saveProfile(event: SubmitEvent) {
@@ -67,6 +95,29 @@ function AccountSettingsInner() {
     setCurrentPassword("");
     setNewPassword("");
     toast.show("Password changed.", "success");
+  }
+
+  async function toggleNotification(
+    key: "weekBefore" | "dayBefore" | "dayOf",
+    value: boolean,
+  ) {
+    if (notificationsPending()) return;
+    const previous = notifications();
+    const next = { ...previous, [key]: value };
+    setNotifications(next);
+    setNotificationsPending(true);
+    const result = await updateNotificationSettings({
+      notifyBirthdayWeekBefore: next.weekBefore,
+      notifyBirthdayDayBefore: next.dayBefore,
+      notifyBirthdayDayOf: next.dayOf,
+    });
+    setNotificationsPending(false);
+    if (!result.ok) {
+      setNotifications(previous);
+      toast.show(result.error, "error");
+      return;
+    }
+    await revalidate([getUser.key, requireUserPage.key]);
   }
 
   return (
@@ -136,6 +187,60 @@ function AccountSettingsInner() {
               <CardHeader class="gap-1 px-5 sm:px-6">
                 <div class="flex items-center gap-3">
                   <span class="grid size-9 place-items-center rounded-xl bg-accent text-accent-foreground">
+                    <BellRing size={17} />
+                  </span>
+                  <div>
+                    <CardTitle class="font-display text-xl">Email notifications</CardTitle>
+                    <CardDescription class="text-xs">
+                      Birthday reminders for living people in your trees.
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent class="px-5 sm:px-6">
+                <div class="divide-y divide-border">
+                  <NotificationToggle
+                    label="One week before"
+                    description="A heads-up seven days before the birthday."
+                    checked={notifications().weekBefore}
+                    disabled={!current().emailVerified || notificationsPending()}
+                    onChange={value => toggleNotification("weekBefore", value)}
+                  />
+                  <NotificationToggle
+                    label="The day before"
+                    description="A reminder the day before the birthday."
+                    checked={notifications().dayBefore}
+                    disabled={!current().emailVerified || notificationsPending()}
+                    onChange={value => toggleNotification("dayBefore", value)}
+                  />
+                  <NotificationToggle
+                    label="On the morning of the birthday"
+                    description="A reminder on the day itself. On by default."
+                    checked={notifications().dayOf}
+                    disabled={!current().emailVerified || notificationsPending()}
+                    onChange={value => toggleNotification("dayOf", value)}
+                  />
+                </div>
+                <Show
+                  when={current().emailVerified}
+                  fallback={
+                    <p class="mt-4 rounded-xl border border-dashed border-border px-3 py-2 text-xs leading-relaxed text-muted-foreground">
+                      Confirm your email address before birthday reminders can be sent.
+                    </p>
+                  }
+                >
+                  <p class="mt-4 text-xs leading-relaxed text-muted-foreground">
+                    Reminders are sent to <span class="font-medium text-foreground">{current().email}</span>{" "}
+                    and include every tree you belong to. Changes save automatically.
+                  </p>
+                </Show>
+              </CardContent>
+            </Card>
+
+            <Card class="mt-5 gap-4 py-5 sm:py-6">
+              <CardHeader class="gap-1 px-5 sm:px-6">
+                <div class="flex items-center gap-3">
+                  <span class="grid size-9 place-items-center rounded-xl bg-accent text-accent-foreground">
                     <KeyRound size={17} />
                   </span>
                   <div>
@@ -187,5 +292,31 @@ function AccountSettingsInner() {
         </div>
       )}
     </Show>
+  );
+}
+
+function NotificationToggle(props: {
+  label: string;
+  description: string;
+  checked: boolean;
+  disabled: boolean;
+  onChange: (value: boolean) => void;
+}) {
+  return (
+    <Switch
+      class="flex w-full items-start justify-between gap-4 py-3.5 first:pt-0 last:pb-0"
+      checked={props.checked}
+      disabled={props.disabled}
+      onChange={props.onChange}
+    >
+      <SwitchInput />
+      <div class="min-w-0">
+        <SwitchLabel>{props.label}</SwitchLabel>
+        <SwitchDescription class="mt-0.5">{props.description}</SwitchDescription>
+      </div>
+      <SwitchControl aria-label={props.label}>
+        <SwitchThumb />
+      </SwitchControl>
+    </Switch>
   );
 }

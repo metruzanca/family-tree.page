@@ -7,6 +7,7 @@ import {
   personSchema,
   registerSchema,
   resetPasswordSchema,
+  updateNotificationSettingsSchema,
 } from "./validation";
 
 describe("validation", () => {
@@ -61,6 +62,23 @@ describe("validation", () => {
   it("requires a valid email for a password reset request", () => {
     expect(forgotPasswordSchema.safeParse({ email: "sam@example.com" }).success).toBe(true);
     expect(forgotPasswordSchema.safeParse({ email: "nope" }).success).toBe(false);
+  });
+
+  it("requires booleans for birthday notification settings", () => {
+    expect(
+      updateNotificationSettingsSchema.safeParse({
+        notifyBirthdayWeekBefore: false,
+        notifyBirthdayDayBefore: true,
+        notifyBirthdayDayOf: true,
+      }).success,
+    ).toBe(true);
+    expect(
+      updateNotificationSettingsSchema.safeParse({
+        notifyBirthdayWeekBefore: "yes",
+        notifyBirthdayDayBefore: false,
+        notifyBirthdayDayOf: true,
+      }).success,
+    ).toBe(false);
   });
 
   it("requires matching passwords when resetting", () => {

@@ -46,6 +46,9 @@ export type PublicUser = {
   email: string;
   displayName: string;
   emailVerified: boolean;
+  notifyBirthdayWeekBefore: boolean;
+  notifyBirthdayDayBefore: boolean;
+  notifyBirthdayDayOf: boolean;
 };
 
 export function toPublicUser(user: User): PublicUser {
@@ -54,6 +57,9 @@ export function toPublicUser(user: User): PublicUser {
     email: user.email,
     displayName: user.displayName,
     emailVerified: Boolean(user.emailVerifiedAt),
+    notifyBirthdayWeekBefore: user.notifyBirthdayWeekBefore,
+    notifyBirthdayDayBefore: user.notifyBirthdayDayBefore,
+    notifyBirthdayDayOf: user.notifyBirthdayDayOf,
   };
 }
 
