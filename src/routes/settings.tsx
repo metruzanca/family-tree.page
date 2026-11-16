@@ -5,9 +5,12 @@ import {
   CalendarPlus,
   CircleCheck,
   Copy,
+  Download,
   ExternalLink,
   KeyRound,
+  Mail,
   RotateCw,
+  ShieldAlert,
   Trash2,
   UserRound,
 } from "lucide-solid";
@@ -16,8 +19,13 @@ import {
   updateNotificationSettings,
   updateProfile,
 } from "~/api/auth-server";
+import {
+  cancelEmailChange,
+  deleteAccount,
+  requestEmailChange,
+} from "~/api/account-server";
 import { createCalendarFeed, disableCalendarFeed } from "~/api/calendar-server";
-import { getCalendarFeed, getUser, requireUserPage } from "~/api";
+import { getCalendarFeed, getPendingEmailChange, getUser, requireUserPage } from "~/api";
 import { AppHeader } from "~/components/app/AppHeader";
 import { VerifyEmailNotice } from "~/components/auth/VerifyEmailNotice";
 import { Button, buttonVariants } from "~/components/ui/button";
@@ -25,6 +33,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/com
 import { ConfirmDialog } from "~/components/ui/ConfirmDialog";
 import { Field } from "~/components/ui/Field";
 import { LoadingScreen } from "~/components/ui/Loading";
+import { Modal } from "~/components/ui/Modal";
+import { formatRelative } from "~/lib/format";
 import {
   Switch,
   SwitchControl,
@@ -40,6 +50,7 @@ export const route = {
   preload: () => {
     requireUserPage();
     getCalendarFeed();
+    getPendingEmailChange();
   },
 };
 
@@ -68,6 +79,15 @@ function AccountSettingsInner() {
   const feed = createAsync(() => getCalendarFeed());
   const [feedPending, setFeedPending] = createSignal(false);
   const [feedConfirm, setFeedConfirm] = createSignal<"rotate" | "disable" | null>(null);
+  const pendingEmailChange = createAsync(() => getPendingEmailChange());
+  const [emailFormOpen, setEmailFormOpen] = createSignal(false);
+  const [newEmail, setNewEmail] = createSignal("");
+  const [emailPassword, setEmailPassword] = createSignal("");
+  const [emailPending, setEmailPending] = createSignal(false);
+  const [deleteOpen, setDeleteOpen] = createSignal(false);
+  const [deletePassword, setDeletePassword] = createSignal("");
+  const [deleteConfirmation, setDeleteConfirmation] = createSignal("");
+  const [deletePending, setDeletePending] = createSignal(false);
 
   createEffect(() => {
     const current = user();
@@ -171,6 +191,61 @@ function AccountSettingsInner() {
     );
   }
 
+  async function saveEmail(event: SubmitEvent) {
+    event.preventDefault();
+    if (emailPending()) return;
+    setEmailPending(true);
+    const result = await requestEmailChange({
+      newEmail: newEmail(),
+      currentPassword: emailPassword(),
+    });
+    setEmailPending(false);
+    if (!result.ok) {
+      toast.show(result.error, "error");
+      return;
+    }
+    setEmailFormOpen(false);
+    setNewEmail("");
+    setEmailPassword("");
+    await revalidate([
+      getPendingEmailChange.key,
+      getUser.key,
+      requireUserPage.key,
+    ]);
+    toast.show(
+      result.data.emailSimulated
+        ? "Email is not configured here. The confirmation link is in the server console."
+        : "Check your new inbox to confirm the change.",
+      "success",
+    );
+  }
+
+  async function cancelPendingEmail() {
+    const result = await cancelEmailChange();
+    if (!result.ok) {
+      toast.show(result.error, "error");
+      return;
+    }
+    await revalidate(getPendingEmailChange.key);
+    toast.show("Email change cancelled.", "success");
+  }
+
+  async function confirmDeleteAccount(event: SubmitEvent) {
+    event.preventDefault();
+    if (deletePending()) return;
+    setDeletePending(true);
+    const result = await deleteAccount({
+      password: deletePassword(),
+      confirmation: deleteConfirmation(),
+    });
+    setDeletePending(false);
+    if (!result.ok) {
+      toast.show(result.error, "error");
+      return;
+    }
+    window.location.assign("/");
+  }
+
   return (
     <Show when={user()}>
       {current => (
@@ -209,28 +284,126 @@ function AccountSettingsInner() {
                       required
                     />
                   </Field>
-                  <Field
-                    label="Email"
-                    for="account-email"
-                    hint="Email changes are not available in this version."
-                  >
-                    <input id="account-email" class="input" value={current().email} disabled />
-                  </Field>
-                  <Show
-                    when={!current().emailVerified}
-                    fallback={
-                      <p class="flex items-center gap-1.5 text-xs text-muted-foreground">
-                        <CircleCheck size={14} class="text-primary" />
-                        Your email address is confirmed.
-                      </p>
-                    }
-                  >
-                    <VerifyEmailNotice email={current().email} />
-                  </Show>
                   <Button type="submit" disabled={profilePending()}>
                     {profilePending() ? "Saving…" : "Save profile"}
                   </Button>
                 </form>
+              </CardContent>
+            </Card>
+
+            <Card class="mt-5 gap-4 py-5 sm:py-6">
+              <CardHeader class="gap-1 px-5 sm:px-6">
+                <div class="flex items-center gap-3">
+                  <span class="grid size-9 place-items-center rounded-xl bg-accent text-accent-foreground">
+                    <Mail size={17} />
+                  </span>
+                  <div>
+                    <CardTitle class="font-display text-xl">Email address</CardTitle>
+                    <CardDescription class="text-xs">
+                      Used for sign-in, invitations, and birthday reminders.
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent class="space-y-4 px-5 sm:px-6">
+                <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-background/60 px-3.5 py-3">
+                  <div class="min-w-0">
+                    <p class="truncate text-sm font-medium text-foreground">{current().email}</p>
+                    <p class="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Show
+                        when={current().emailVerified}
+                        fallback="Not confirmed yet"
+                      >
+                        <>
+                          <CircleCheck size={13} class="text-primary" />
+                          Confirmed
+                        </>
+                      </Show>
+                    </p>
+                  </div>
+                  <Show when={!emailFormOpen()}>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      type="button"
+                      onClick={() => setEmailFormOpen(true)}
+                    >
+                      Change email
+                    </Button>
+                  </Show>
+                </div>
+
+                <Show when={pendingEmailChange()}>
+                  {pending => (
+                    <div class="rounded-xl border border-gold/40 bg-gold/10 px-3.5 py-3">
+                      <p class="text-xs leading-relaxed text-foreground">
+                        Waiting for{" "}
+                        <span class="font-medium">{pending().newEmail}</span> to confirm the
+                        change. The link expires {formatRelative(pending().expiresAt)}.
+                      </p>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        type="button"
+                        class="mt-1.5 -ml-2"
+                        onClick={() => void cancelPendingEmail()}
+                      >
+                        Cancel change
+                      </Button>
+                    </div>
+                  )}
+                </Show>
+
+                <Show when={emailFormOpen()}>
+                  <form class="space-y-4" onSubmit={saveEmail}>
+                    <Field
+                      label="New email"
+                      for="new-email"
+                      hint="We send a confirmation link to this address. Your current address keeps working until you confirm."
+                    >
+                      <input
+                        id="new-email"
+                        type="email"
+                        class="input"
+                        autocomplete="email"
+                        value={newEmail()}
+                        onInput={event => setNewEmail(event.currentTarget.value)}
+                        required
+                      />
+                    </Field>
+                    <Field label="Current password" for="email-password">
+                      <input
+                        id="email-password"
+                        type="password"
+                        class="input"
+                        autocomplete="current-password"
+                        value={emailPassword()}
+                        onInput={event => setEmailPassword(event.currentTarget.value)}
+                        required
+                      />
+                    </Field>
+                    <div class="flex flex-wrap gap-2">
+                      <Button type="submit" disabled={emailPending()}>
+                        {emailPending() ? "Sending…" : "Send confirmation"}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => {
+                          setEmailFormOpen(false);
+                          setNewEmail("");
+                          setEmailPassword("");
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </form>
+                </Show>
+
+                <Show when={!current().emailVerified}>
+                  <VerifyEmailNotice email={current().email} />
+                </Show>
               </CardContent>
             </Card>
 
@@ -476,11 +649,123 @@ function AccountSettingsInner() {
               </CardContent>
             </Card>
 
+            <Card class="mt-5 gap-4 border-destructive/30 py-5 sm:py-6">
+              <CardHeader class="gap-1 px-5 sm:px-6">
+                <div class="flex items-center gap-3">
+                  <span class="grid size-9 place-items-center rounded-xl bg-destructive/10 text-destructive">
+                    <ShieldAlert size={17} />
+                  </span>
+                  <div>
+                    <CardTitle class="font-display text-xl">Your data</CardTitle>
+                    <CardDescription class="text-xs">
+                      Download a copy of your account or close it for good.
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent class="space-y-3 px-5 sm:px-6">
+                <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-background/60 px-3.5 py-3">
+                  <div class="min-w-0">
+                    <p class="text-sm font-medium text-foreground">Download your data</p>
+                    <p class="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                      A zip with your profile, trees, people, relationships, and a manifest of every
+                      file. Add the photos and documents with the larger export.
+                    </p>
+                  </div>
+                  <div class="flex flex-wrap gap-2">
+                    <a
+                      href="/api/account/export"
+                      download="family-tree-export.zip"
+                      class={buttonVariants({ variant: "secondary", size: "sm" })}
+                    >
+                      <Download />
+                      Data only
+                    </a>
+                    <a
+                      href="/api/account/export?media=1"
+                      download="family-tree-export-with-files.zip"
+                      class={buttonVariants({ variant: "secondary", size: "sm" })}
+                    >
+                      <Download />
+                      With files
+                    </a>
+                  </div>
+                </div>
+
+                <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-destructive/30 bg-destructive/5 px-3.5 py-3">
+                  <div class="min-w-0">
+                    <p class="text-sm font-medium text-destructive">Delete account</p>
+                    <p class="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                      This removes your account. Trees where you are the only member are deleted
+                      along with their photos and documents.
+                    </p>
+                  </div>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    type="button"
+                    onClick={() => setDeleteOpen(true)}
+                  >
+                    <Trash2 />
+                    Delete account
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
             <p class="mt-6 text-center text-xs leading-relaxed text-muted-foreground">
               Forgot your password? Sign out and choose “Forgot your password?” on the sign-in page
               to get a reset link by email.
             </p>
           </main>
+
+          <Modal
+            open={deleteOpen()}
+            onClose={() => setDeleteOpen(false)}
+            title="Delete your account?"
+            description="This cannot be undone."
+          >
+            <form class="space-y-4" onSubmit={confirmDeleteAccount}>
+              <div class="rounded-xl border border-destructive/30 bg-destructive/5 px-3.5 py-3 text-xs leading-relaxed text-muted-foreground">
+                Trees where you are the only member are deleted with all their photos and documents.
+                If you are the last owner of a shared tree, promote another owner or delete that
+                tree first.
+              </div>
+              <Field label="Your password" for="delete-password">
+                <input
+                  id="delete-password"
+                  type="password"
+                  class="input"
+                  autocomplete="current-password"
+                  value={deletePassword()}
+                  onInput={event => setDeletePassword(event.currentTarget.value)}
+                  required
+                />
+              </Field>
+              <Field
+                label="Confirm your email"
+                for="delete-confirmation"
+                hint={`Type ${current().email} exactly.`}
+              >
+                <input
+                  id="delete-confirmation"
+                  class="input"
+                  autocomplete="off"
+                  value={deleteConfirmation()}
+                  onInput={event => setDeleteConfirmation(event.currentTarget.value)}
+                  required
+                />
+              </Field>
+              <div class="flex flex-wrap justify-end gap-2 pt-1">
+                <Button type="button" variant="ghost" onClick={() => setDeleteOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" variant="destructive" disabled={deletePending()}>
+                  {deletePending() ? "Deleting…" : "Delete my account"}
+                </Button>
+              </div>
+            </form>
+          </Modal>
         </div>
       )}
     </Show>

@@ -19,6 +19,10 @@ import {
 } from "./trees-server";
 import { getTreeGraph as getTreeGraphFn } from "./people-server";
 import { getCalendarFeed as getCalendarFeedFn } from "./calendar-server";
+import {
+  getEmailChangePreview as getEmailChangePreviewFn,
+  getPendingEmailChange as getPendingEmailChangeFn,
+} from "./account-server";
 
 export const getUser = query(getUserFn, "user");
 export const requireUserPage = query(requireUserPageFn, "require-user");
@@ -31,6 +35,8 @@ export const getTreeGraph = query(getTreeGraphFn, "tree-graph");
 export const getCalendarFeed = query(getCalendarFeedFn, "calendar-feed");
 export const verifyEmail = query(verifyEmailFn, "verify-email");
 export const getPasswordResetPreview = query(getPasswordResetPreviewFn, "password-reset-preview");
+export const getPendingEmailChange = query(getPendingEmailChangeFn, "pending-email-change");
+export const getEmailChangePreview = query(getEmailChangePreviewFn, "email-change-preview");
 
 export const login = action(loginFn, "login");
 export const register = action(registerFn, "register");
