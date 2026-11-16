@@ -177,7 +177,9 @@ export function LandingHero() {
                 fitPadding={isNarrow ? 8 : 48}
                 warmupTicks={0}
                 fixedLayout={demoLayout}
-                nodeLabel={node => (node.kind === "person" ? node.person?.firstName ?? node.name : node.name)}
+                nodeLabel={node =>
+                  node.kind === "person" ? node.person?.firstName ?? node.name : node.name
+                }
                 onSelect={handleCanvasSelect}
                 onFileSelect={openFile}
                 onGroupSelect={openGroup}
