@@ -18,11 +18,21 @@ export default createHandler(() => (
         <head>
           <meta charset="utf-8" />
           <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-          <meta name="description" content="A private, collaborative family tree you build and share with your relatives." />
-          <meta name="robots" content="noindex, nofollow" />
+          <meta
+            name="description"
+            content="A private, collaborative family tree built as an interactive graph. Add people, connect parents and partners, and attach the photos and documents that hold the stories together. Free and open source."
+          />
           <meta name="theme-color" content="#f6f1e7" />
+          <meta property="og:type" content="website" />
+          <meta property="og:title" content="family-tree: a private, collaborative family graph" />
+          <meta
+            property="og:description"
+            content="A private, collaborative family tree built as an interactive graph. People, partners, children and media in one connected picture. Free and open source."
+          />
+          <meta property="og:url" content="https://family-tree.page" />
+          <meta name="twitter:card" content="summary" />
           <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-          <title>family-tree</title>
+          <title>family-tree: a private, collaborative family graph</title>
           {umami && (
             <script
               defer
