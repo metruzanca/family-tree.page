@@ -32,6 +32,7 @@ The graph is the main view. People are nodes, parent and partner relationships a
 - Disconnected groups inside a tree get their own side-by-side space, so a new unconnected person never overlaps the rest of the tree
 - Search, neighbor highlighting, zoom and pan
 - Calendar tab with birth and death anniversaries, plus upcoming birthdays for living relatives
+- Subscribe to all tree birthdays from Google Calendar, Apple Calendar, or Outlook with a private iCal URL
 - Email birthday reminders, with one-week, day-before, and day-of toggles in account settings
 - Live presence: see who else has the tree open, which person, file, or album they are looking at, and a colored ring and name tag around that node
 - Pointer cursor only over nodes, not links or empty canvas
@@ -168,6 +169,18 @@ Account settings has three independent reminders: one week before, the day befor
 5. February 29 birthdays are treated as February 28 in common years.
 
 Set `BIRTHDAY_EMAILS=off` to disable the scheduler, or `BIRTHDAY_EMAILS=on` to run it in development and print emails to the server console when Resend is not configured. `BIRTHDAY_EMAIL_HOUR_UTC` changes the daily send hour.
+
+## How calendar subscriptions work
+
+Account settings has a Calendar subscription card. It creates one private iCal URL per user that covers every tree that user belongs to.
+
+1. The URL contains a feed id and an HMAC signature made with `SESSION_SECRET`. No token is stored in the database.
+2. The endpoint checks the signature and then joins current tree memberships, so leaving a tree removes its people on the next fetch.
+3. Each person with a birth date becomes one recurring all-day event. February 29 birthdays use a recurrence rule that falls on February 28 in common years.
+4. Creating a new link revokes the old feed and issues a new id. Turning the feed off revokes it immediately.
+5. Rotating `SESSION_SECRET` invalidates every existing subscription URL, along with sessions.
+
+The link is a bearer secret: anyone who has it can read names and birthdays from that user's trees. Treat it like a password. Calendar apps refresh subscribed feeds on their own schedule, so edits are not instant.
 
 ## Railway deployment
 

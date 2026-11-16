@@ -1,6 +1,6 @@
 import { Show, Suspense } from "solid-js";
 import { A, createAsync, useParams } from "@solidjs/router";
-import { Network } from "lucide-solid";
+import { CalendarPlus, Network } from "lucide-solid";
 import { getTreeGraph, requireUserPage } from "~/api";
 import { AppHeader } from "~/components/app/AppHeader";
 import { TreeCalendar } from "~/components/calendar/TreeCalendar";
@@ -48,13 +48,22 @@ function TreeCalendarInner() {
                       counted forward so you never miss a birthday.
                     </p>
                   </div>
-                  <A
-                    href={`/trees/${params.treeId}`}
-                    class={buttonVariants({ variant: "secondary", size: "sm" })}
-                  >
-                    <Network size={15} />
-                    Open graph
-                  </A>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <A
+                      href="/settings#calendar-subscription"
+                      class={buttonVariants({ variant: "secondary", size: "sm" })}
+                    >
+                      <CalendarPlus size={15} />
+                      Subscribe
+                    </A>
+                    <A
+                      href={`/trees/${params.treeId}`}
+                      class={buttonVariants({ variant: "secondary", size: "sm" })}
+                    >
+                      <Network size={15} />
+                      Open graph
+                    </A>
+                  </div>
                 </div>
 
                 <TreeCalendar treeId={params.treeId} people={graph().people} />

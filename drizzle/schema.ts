@@ -76,6 +76,23 @@ export const birthdayEmailLog = pgTable(
   t => [uniqueIndex("birthday_email_log_unique").on(t.userId, t.kind, t.sentOn)],
 );
 
+export const calendarFeeds = pgTable(
+  "calendar_feeds",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  },
+  t => [
+    uniqueIndex("calendar_feeds_active_user")
+      .on(t.userId)
+      .where(sql`${t.revokedAt} is null`),
+  ],
+);
+
 export const authTokens = pgTable(
   "auth_tokens",
   {
@@ -296,6 +313,7 @@ export const files = pgTable(
 );
 
 export type User = typeof users.$inferSelect;
+export type CalendarFeed = typeof calendarFeeds.$inferSelect;
 export type AuthToken = typeof authTokens.$inferSelect;
 export type Tree = typeof trees.$inferSelect;
 export type TreeMember = typeof treeMembers.$inferSelect;

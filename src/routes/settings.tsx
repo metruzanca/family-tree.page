@@ -1,16 +1,28 @@
 import { Show, createEffect, createSignal } from "solid-js";
 import { createAsync, revalidate } from "@solidjs/router";
-import { BellRing, CircleCheck, KeyRound, UserRound } from "lucide-solid";
+import {
+  BellRing,
+  CalendarPlus,
+  CircleCheck,
+  Copy,
+  ExternalLink,
+  KeyRound,
+  RotateCw,
+  Trash2,
+  UserRound,
+} from "lucide-solid";
 import {
   changePassword,
   updateNotificationSettings,
   updateProfile,
 } from "~/api/auth-server";
-import { getUser, requireUserPage } from "~/api";
+import { createCalendarFeed, disableCalendarFeed } from "~/api/calendar-server";
+import { getCalendarFeed, getUser, requireUserPage } from "~/api";
 import { AppHeader } from "~/components/app/AppHeader";
 import { VerifyEmailNotice } from "~/components/auth/VerifyEmailNotice";
-import { Button } from "~/components/ui/button";
+import { Button, buttonVariants } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import { ConfirmDialog } from "~/components/ui/ConfirmDialog";
 import { Field } from "~/components/ui/Field";
 import { LoadingScreen } from "~/components/ui/Loading";
 import {
@@ -22,9 +34,13 @@ import {
   SwitchThumb,
 } from "~/components/ui/switch";
 import { useToast } from "~/components/ui/Toast";
+import { track } from "~/lib/analytics";
 
 export const route = {
-  preload: () => requireUserPage(),
+  preload: () => {
+    requireUserPage();
+    getCalendarFeed();
+  },
 };
 
 export default function AccountSettingsPage() {
@@ -49,6 +65,9 @@ function AccountSettingsInner() {
     dayOf: true,
   });
   const [notificationsPending, setNotificationsPending] = createSignal(false);
+  const feed = createAsync(() => getCalendarFeed());
+  const [feedPending, setFeedPending] = createSignal(false);
+  const [feedConfirm, setFeedConfirm] = createSignal<"rotate" | "disable" | null>(null);
 
   createEffect(() => {
     const current = user();
@@ -118,6 +137,38 @@ function AccountSettingsInner() {
       return;
     }
     await revalidate([getUser.key, requireUserPage.key]);
+  }
+
+  async function copyCalendarUrl(url: string) {
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.show("Calendar link copied.", "success");
+    } catch {
+      window.prompt("Copy this calendar link", url);
+    }
+  }
+
+  async function applyFeedChange(kind: "create" | "rotate" | "disable") {
+    if (feedPending()) return;
+    setFeedPending(true);
+    const result =
+      kind === "disable" ? await disableCalendarFeed() : await createCalendarFeed();
+    setFeedPending(false);
+    if (!result.ok) {
+      toast.show(result.error, "error");
+      return;
+    }
+    setFeedConfirm(null);
+    await revalidate(getCalendarFeed.key);
+    track(kind === "disable" ? "calendar_feed_disabled" : "calendar_feed_created");
+    toast.show(
+      kind === "disable"
+        ? "Calendar link turned off."
+        : kind === "rotate"
+          ? "New calendar link created. The old link no longer works."
+          : "Calendar link created. Copy it into your calendar app.",
+      "success",
+    );
   }
 
   return (
@@ -236,6 +287,147 @@ function AccountSettingsInner() {
                 </Show>
               </CardContent>
             </Card>
+
+            <Card id="calendar-subscription" class="mt-5 scroll-mt-24 gap-4 py-5 sm:py-6">
+              <CardHeader class="gap-1 px-5 sm:px-6">
+                <div class="flex items-center gap-3">
+                  <span class="grid size-9 place-items-center rounded-xl bg-accent text-accent-foreground">
+                    <CalendarPlus size={17} />
+                  </span>
+                  <div>
+                    <CardTitle class="font-display text-xl">Calendar subscription</CardTitle>
+                    <CardDescription class="text-xs">
+                      Birthdays from every tree you belong to, in your own calendar.
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent class="px-5 sm:px-6">
+                <Show
+                  when={feed()}
+                  fallback={
+                    <div>
+                      <p class="text-sm leading-relaxed text-muted-foreground">
+                        Create a private iCal link, then subscribe to it from Google Calendar,
+                        Apple Calendar, or Outlook. The link includes living and deceased relatives
+                        with birth dates.
+                      </p>
+                      <Button
+                        class="mt-4"
+                        variant="secondary"
+                        type="button"
+                        disabled={feedPending()}
+                        onClick={() => void applyFeedChange("create")}
+                      >
+                        <CalendarPlus />
+                        Create calendar link
+                      </Button>
+                    </div>
+                  }
+                >
+                  {currentFeed => (
+                    <div class="space-y-3">
+                      <Field
+                        label="Subscription URL"
+                        for="calendar-feed-url"
+                        hint="Treat this link like a password. Anyone who has it can see names and birthdays from your trees."
+                      >
+                        <div class="flex flex-col gap-2 sm:flex-row">
+                          <input
+                            id="calendar-feed-url"
+                            class="input min-w-0 flex-1 font-mono text-xs"
+                            readonly
+                            value={currentFeed().url}
+                            onFocus={event => event.currentTarget.select()}
+                          />
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            type="button"
+                            class="self-start sm:self-auto"
+                            onClick={() => copyCalendarUrl(currentFeed().url)}
+                          >
+                            <Copy />
+                            Copy
+                          </Button>
+                        </div>
+                      </Field>
+
+                      <div class="flex flex-wrap gap-2">
+                        <a
+                          href={currentFeed().webcalUrl}
+                          class={buttonVariants({ variant: "secondary", size: "sm" })}
+                        >
+                          <ExternalLink />
+                          Open in calendar
+                        </a>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          type="button"
+                          disabled={feedPending()}
+                          onClick={() => setFeedConfirm("rotate")}
+                        >
+                          <RotateCw />
+                          New link
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          type="button"
+                          disabled={feedPending()}
+                          onClick={() => setFeedConfirm("disable")}
+                        >
+                          <Trash2 />
+                          Turn off
+                        </Button>
+                      </div>
+
+                      <div class="rounded-xl border border-border bg-muted/35 px-3.5 py-3">
+                        <p class="text-xs font-semibold text-foreground">How to subscribe</p>
+                        <ul class="mt-2 space-y-1 text-xs leading-relaxed text-muted-foreground">
+                          <li>
+                            <span class="font-medium text-foreground">Google Calendar:</span> Other
+                            calendars, plus, From URL.
+                          </li>
+                          <li>
+                            <span class="font-medium text-foreground">Apple Calendar:</span> File,
+                            New Calendar Subscription.
+                          </li>
+                          <li>
+                            <span class="font-medium text-foreground">Outlook:</span> Add calendar,
+                            Subscribe from web.
+                          </li>
+                        </ul>
+                      </div>
+
+                      <p class="text-xs leading-relaxed text-muted-foreground">
+                        Calendar apps refresh the feed on their own schedule. Creating a new link
+                        immediately stops the old one.
+                      </p>
+                    </div>
+                  )}
+                </Show>
+              </CardContent>
+            </Card>
+
+            <ConfirmDialog
+              open={feedConfirm() !== null}
+              title={feedConfirm() === "disable" ? "Turn off calendar link?" : "Create a new calendar link?"}
+              message={
+                feedConfirm() === "disable"
+                  ? "The current URL stops working immediately. If your calendar app already subscribed to it, existing events may remain until you remove the subscription there."
+                  : "The current URL stops working immediately. You will need to paste the new URL into your calendar app."
+              }
+              confirmLabel={feedConfirm() === "disable" ? "Turn off" : "Create new link"}
+              danger={feedConfirm() === "disable"}
+              pending={feedPending()}
+              onClose={() => setFeedConfirm(null)}
+              onConfirm={() => {
+                const kind = feedConfirm();
+                if (kind) void applyFeedChange(kind);
+              }}
+            />
 
             <Card class="mt-5 gap-4 py-5 sm:py-6">
               <CardHeader class="gap-1 px-5 sm:px-6">
