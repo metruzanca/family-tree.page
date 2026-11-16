@@ -4,7 +4,7 @@ pkgs.mkShell {
   packages = with pkgs; [
     nodejs_24
     pnpm
-    postgresql_16
+    postgresql_18
     openssl
     curl
   ];

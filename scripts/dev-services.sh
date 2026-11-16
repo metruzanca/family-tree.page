@@ -21,6 +21,16 @@ start_postgres() {
   require initdb
   require createdb
 
+  if [ -f "$PGDATA/PG_VERSION" ]; then
+    local current_version
+    current_version="$(cat "$PGDATA/PG_VERSION")"
+    if [ "$current_version" != "18" ]; then
+      echo "Local Postgres data is version $current_version, but this shell uses 18."
+      echo "Reset the disposable local cluster with: pnpm dev:reset-db"
+      exit 1
+    fi
+  fi
+
   if [ ! -f "$PGDATA/PG_VERSION" ]; then
     echo "Initializing local Postgres in $PGDATA"
     initdb -D "$PGDATA" -U roots --auth=trust --locale=C --encoding=UTF8 > .dev/initdb.log 2>&1
@@ -71,6 +81,17 @@ stop_all() {
   fi
 }
 
+reset_database() {
+  if command -v pg_ctl >/dev/null 2>&1 && [ -f "$PGDATA/PG_VERSION" ]; then
+    pg_ctl -D "$PGDATA" stop -m fast >/dev/null 2>&1 || true
+  fi
+  rm -rf "$PGDATA"
+  echo "Removed the local Postgres cluster."
+  start_postgres
+  echo
+  echo "Local Postgres is ready. Restore production data with: pnpm db:pull"
+}
+
 status_all() {
   if command -v pg_ctl >/dev/null 2>&1 && pg_ctl -D "$PGDATA" status >/dev/null 2>&1; then
     echo "Postgres: running on port $PGPORT"
@@ -98,8 +119,11 @@ case "${1:-start}" in
   status)
     status_all
     ;;
+  reset)
+    reset_database
+    ;;
   *)
-    echo "Usage: $0 [start|stop|status]"
+    echo "Usage: $0 [start|stop|status|reset]"
     exit 1
     ;;
 esac

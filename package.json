@@ -4,7 +4,7 @@
   "private": true,
   "packageManager": "pnpm@11.22.0",
   "scripts": {
-    "dev": "vite dev --host 0.0.0.0",
+    "dev": "tsx scripts/assert-local-db.ts && vite dev --host 0.0.0.0",
     "build": "vite build",
     "start": "node .output/server/index.mjs",
     "typecheck": "tsc --noEmit",
@@ -13,9 +13,12 @@
     "dev:services": "bash scripts/dev-services.sh start",
     "dev:stop": "bash scripts/dev-services.sh stop",
     "dev:status": "bash scripts/dev-services.sh status",
+    "dev:reset-db": "bash scripts/dev-services.sh reset",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "tsx scripts/migrate.ts",
-    "db:seed": "tsx scripts/seed.ts",
+    "db:migrate": "tsx scripts/assert-local-db.ts --allow-deployed && tsx scripts/migrate.ts",
+    "db:seed": "tsx scripts/assert-local-db.ts && tsx scripts/seed.ts",
+    "db:pull": "tsx scripts/db-pull.ts",
+    "db:check": "tsx scripts/db-check.ts",
     "storage:cors": "tsx scripts/storage-cors.ts"
   },
   "devDependencies": {

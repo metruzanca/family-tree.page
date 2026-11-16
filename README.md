@@ -23,6 +23,7 @@ The graph is the main view. People are nodes, parent and partner relationships a
 - Invites by copyable link or by email, with expiry and single use
 - People, parent-child relationships, and partnerships
 - Generation-aware force graph with a freeform layout toggle
+- Cycle-safe generation rows that stay bounded when relationships contradict each other, with an in-app warning and `pnpm db:check`
 - Static generation bands: parents and children stay in ordered rows, with no node dragging
 - Partners are aligned on the same row and placed side by side
 - Parent pairs join at one small junction before branching to their children, so each child gets one parent-line arrow
@@ -71,11 +72,36 @@ The dev server binds to `0.0.0.0`, so a phone on the same Tailscale network can 
 pnpm dev:services   # start Postgres on 5432 and local S3 on 9000
 pnpm dev:status
 pnpm dev:stop
+pnpm dev:reset-db   # delete and re-create the disposable local Postgres cluster
 ```
 
 Postgres data lives in `.dev/postgres`. Local objects live in `.dev/s3`. Both are ignored by git.
 
-If you do not use Nix, any PostgreSQL 16+ database and S3-compatible service will work. Point `DATABASE_URL`, `S3_ENDPOINT`, and the other `S3_*` variables at them.
+If you do not use Nix, any PostgreSQL 18+ database and S3-compatible service will work. Point `DATABASE_URL`, `S3_ENDPOINT`, and the other `S3_*` variables at them.
+
+### Never develop against production
+
+Production data is read-only from a development machine. Do not point `DATABASE_URL` at Railway or any other remote host, and do not run feature work, seeds, or migrations there.
+
+Copy production Postgres into the local cluster instead:
+
+```bash
+pnpm dev:services
+pnpm db:pull
+pnpm dev
+```
+
+`pnpm db:pull` dumps the linked Railway `Postgres` service over SSH, restores it into the local database, and applies any newer migrations from your branch. Set `RAILWAY_DB_SERVICE` if the database service has another name.
+
+`pnpm dev` and `pnpm db:seed` refuse to start when `DATABASE_URL` is not a loopback host. `pnpm db:migrate` applies the same rule but allows the Railway pre-deploy environment. Override only when you know what you are doing with `ALLOW_REMOTE_DB=1`.
+
+Check the copied data for contradictory family links:
+
+```bash
+pnpm db:check
+```
+
+It reports parent loops, partners who are also ancestors, and people with more than two parents.
 
 ### Environment
 
@@ -167,8 +193,11 @@ pnpm test           Vitest unit tests
 pnpm db:generate    generate a Drizzle migration
 pnpm db:migrate     apply migrations
 pnpm db:seed        seed the demo tree
+pnpm db:pull        copy the linked Railway Postgres into the local database
+pnpm db:check       report contradictory parent and partner relationships
 pnpm storage:cors   set bucket CORS from APP_URL and CORS_ORIGINS
 pnpm dev:services   start local Postgres and S3
+pnpm dev:reset-db   delete and re-create the local Postgres cluster
 ```
 
 UI checks are done manually with the agent-browser tool against the local or production app. The project does not include a browser test runner.
