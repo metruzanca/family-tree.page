@@ -39,6 +39,8 @@ The graph is the main view. People are nodes, parent and partner relationships a
 - Person and document info panels on desktop and mobile
 - Optional Umami analytics with page views and product events, enabled by environment variables
 - Full-screen image lightbox with a details sidebar
+- Tag other people in a photo, with an "Also in photos" section on each tagged person's profile
+- Optional date taken on photos, prefilled from EXIF when the camera recorded it
 - Multi-file uploads become albums rendered as stacked nodes on the graph
 - Portraits stay on the person node and are not duplicated as file nodes
 - Person profiles with parents, partners, children, and life notes
@@ -148,6 +150,14 @@ On Railway, `RAILWAY_PUBLIC_DOMAIN` is the source of truth for the public origin
 6. Originals and documents redirect to a short-lived presigned URL after an authorization check.
 
 The bucket stays private. Browsers never receive storage credentials. SVG, HTML, JavaScript, and executable files are rejected.
+
+### Photo tags and dates
+
+Every file is still filed under one person, which is where its graph node lives. Editors can additionally tag any other people who appear in an image. Tags live in `file_tags` with tree-scoped foreign keys, so removing a person or a file removes the tags automatically. A tagged person sees the picture under "Also in photos" on their profile without becoming the owner.
+
+Images also carry an optional `taken_at` date. The browser reads EXIF `DateTimeOriginal` with `exifr` during upload and uses it as the initial value; editors can change or clear it in the file panel or lightbox. This is separate from the upload date, so scanned photos can be dated to when they were actually taken.
+
+`file_tags` also has nullable `face_box` and a `source` of `manual` or `face`. Nothing writes `face` yet: the columns and the tag picker are the groundwork for face detection and a "who is this?" pass after upload.
 
 ## How presence works
 
@@ -273,7 +283,7 @@ The interface uses [shadcn-solid](https://shadcn-solid.com) components on top of
 - Presence is held in the app process. It works as-is on a single Railway replica. Running more than one replica needs a shared presence store, such as Redis or Postgres `LISTEN`/`NOTIFY`.
 - HEIC photos work only when the browser can decode them; otherwise the user is asked to export as JPEG.
 - Railway buckets do not have automatic backups. PostgreSQL point-in-time recovery should be enabled on the database.
-- No GEDCOM import/export, public share links, OCR, or face tagging yet.
+- No GEDCOM import/export, public share links, OCR, or face detection yet.
 
 ## License
 
