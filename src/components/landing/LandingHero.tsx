@@ -174,7 +174,7 @@ export function LandingHero() {
                 generationDirection="oldest-top"
                 class="landing-graph !h-full"
                 thumbUrlFor={demoThumbUrl}
-                fitPadding={isNarrow ? 8 : 48}
+                fitPadding={isNarrow ? 8 : 64}
                 warmupTicks={0}
                 fixedLayout={demoLayout}
                 nodeLabel={node =>
@@ -191,7 +191,7 @@ export function LandingHero() {
               <div class="pointer-events-auto flex items-center gap-2 rounded-full border border-white/10 bg-black/35 px-3 py-2 text-[0.64rem] font-semibold uppercase tracking-[0.12em] text-white/70 backdrop-blur-md">
                 <span class="size-1.5 animate-pulse rounded-full bg-gold" />
                 Live demo
-                <span class="hidden text-white/40 sm:inline">The Britannian family</span>
+                <span class="hidden text-white/40 sm:inline">The Simpsons</span>
               </div>
 
               <div class="pointer-events-auto ml-auto flex items-center gap-1.5">

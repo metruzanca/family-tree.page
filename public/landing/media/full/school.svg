@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 240" width="360" height="240" role="img" aria-label="A brick school building with steps and a flag">
+  <rect width="360" height="240" fill="#e7e1cf"/>
+  <path d="M0 190h360v50H0Z" fill="#a9b98d"/>
+  <rect x="46" y="78" width="268" height="112" fill="#b96b52" stroke="#40301f" stroke-width="4"/>
+  <rect x="46" y="78" width="268" height="20" fill="#8e4f3b" stroke="#40301f" stroke-width="4"/>
+  <g fill="#cfe3ea" stroke="#40301f" stroke-width="3.5">
+    <rect x="66" y="112" width="34" height="30"/>
+    <rect x="116" y="112" width="34" height="30"/>
+    <rect x="210" y="112" width="34" height="30"/>
+    <rect x="260" y="112" width="34" height="30"/>
+    <rect x="66" y="156" width="34" height="26"/>
+    <rect x="260" y="156" width="34" height="26"/>
+  </g>
+  <rect x="166" y="120" width="48" height="70" fill="#7d5a3e" stroke="#40301f" stroke-width="4"/>
+  <path d="M166 140h48" stroke="#40301f" stroke-width="3"/>
+  <circle cx="204" cy="158" r="3.5" fill="#c49a45"/>
+  <path d="M56 190h248v10H56Z" fill="#d8cdb8" stroke="#40301f" stroke-width="4"/>
+  <path d="M72 200h216v8H72Z" fill="#c6bba4" stroke="#40301f" stroke-width="4"/>
+  <path d="M320 72V42" stroke="#40301f" stroke-width="4"/>
+  <path d="M320 42h34l-8 10 8 10h-34Z" fill="#bf6247" stroke="#40301f" stroke-width="3.5"/>
+</svg>

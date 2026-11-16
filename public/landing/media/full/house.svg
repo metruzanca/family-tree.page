@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 240" width="360" height="240" role="img" aria-label="A suburban house with a green lawn">
+  <rect width="360" height="240" fill="#cfe0e6"/>
+  <circle cx="308" cy="48" r="26" fill="#f2d27c"/>
+  <path d="M0 176h360v64H0Z" fill="#9ec27f"/>
+  <path d="M0 176h360" stroke="#7f9f64" stroke-width="4"/>
+  <rect x="72" y="104" width="216" height="84" fill="#f0c86a" stroke="#40301f" stroke-width="4"/>
+  <path d="M58 108 180 34l122 74Z" fill="#b5643f" stroke="#40301f" stroke-width="4" stroke-linejoin="round"/>
+  <rect x="88" y="60" width="22" height="44" fill="#a65b3b" stroke="#40301f" stroke-width="4"/>
+  <rect x="92" y="126" width="44" height="36" fill="#cfe3ea" stroke="#40301f" stroke-width="4"/>
+  <path d="M114 126v36M92 144h44" stroke="#40301f" stroke-width="3"/>
+  <rect x="156" y="130" width="42" height="58" fill="#7d4a2e" stroke="#40301f" stroke-width="4"/>
+  <circle cx="188" cy="160" r="3.5" fill="#c49a45"/>
+  <rect x="222" y="126" width="44" height="36" fill="#cfe3ea" stroke="#40301f" stroke-width="4"/>
+  <path d="M244 126v36M222 144h44" stroke="#40301f" stroke-width="3"/>
+  <path d="M156 188h42l20 24h-82Z" fill="#d8cdb8" stroke="#40301f" stroke-width="4"/>
+  <path d="M28 188q14-20 34-6 12-14 28 2v16H28Z" fill="#6f9a5f" stroke="#40301f" stroke-width="4"/>
+  <path d="M270 188q14-20 34-6 12-14 28 2v16h-62Z" fill="#6f9a5f" stroke="#40301f" stroke-width="4"/>
+</svg>

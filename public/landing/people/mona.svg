@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="40 18 184 184" width="256" height="256" role="img" aria-label="Mona Simpson">
+  <rect width="256" height="256" fill="#efe8da"/>
+  <circle cx="128" cy="118" r="98" fill="#e5dcc7"/>
+  <path d="M46 256c6-44 38-68 82-68s76 24 82 68Z" fill="#8f7fa8" stroke="#40301f" stroke-width="4.5"/>
+  <path d="M74 138c-8-52 10-78 54-78s62 26 54 78c-4 26-20 34-54 34s-50-8-54-34Z" fill="#d3ccbe" stroke="#40301f" stroke-width="4.5"/>
+  <circle cx="80" cy="150" r="11" fill="#ffd90f" stroke="#40301f" stroke-width="4"/>
+  <circle cx="176" cy="150" r="11" fill="#ffd90f" stroke="#40301f" stroke-width="4"/>
+  <ellipse cx="128" cy="140" rx="48" ry="52" fill="#ffd90f" stroke="#40301f" stroke-width="4.5"/>
+  <path d="M88 124q40-22 80 0" fill="none" stroke="#40301f" stroke-width="4"/>
+  <circle cx="108" cy="134" r="17" fill="none" stroke="#40301f" stroke-width="4"/>
+  <circle cx="148" cy="134" r="17" fill="none" stroke="#40301f" stroke-width="4"/>
+  <path d="M125 134h6" stroke="#40301f" stroke-width="4"/>
+  <circle cx="108" cy="136" r="3.5" fill="#2a2118"/>
+  <circle cx="148" cy="136" r="3.5" fill="#2a2118"/>
+  <path d="M122 152q6 5 12 0" fill="none" stroke="#40301f" stroke-width="4" stroke-linecap="round"/>
+  <path d="M112 166q16 12 32 0" fill="none" stroke="#40301f" stroke-width="4" stroke-linecap="round"/>
+  <path d="M92 108q6-6 14-4M150 104q8-2 14 4" fill="none" stroke="#40301f" stroke-width="3" stroke-linecap="round"/>
+</svg>

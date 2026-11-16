@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 240" width="360" height="240" role="img" aria-label="An open notebook, pen and cup of coffee on a desk">
+  <rect width="360" height="240" fill="#d8c7a5"/>
+  <path d="M0 186h360v54H0Z" fill="#b99d74"/>
+  <g transform="rotate(-4 180 120)">
+    <rect x="58" y="54" width="244" height="140" fill="#fffdf8" stroke="#40301f" stroke-width="4"/>
+    <path d="M180 54v140" stroke="#40301f" stroke-width="4"/>
+    <g stroke="#9c9a8e" stroke-width="3" stroke-linecap="round">
+      <path d="M78 84h82M78 104h74M78 124h84M78 144h62M78 164h72"/>
+      <path d="M198 84h84M198 104h70M198 124h82M198 144h54"/>
+    </g>
+    <circle cx="284" cy="168" r="12" fill="#c49a45" opacity="0.55"/>
+  </g>
+  <path d="M262 116 300 96" stroke="#40301f" stroke-width="8" stroke-linecap="round"/>
+  <path d="M300 96l14-8-6 16Z" fill="#3b4a57" stroke="#40301f" stroke-width="3"/>
+  <rect x="38" y="120" width="46" height="46" rx="6" fill="#f2ede1" stroke="#40301f" stroke-width="4"/>
+  <path d="M84 132h14a10 10 0 0 1 0 20H84" fill="none" stroke="#40301f" stroke-width="4"/>
+  <ellipse cx="61" cy="122" rx="17" ry="5" fill="#7d4a2e" stroke="#40301f" stroke-width="3"/>
+</svg>

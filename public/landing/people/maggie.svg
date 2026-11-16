@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="40 18 184 184" width="256" height="256" role="img" aria-label="Maggie Simpson">
+  <rect width="256" height="256" fill="#efe8da"/>
+  <circle cx="128" cy="118" r="98" fill="#e5dcc7"/>
+  <path d="M58 256c6-38 34-58 70-58s64 20 70 58Z" fill="#7fb3d5" stroke="#40301f" stroke-width="4.5"/>
+  <path d="M104 198q24 18 48 0" fill="#f8f5ed" stroke="#40301f" stroke-width="4"/>
+  <path d="M124 96 130 60l14 22 24-10-16 26 22 6-26 8 8 22-20-14-16 16 2-22-24-6 24-12Z" fill="#ffd90f" stroke="#40301f" stroke-width="4.5" stroke-linejoin="round"/>
+  <circle cx="84" cy="158" r="11" fill="#ffd90f" stroke="#40301f" stroke-width="4"/>
+  <circle cx="172" cy="158" r="11" fill="#ffd90f" stroke="#40301f" stroke-width="4"/>
+  <ellipse cx="128" cy="154" rx="46" ry="48" fill="#ffd90f" stroke="#40301f" stroke-width="4.5"/>
+  <ellipse cx="110" cy="146" rx="14" ry="17" fill="#fffdf8" stroke="#40301f" stroke-width="4"/>
+  <ellipse cx="146" cy="146" rx="14" ry="17" fill="#fffdf8" stroke="#40301f" stroke-width="4"/>
+  <circle cx="111" cy="149" r="5" fill="#2a2118"/>
+  <circle cx="147" cy="149" r="5" fill="#2a2118"/>
+  <circle cx="128" cy="180" r="16" fill="#cfe8f5" stroke="#40301f" stroke-width="4"/>
+  <circle cx="128" cy="180" r="7" fill="#7fb3d5" stroke="#40301f" stroke-width="3"/>
+  <path d="M128 196q-10 12-2 20" fill="none" stroke="#40301f" stroke-width="4" stroke-linecap="round"/>
+</svg>

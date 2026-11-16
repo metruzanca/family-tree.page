@@ -11,10 +11,10 @@ import type { GraphNode } from "~/lib/graph";
  * A static demo tree for the landing page. It is deliberately separate from the
  * seeded development tree so the marketing page never needs a database or login.
  *
- * The family is a fictional slice of the Britannian imperial line from Code Geass.
- * Code Geass belongs to Sunrise and this demo is not affiliated with it. Marianne
- * and Gabrielle are the only consorts named in the source material; Helena and
- * Elise are placeholder names for the unnamed "li" and "el" consorts.
+ * The family is a fictional, simplified slice of the Simpsons: three generations
+ * around one couple. The Simpsons belongs to its rights holders and this demo is
+ * not affiliated with them. Portraits and photographs are original SVG
+ * approximations drawn for this page, not official artwork.
  */
 
 type PersonSeed = {
@@ -29,103 +29,103 @@ type PersonSeed = {
 
 const personSeeds: PersonSeed[] = [
   {
-    id: "charles",
-    firstName: "Charles",
-    lastName: "zi Britannia",
-    birthDate: "1955-04-14",
-    birthPlace: "Pendragon",
-    bio: "The 98th Emperor of Britannia. Believes struggle is the only honest teacher, and says so at every dinner.",
-    avatar: "charles",
+    id: "abraham",
+    firstName: "Abraham",
+    lastName: "Simpson",
+    birthDate: "1920-03-17",
+    birthPlace: "Springfield",
+    bio: "Retired safety inspector, war veteran, and the loudest voice at the dinner table. Still keeps a photo of the old farm in his wallet.",
+    avatar: "abraham",
   },
   {
-    id: "marianne",
-    firstName: "Marianne",
-    lastName: "vi Britannia",
-    birthDate: "1959-11-03",
-    birthPlace: "Pendragon",
-    bio: "Empress consort, former Knightmare test pilot, and the only person who can interrupt the Emperor mid-sentence.",
-    avatar: "marianne",
+    id: "mona",
+    firstName: "Mona",
+    lastName: "Simpson",
+    birthDate: "1923-06-02",
+    birthPlace: "Springfield",
+    bio: "Homer's mother. Away for long stretches, and writes far more often than she visits.",
+    avatar: "mona",
   },
   {
-    id: "gabrielle",
-    firstName: "Gabrielle",
-    lastName: "la Britannia",
-    birthDate: "1963-02-18",
-    birthPlace: "Pendragon",
-    bio: "Consort, patron of the arts, and keeper of the palace's impossible guest list.",
-    avatar: "gabrielle",
+    id: "jackie",
+    firstName: "Jackie",
+    lastName: "Bouvier",
+    birthDate: "1926-11-08",
+    birthPlace: "Springfield",
+    bio: "Marge's mother. Has an opinion about every haircut and a pearl necklace for every occasion.",
+    avatar: "jackie",
   },
   {
-    id: "helena",
-    firstName: "Helena",
-    lastName: "li Britannia",
-    birthDate: "1962-07-09",
-    birthPlace: "Pendragon",
-    bio: "Consort and mother of Cornelia and Euphemia. Prefers the garden to the throne room.",
-    avatar: "helena",
+    id: "clancy",
+    firstName: "Clancy",
+    lastName: "Bouvier",
+    birthDate: "1924-01-15",
+    birthPlace: "Springfield",
+    bio: "Marge's father. Quiet, tidy, and happy to let somebody else do the talking.",
+    avatar: "clancy",
   },
   {
-    id: "elise",
-    firstName: "Elise",
-    lastName: "el Britannia",
-    birthDate: "1964-09-26",
-    birthPlace: "Pendragon",
-    bio: "Consort and mother of Schneizel. Keeps the library in better order than the court.",
-    avatar: "elise",
+    id: "homer",
+    firstName: "Homer",
+    lastName: "Simpson",
+    birthDate: "1956-05-12",
+    birthPlace: "Springfield",
+    bio: "Works at the plant, eats at the kitchen table, and would usually rather be at Moe's.",
+    avatar: "homer",
   },
   {
-    id: "lelouch",
-    firstName: "Lelouch",
-    lastName: "vi Britannia",
-    birthDate: "2000-12-05",
-    birthPlace: "Pendragon",
-    bio: "Eleventh prince, exiled to Japan, and a far better chess player than he lets on.",
-    avatar: "lelouch",
+    id: "marge",
+    firstName: "Marge",
+    lastName: "Simpson",
+    birthDate: "1956-10-01",
+    birthPlace: "Springfield",
+    bio: "Holds the house together. Keeps the photo albums, the birthday calendar, and the peace.",
+    avatar: "marge",
   },
   {
-    id: "nunnally",
-    firstName: "Nunnally",
-    lastName: "vi Britannia",
-    birthDate: "2003-10-25",
-    birthPlace: "Pendragon",
-    bio: "Ninth princess. Gentle, observant, and the only one who can make Lelouch stop scheming for five minutes.",
-    avatar: "nunnally",
+    id: "selma",
+    firstName: "Selma",
+    lastName: "Bouvier",
+    birthDate: "1954-05-12",
+    birthPlace: "Springfield",
+    bio: "Marge's older sister. Works at the DMV, smokes too much, and is fiercely loyal when it counts.",
+    avatar: "selma",
   },
   {
-    id: "clovis",
-    firstName: "Clovis",
-    lastName: "la Britannia",
-    birthDate: "1994-03-14",
-    birthPlace: "Pendragon",
-    bio: "Third prince and viceroy. Treats a portrait commission like a state occasion.",
-    avatar: "clovis",
+    id: "patty",
+    firstName: "Patty",
+    lastName: "Bouvier",
+    birthDate: "1954-05-12",
+    birthPlace: "Springfield",
+    bio: "Marge's older sister and Selma's twin. Also works at the DMV, and prefers the family at arm's length.",
+    avatar: "patty",
   },
   {
-    id: "cornelia",
-    firstName: "Cornelia",
-    lastName: "li Britannia",
-    birthDate: "1992-01-04",
-    birthPlace: "Pendragon",
-    bio: "Second princess and commander. Wins the argument and the war.",
-    avatar: "cornelia",
+    id: "bart",
+    firstName: "Bart",
+    lastName: "Simpson",
+    birthDate: "1980-04-01",
+    birthPlace: "Springfield",
+    bio: "Fourth grade, skateboard, trouble. The one who will find every unlocked door in any house.",
+    avatar: "bart",
   },
   {
-    id: "euphemia",
-    firstName: "Euphemia",
-    lastName: "li Britannia",
-    birthDate: "2001-07-11",
-    birthPlace: "Pendragon",
-    bio: "Third princess. Kind enough to make the whole court uncomfortable.",
-    avatar: "euphemia",
+    id: "lisa",
+    firstName: "Lisa",
+    lastName: "Simpson",
+    birthDate: "1982-05-09",
+    birthPlace: "Springfield",
+    bio: "Second grade, saxophone, and a strong opinion about the school budget. Keeps the family honest.",
+    avatar: "lisa",
   },
   {
-    id: "schneizel",
-    firstName: "Schneizel",
-    lastName: "el Britannia",
-    birthDate: "1991-06-02",
-    birthPlace: "Pendragon",
-    bio: "Second prince and prime minister. Calm, courteous, and always three moves ahead.",
-    avatar: "schneizel",
+    id: "maggie",
+    firstName: "Maggie",
+    lastName: "Simpson",
+    birthDate: "1988-01-12",
+    birthPlace: "Springfield",
+    bio: "The youngest. Has said almost nothing, yet somehow sees everything.",
+    avatar: "maggie",
   },
 ];
 
@@ -149,13 +149,14 @@ const partnership = (
   source: string,
   target: string,
   status: "married" | "partnered",
+  startDate: string | null,
 ): GraphRelationship => ({
   id,
   type: "partner",
   source,
   target,
   status,
-  startDate: status === "married" ? "1989-06-17" : null,
+  startDate,
   endDate: null,
 });
 
@@ -168,30 +169,30 @@ const parent = (id: string, source: string, target: string): GraphRelationship =
 });
 
 export const demoRelationships: GraphRelationship[] = [
-  partnership("partner:charles-marianne", "charles", "marianne", "married"),
-  partnership("partner:charles-gabrielle", "charles", "gabrielle", "partnered"),
-  partnership("partner:charles-helena", "charles", "helena", "partnered"),
-  partnership("partner:charles-elise", "charles", "elise", "partnered"),
+  partnership("partner:abraham-mona", "abraham", "mona", "married", "1948-06-12"),
+  partnership("partner:clancy-jackie", "clancy", "jackie", "married", "1952-04-20"),
+  partnership("partner:homer-marge", "homer", "marge", "married", "1979-06-17"),
 
-  parent("parent:charles-lelouch", "charles", "lelouch"),
-  parent("parent:marianne-lelouch", "marianne", "lelouch"),
-  parent("parent:charles-nunnally", "charles", "nunnally"),
-  parent("parent:marianne-nunnally", "marianne", "nunnally"),
+  parent("parent:abraham-homer", "abraham", "homer"),
+  parent("parent:mona-homer", "mona", "homer"),
 
-  parent("parent:charles-clovis", "charles", "clovis"),
-  parent("parent:gabrielle-clovis", "gabrielle", "clovis"),
+  parent("parent:clancy-marge", "clancy", "marge"),
+  parent("parent:jackie-marge", "jackie", "marge"),
+  parent("parent:clancy-selma", "clancy", "selma"),
+  parent("parent:jackie-selma", "jackie", "selma"),
+  parent("parent:clancy-patty", "clancy", "patty"),
+  parent("parent:jackie-patty", "jackie", "patty"),
 
-  parent("parent:charles-cornelia", "charles", "cornelia"),
-  parent("parent:helena-cornelia", "helena", "cornelia"),
-  parent("parent:charles-euphemia", "charles", "euphemia"),
-  parent("parent:helena-euphemia", "helena", "euphemia"),
-
-  parent("parent:charles-schneizel", "charles", "schneizel"),
-  parent("parent:elise-schneizel", "elise", "schneizel"),
+  parent("parent:homer-bart", "homer", "bart"),
+  parent("parent:marge-bart", "marge", "bart"),
+  parent("parent:homer-lisa", "homer", "lisa"),
+  parent("parent:marge-lisa", "marge", "lisa"),
+  parent("parent:homer-maggie", "homer", "maggie"),
+  parent("parent:marge-maggie", "marge", "maggie"),
 ];
 
-const thumbUrl = (name: string) => `/landing/media/thumbs/${name}.jpg`;
-const fullUrl = (name: string) => `/landing/media/full/${name}.jpg`;
+const thumbUrl = (name: string) => `/landing/media/thumbs/${name}.svg`;
+const fullUrl = (name: string) => `/landing/media/full/${name}.svg`;
 
 const file = (
   id: string,
@@ -204,56 +205,56 @@ const file = (
   personId,
   groupId: options.groupId ?? null,
   name,
-  mimeType: "image/jpeg",
+  mimeType: "image/svg+xml",
   kind: options.kind ?? "image",
   thumbUrl: thumbUrl(thumb),
   width: 360,
   height: 240,
-  sizeBytes: 44_000,
+  sizeBytes: 18_000,
   createdAt: new Date(options.createdAt ?? "2017-05-12T00:00:00Z"),
   isAvatar: false,
 });
 
 export const demoFiles: GraphFile[] = [
-  file("file:palace", "charles", "The Imperial Palace", "palace", { createdAt: "2017-05-12" }),
-  file("file:villa", "lelouch", "Aries Villa", "villa", { createdAt: "2017-05-19" }),
-  file("file:letter", "nunnally", "Letter from the Empress", "letter", {
+  file("file:house", "homer", "742 Evergreen Terrace", "house", { createdAt: "2016-04-10" }),
+  file("file:school", "bart", "Springfield Elementary", "school", { createdAt: "2017-09-06" }),
+  file("file:notebook", "marge", "Marge's notebook", "notebook", {
     kind: "document",
-    createdAt: "2017-06-01",
+    createdAt: "2018-02-14",
   }),
-  file("file:court-1", "schneizel", "The Imperial Court, I", "court-1", {
-    groupId: "group:court",
-    createdAt: "2017-06-02",
+  file("file:couch-1", "homer", "Couch gag, I", "couch-1", {
+    groupId: "group:couch",
+    createdAt: "2018-03-02",
   }),
-  file("file:court-2", "schneizel", "The Imperial Court, II", "court-2", {
-    groupId: "group:court",
-    createdAt: "2017-06-02",
+  file("file:couch-2", "homer", "Couch gag, II", "couch-2", {
+    groupId: "group:couch",
+    createdAt: "2018-03-02",
   }),
-  file("file:court-3", "schneizel", "The Imperial Court, III", "court-3", {
-    groupId: "group:court",
-    createdAt: "2017-06-02",
+  file("file:couch-3", "homer", "Couch gag, III", "couch-3", {
+    groupId: "group:couch",
+    createdAt: "2018-03-02",
   }),
 ];
 
 export const demoGroups: GraphFileGroup[] = [
   {
-    id: "group:court",
-    personId: "schneizel",
-    name: "The Imperial Court",
+    id: "group:couch",
+    personId: "homer",
+    name: "Couch gags",
     count: 3,
-    coverFileId: "album:court",
+    coverFileId: "album:couch",
     coverWidth: 360,
     coverHeight: 240,
-    createdAt: new Date("2017-06-02T00:00:00Z"),
+    createdAt: new Date("2018-03-02T00:00:00Z"),
   },
 ];
 
 export const demoTree: TreeGraph = {
   tree: {
-    id: "demo:britannia",
-    name: "The Britannian family",
+    id: "demo:simpsons",
+    name: "The Simpsons",
     description:
-      "A fictional slice of the imperial line. Click a face, open a photo, and follow the branches.",
+      "A fictional slice of Springfield. Click a face, open a photo, and follow the branches.",
   },
   role: "viewer",
   people: demoPeople,
@@ -263,16 +264,16 @@ export const demoTree: TreeGraph = {
 };
 
 const avatarUrls: Record<string, string> = Object.fromEntries(
-  personSeeds.map(person => [`avatar:${person.avatar}`, `/landing/people/${person.avatar}.png`]),
+  personSeeds.map(person => [`avatar:${person.avatar}`, `/landing/people/${person.avatar}.svg`]),
 );
 
 const groupCoverUrls: Record<string, string> = {
-  "album:court": thumbUrl("court-1"),
+  "album:couch": thumbUrl("couch-1"),
 };
 
 /** Thumbnail resolver passed to GraphView, so demo assets never hit the file API. */
 export function demoThumbUrl(fileId: string) {
-  return avatarUrls[fileId] ?? groupCoverUrls[fileId] ?? "/landing/people/charles.png";
+  return avatarUrls[fileId] ?? groupCoverUrls[fileId] ?? "/landing/people/homer.svg";
 }
 
 export function demoPersonAvatar(person: GraphPerson) {
@@ -304,74 +305,75 @@ const media = (
 });
 
 export const demoMediaById: Record<string, DemoMedia> = {
-  "file:palace": media(
-    "file:palace",
-    "The Imperial Palace",
-    "palace",
-    "The colonnade at Pendragon, photographed before the court moved indoors for the winter.",
+  "file:house": media(
+    "file:house",
+    "742 Evergreen Terrace",
+    "house",
+    "The house, the hedge, and the driveway that has seen four bicycles and one trampoline.",
   ),
-  "file:villa": media(
-    "file:villa",
-    "Aries Villa",
-    "villa",
-    "The quiet house and the long walk where Lelouch and Nunnally spent their first years.",
+  "file:school": media(
+    "file:school",
+    "Springfield Elementary",
+    "school",
+    "The front steps where the bus stops, photographed on a suspiciously quiet morning.",
   ),
-  "file:letter": media(
-    "file:letter",
-    "Letter from the Empress",
-    "letter",
-    "Marianne's note to Nunnally, sealed with the imperial crest and far too much ribbon.",
+  "file:notebook": media(
+    "file:notebook",
+    "Marge's notebook",
+    "notebook",
+    "Groceries, birthdays, and the phone numbers of everyone who might need a reminder.",
     "document",
   ),
-  "file:court-1": media(
-    "file:court-1",
-    "The Imperial Court, I",
-    "court-1",
-    "The ceiling of the east hall, lit for the winter audience.",
+  "file:couch-1": media(
+    "file:couch-1",
+    "Couch gag, I",
+    "couch-1",
+    "The living room as it usually looks: one lamp, one television, and one very worn couch.",
   ),
-  "file:court-2": media(
-    "file:court-2",
-    "The Imperial Court, II",
-    "court-2",
-    "The long gallery, where the court waits before an audience with the Emperor.",
+  "file:couch-2": media(
+    "file:couch-2",
+    "Couch gag, II",
+    "couch-2",
+    "The same room, one donut later.",
   ),
-  "file:court-3": media(
-    "file:court-3",
-    "The Imperial Court, III",
-    "court-3",
-    "The crystal chandelier in the antechamber, looking up.",
+  "file:couch-3": media(
+    "file:couch-3",
+    "Couch gag, III",
+    "couch-3",
+    "The same room again, decorated for a birthday nobody wrote down.",
   ),
 };
 
 export const demoAlbum = {
-  id: "group:court",
-  name: "The Imperial Court",
-  files: ["file:court-1", "file:court-2", "file:court-3"].map(id => demoMediaById[id]),
+  id: "group:couch",
+  name: "Couch gags",
+  files: ["file:couch-1", "file:couch-2", "file:couch-3"].map(id => demoMediaById[id]),
 };
 
 /**
  * The landing hero uses a fixed, hand-authored layout instead of the force
- * simulation. A royal family with several consorts is too wide for the generic
- * auto layout to keep labels readable, and a fixed layout renders faster.
+ * simulation. Three generations with a few siblings are easier to read when the
+ * positions are chosen by hand, and a fixed layout renders faster.
  */
 const demoPositions: Record<string, { x: number; y: number }> = {
-  gabrielle: { x: -250, y: 0 },
-  marianne: { x: -125, y: 0 },
-  charles: { x: 0, y: 0 },
-  helena: { x: 125, y: 0 },
-  elise: { x: 250, y: 0 },
+  abraham: { x: -150, y: -210 },
+  mona: { x: -40, y: -210 },
+  clancy: { x: 120, y: -210 },
+  jackie: { x: 230, y: -210 },
 
-  clovis: { x: -250, y: 200 },
-  lelouch: { x: -165, y: 200 },
-  nunnally: { x: -85, y: 200 },
-  cornelia: { x: 85, y: 200 },
-  euphemia: { x: 165, y: 200 },
-  schneizel: { x: 250, y: 200 },
+  homer: { x: -90, y: 0 },
+  marge: { x: 25, y: 0 },
+  selma: { x: 140, y: 0 },
+  patty: { x: 230, y: 0 },
 
-  "file:file:palace": { x: 0, y: -120 },
-  "file:file:villa": { x: -250, y: 320 },
-  "file:file:letter": { x: -85, y: 320 },
-  "group:group:court": { x: 250, y: 320 },
+  bart: { x: -110, y: 210 },
+  lisa: { x: -15, y: 210 },
+  maggie: { x: 80, y: 210 },
+
+  "file:file:house": { x: -140, y: 340 },
+  "file:file:school": { x: -30, y: 340 },
+  "file:file:notebook": { x: 80, y: 340 },
+  "group:group:couch": { x: 200, y: 340 },
 };
 
 export function demoLayout(node: GraphNode) {

@@ -325,8 +325,8 @@ export function LandingPage() {
             </nav>
           </div>
           <p class="text-[0.68rem] leading-relaxed text-muted-foreground">
-            Fictional demo data inspired by Code Geass. Not affiliated with Sunrise. Stock
-            photography from StockSnap under CC0. Portraits by Pablo Stanley for DiceBear.
+            Fictional demo data inspired by The Simpsons. Not affiliated with its rights
+            holders. Portraits and photographs are original SVG approximations.
           </p>
         </div>
       </footer>

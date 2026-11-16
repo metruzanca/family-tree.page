@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="40 18 184 184" width="256" height="256" role="img" aria-label="Jackie Bouvier">
+  <rect width="256" height="256" fill="#efe8da"/>
+  <circle cx="128" cy="118" r="98" fill="#e5dcc7"/>
+  <path d="M46 256c6-44 38-68 82-68s76 24 82 68Z" fill="#6f86a8" stroke="#40301f" stroke-width="4.5"/>
+  <path d="M70 118c-14-14-12-38 2-48-2-20 16-32 32-26 4-18 26-24 38-12 16-14 36-2 36 14 18-2 30 16 22 32 14 14 8 36-8 40-2 14-14 22-24 20-6 12-20 16-30 10-10 10-26 10-36 0-12 8-26 2-32-10-10 4-20-4-20-14Z" fill="#c9d2dd" stroke="#40301f" stroke-width="4.5"/>
+  <circle cx="80" cy="152" r="11" fill="#ffd90f" stroke="#40301f" stroke-width="4"/>
+  <circle cx="176" cy="152" r="11" fill="#ffd90f" stroke="#40301f" stroke-width="4"/>
+  <ellipse cx="128" cy="146" rx="46" ry="50" fill="#ffd90f" stroke="#40301f" stroke-width="4.5"/>
+  <path d="M92 132q36-20 72 0" fill="none" stroke="#40301f" stroke-width="4"/>
+  <circle cx="110" cy="142" r="15" fill="none" stroke="#40301f" stroke-width="4"/>
+  <circle cx="146" cy="142" r="15" fill="none" stroke="#40301f" stroke-width="4"/>
+  <path d="M125 142h6" stroke="#40301f" stroke-width="4"/>
+  <circle cx="110" cy="144" r="3.5" fill="#2a2118"/>
+  <circle cx="146" cy="144" r="3.5" fill="#2a2118"/>
+  <path d="M122 158q6 5 12 0" fill="none" stroke="#40301f" stroke-width="4" stroke-linecap="round"/>
+  <path d="M114 172q14 8 28-2" fill="none" stroke="#40301f" stroke-width="4" stroke-linecap="round"/>
+  <path d="M102 200q26 14 52 0" fill="none" stroke="#fffdf8" stroke-width="7" stroke-linecap="round"/>
+</svg>

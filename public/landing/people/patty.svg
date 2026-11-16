@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="40 18 184 184" width="256" height="256" role="img" aria-label="Patty Bouvier">
+  <rect width="256" height="256" fill="#efe8da"/>
+  <circle cx="128" cy="118" r="98" fill="#e5dcc7"/>
+  <path d="M44 256c5-46 40-70 84-70s79 24 84 70Z" fill="#9a7fb0" stroke="#40301f" stroke-width="4.5"/>
+  <path d="M74 134c-6-46 12-70 54-70s60 24 54 70c-2 20-14 28-54 28s-52-8-54-28Z" fill="#8a5a3b" stroke="#40301f" stroke-width="4.5"/>
+  <path d="M88 106q40-18 80 0" fill="none" stroke="#40301f" stroke-width="4"/>
+  <circle cx="80" cy="150" r="11" fill="#ffd90f" stroke="#40301f" stroke-width="4"/>
+  <circle cx="176" cy="150" r="11" fill="#ffd90f" stroke="#40301f" stroke-width="4"/>
+  <circle cx="66" cy="172" r="8" fill="none" stroke="#c49a45" stroke-width="3.5"/>
+  <circle cx="190" cy="172" r="8" fill="none" stroke="#c49a45" stroke-width="3.5"/>
+  <ellipse cx="128" cy="142" rx="48" ry="52" fill="#ffd90f" stroke="#40301f" stroke-width="4.5"/>
+  <path d="M88 130q40-16 80 0" fill="none" stroke="#8a5a3b" stroke-width="10" stroke-linecap="round"/>
+  <ellipse cx="109" cy="140" rx="13" ry="14" fill="#fffdf8" stroke="#40301f" stroke-width="4"/>
+  <ellipse cx="147" cy="140" rx="13" ry="14" fill="#fffdf8" stroke="#40301f" stroke-width="4"/>
+  <circle cx="109" cy="143" r="4" fill="#2a2118"/>
+  <circle cx="147" cy="143" r="4" fill="#2a2118"/>
+  <ellipse cx="128" cy="156" rx="8" ry="6" fill="#ffd90f" stroke="#40301f" stroke-width="4"/>
+  <path d="M114 170q14 8 28 0" fill="none" stroke="#40301f" stroke-width="4" stroke-linecap="round"/>
+</svg>

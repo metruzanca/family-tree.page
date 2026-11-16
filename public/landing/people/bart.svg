@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="40 18 184 184" width="256" height="256" role="img" aria-label="Bart Simpson">
+  <rect width="256" height="256" fill="#efe8da"/>
+  <circle cx="128" cy="118" r="98" fill="#e5dcc7"/>
+  <path d="M42 256c5-44 40-68 86-68s81 24 86 68Z" fill="#e8552d" stroke="#40301f" stroke-width="4.5"/>
+  <path d="M106 194l22 20 22-20" fill="#f8f5ed" stroke="#40301f" stroke-width="4"/>
+  <path d="M94 70 100 32l16 24 10-32 14 30 12-28 16 32 10-24 16 36Z" fill="#ffd90f" stroke="#40301f" stroke-width="4.5" stroke-linejoin="round"/>
+  <circle cx="76" cy="140" r="12" fill="#ffd90f" stroke="#40301f" stroke-width="4"/>
+  <circle cx="180" cy="140" r="12" fill="#ffd90f" stroke="#40301f" stroke-width="4"/>
+  <ellipse cx="128" cy="132" rx="54" ry="58" fill="#ffd90f" stroke="#40301f" stroke-width="4.5"/>
+  <path d="M92 78q36-16 72 0" fill="none" stroke="#40301f" stroke-width="4"/>
+  <ellipse cx="108" cy="126" rx="14" ry="17" fill="#fffdf8" stroke="#40301f" stroke-width="4"/>
+  <ellipse cx="148" cy="126" rx="14" ry="17" fill="#fffdf8" stroke="#40301f" stroke-width="4"/>
+  <circle cx="110" cy="130" r="4.5" fill="#2a2118"/>
+  <circle cx="150" cy="130" r="4.5" fill="#2a2118"/>
+  <ellipse cx="128" cy="148" rx="9" ry="7" fill="#ffd90f" stroke="#40301f" stroke-width="4"/>
+  <path d="M104 162q24 22 48-2" fill="none" stroke="#40301f" stroke-width="4" stroke-linecap="round"/>
+  <path d="M156 166q10 2 14 10" fill="none" stroke="#40301f" stroke-width="3.5" stroke-linecap="round"/>
+</svg>
