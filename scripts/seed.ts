@@ -150,11 +150,15 @@ try {
     birthPlace: "Milan, Italy",
   });
 
-  await db.insert(partnerships).values([
-    { treeId: tree.id, personAId: giuseppe.id, personBId: maria.id, status: "married" },
-    { treeId: tree.id, personAId: david.id, personBId: lucia.id, status: "married" },
-    { treeId: tree.id, personAId: marco.id, personBId: sofia.id, status: "partnered" },
-  ]);
+  const partnershipRows = [
+    { a: giuseppe.id, b: maria.id, status: "married" as const },
+    { a: david.id, b: lucia.id, status: "married" as const },
+    { a: marco.id, b: sofia.id, status: "partnered" as const },
+  ].map(({ a, b, status }) => {
+    const [personAId, personBId] = [a, b].sort();
+    return { treeId: tree.id, personAId, personBId, status };
+  });
+  await db.insert(partnerships).values(partnershipRows);
 
   await db.insert(parentChild).values([
     { treeId: tree.id, parentId: giuseppe.id, childId: lucia.id },
