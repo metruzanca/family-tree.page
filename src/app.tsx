@@ -6,6 +6,7 @@ import "./app.css";
 import { ThemeProvider } from "./components/ui/Theme";
 import { ToastProvider } from "./components/ui/Toast";
 import { LoadingScreen } from "./components/ui/Loading";
+import { AppErrorBoundary } from "./components/app/AppErrorBoundary";
 
 function CacheBoundary(props: ParentProps) {
   const location = useLocation();
@@ -25,7 +26,12 @@ export default function App() {
           root={props => (
             <CacheBoundary>
               <Suspense fallback={<LoadingScreen />}>
-                {props.children}
+                <AppErrorBoundary
+                  title="Something went wrong"
+                  back={{ href: "/", label: "Go home" }}
+                >
+                  {props.children}
+                </AppErrorBoundary>
               </Suspense>
             </CacheBoundary>
           )}
