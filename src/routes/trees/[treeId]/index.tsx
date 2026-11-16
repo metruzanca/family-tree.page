@@ -1,6 +1,6 @@
-import { Show, Suspense, createMemo, createSignal, onCleanup, onMount } from "solid-js";
+import { For, Show, Suspense, createMemo, createSignal, onCleanup, onMount } from "solid-js";
 import { createAsync, revalidate, useParams, useSearchParams } from "@solidjs/router";
-import { Plus, Sprout } from "lucide-solid";
+import { Plus, Sprout, TriangleAlert } from "lucide-solid";
 import type {
   GraphFile,
   GraphFileGroup,
@@ -25,10 +25,12 @@ import { AddRelativeDialog } from "~/components/people/AddRelativeDialog";
 import { FilePanel } from "~/components/files/FilePanel";
 import { MediaLightbox } from "~/components/files/MediaLightbox";
 import { ConfirmDialog } from "~/components/ui/ConfirmDialog";
+import { Alert, AlertDescription, AlertTitle } from "~/components/ui/alert";
 import { Button } from "~/components/ui/button";
 import { useToast } from "~/components/ui/Toast";
 import { uploadPersonFile } from "~/lib/upload";
 import { fileNodeId, groupNodeId, type GenerationDirection } from "~/lib/graph";
+import { analyzeRelationships, type RelationshipConflict } from "~/lib/relationships";
 import { track } from "~/lib/analytics";
 import { createTreePresence } from "~/lib/presence";
 
@@ -113,6 +115,36 @@ function TreePageInner() {
     return null;
   });
   const editable = () => data()?.role === "owner" || data()?.role === "editor";
+
+  const selectedParentCount = createMemo(() => {
+    const person = selectedPerson();
+    const graph = data();
+    if (!person || !graph) return 0;
+    return graph.relationships.filter(
+      relationship =>
+        relationship.type === "parent" && relationship.target === person.id,
+    ).length;
+  });
+
+  const conflicts = createMemo<RelationshipConflict[]>(() => {
+    const graph = data();
+    if (!graph) return [];
+    return analyzeRelationships(graph.people, graph.relationships).conflicts;
+  });
+
+  function conflictPersonName(personId: string) {
+    return data()?.people.find(person => person.id === personId)?.displayName ?? "Someone";
+  }
+
+  function conflictTitle(conflict: RelationshipConflict) {
+    if (conflict.kind === "partner-ancestor") {
+      const [first, second] = conflict.personIds;
+      return `${conflictPersonName(first)} is both partner and ancestor of ${conflictPersonName(second)}.`;
+    }
+    return `A parent loop connects ${conflict.personIds
+      .map(conflictPersonName)
+      .join(", ")}.`;
+  }
 
   const presence = createTreePresence({
     treeId: params.treeId,
@@ -415,6 +447,39 @@ function TreePageInner() {
             onReady={setHandle}
           />
 
+          <Show when={conflicts().length}>
+            <div class="pointer-events-none absolute inset-x-0 top-20 z-30 flex justify-center px-3">
+              <Alert
+                variant="destructive"
+                class="pointer-events-auto max-w-xl border-destructive/30 bg-card/95 shadow-xl backdrop-blur"
+              >
+                <TriangleAlert size={16} />
+                <AlertTitle>Some relationships contradict each other</AlertTitle>
+                <AlertDescription class="text-xs">
+                  <p>
+                    The graph may look wrong until {editable() ? "you fix" : "an editor fixes"} one
+                    of these links.
+                  </p>
+                  <ul class="mt-1 space-y-1">
+                    <For each={conflicts()}>
+                      {conflict => (
+                        <li>
+                          <button
+                            type="button"
+                            class="text-left underline decoration-destructive/40 underline-offset-2 hover:text-foreground"
+                            onClick={() => focusPerson(conflict.personIds[0])}
+                          >
+                            {conflictTitle(conflict)}
+                          </button>
+                        </li>
+                      )}
+                    </For>
+                  </ul>
+                </AlertDescription>
+              </Alert>
+            </div>
+          </Show>
+
           <GraphToolbar
             treeId={params.treeId}
             treeName={graph().tree.name}
@@ -578,6 +643,8 @@ function TreePageInner() {
             treeId={params.treeId}
             anchor={selectedPerson()}
             people={graph().people}
+            relationships={graph().relationships}
+            anchorParentCount={selectedParentCount()}
             onAdded={focusPerson}
           />
 

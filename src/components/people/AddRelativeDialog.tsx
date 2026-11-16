@@ -1,8 +1,8 @@
-import { For, Show, createEffect, createMemo, createSignal } from "solid-js";
+import { For, Show, createEffect, createMemo, createSignal, on } from "solid-js";
 import { createStore } from "solid-js/store";
 import { revalidate } from "@solidjs/router";
 import { ArrowDown, ArrowUp, Heart, Search } from "lucide-solid";
-import type { GraphPerson } from "~/api/people-server";
+import type { GraphPerson, GraphRelationship } from "~/api/people-server";
 import { addRelative } from "~/api/people-server";
 import { getMyTrees, getTreeGraph, getTreeOverview } from "~/api";
 import { Avatar } from "../ui/Avatar";
@@ -45,6 +45,8 @@ export function AddRelativeDialog(props: {
   treeId: string;
   anchor: GraphPerson | null;
   people: GraphPerson[];
+  relationships: GraphRelationship[];
+  anchorParentCount: number;
   onAdded?: (personId: string) => void;
 }) {
   const toast = useToast();
@@ -52,6 +54,7 @@ export function AddRelativeDialog(props: {
   const [mode, setMode] = createSignal<"existing" | "new">("existing");
   const [search, setSearch] = createSignal("");
   const [selectedId, setSelectedId] = createSignal<string | null>(null);
+  const [otherParentId, setOtherParentId] = createSignal("none");
   const [parentType, setParentType] = createSignal("biological");
   const [status, setStatus] = createSignal("partnered");
   const [pending, setPending] = createSignal(false);
@@ -64,6 +67,42 @@ export function AddRelativeDialog(props: {
     deathDate: "",
   });
 
+  const parentDisabled = () => props.anchorParentCount >= 2;
+
+  const partnerIds = createMemo(() => {
+    const anchorId = props.anchor?.id;
+    const found = new Set<string>();
+    if (!anchorId) return found;
+    for (const relationship of props.relationships) {
+      if (relationship.type !== "partner") continue;
+      if (relationship.source === anchorId) found.add(relationship.target);
+      if (relationship.target === anchorId) found.add(relationship.source);
+    }
+    return found;
+  });
+
+  const otherParentOptions = createMemo(() => {
+    const excluded = new Set<string>();
+    if (props.anchor) excluded.add(props.anchor.id);
+    if (mode() === "existing" && selectedId()) excluded.add(selectedId()!);
+    const candidates = props.people.filter(person => !excluded.has(person.id));
+    const partners = candidates.filter(person => partnerIds().has(person.id));
+    const others = candidates.filter(person => !partnerIds().has(person.id));
+    return [
+      { value: "none", label: "No other parent" },
+      ...[...partners, ...others].map(person => ({
+        value: person.id,
+        label: person.displayName,
+      })),
+    ];
+  });
+
+  const otherParentOption = createMemo(
+    () =>
+      otherParentOptions().find(option => option.value === otherParentId()) ??
+      otherParentOptions()[0],
+  );
+
   const options = createMemo(() =>
     props.people
       .filter(person => person.id !== props.anchor?.id)
@@ -75,19 +114,34 @@ export function AddRelativeDialog(props: {
       .slice(0, 60),
   );
 
-  createEffect(() => {
-    if (!props.open) return;
+  createEffect(
+    on(
+      () => props.open,
+      open => {
+        if (!open) return;
+        setSearch("");
+        setSelectedId(null);
+        setOtherParentId("none");
+        setError("");
+        setMode("existing");
+        setRelation(parentDisabled() ? "child" : "parent");
+        setForm({ firstName: "", lastName: "", nickname: "", birthDate: "", deathDate: "" });
+      },
+    ),
+  );
+
+  function resetForNext() {
     setSearch("");
     setSelectedId(null);
     setError("");
-    setMode("existing");
-    setRelation("parent");
     setForm({ firstName: "", lastName: "", nickname: "", birthDate: "", deathDate: "" });
-  });
+  }
 
   async function submit(event: SubmitEvent) {
     event.preventDefault();
     if (!props.anchor || pending()) return;
+    const shouldKeepOpen =
+      (event.submitter as HTMLButtonElement | null)?.dataset.keepOpen === "true";
     if (mode() === "existing" && !selectedId()) {
       setError("Choose an existing person, or switch to New person.");
       return;
@@ -100,6 +154,9 @@ export function AddRelativeDialog(props: {
       anchorPersonId: props.anchor.id,
       relation: relation(),
       personId: selectedId() ?? undefined,
+      otherParentId: relation() === "child" && otherParentId() !== "none"
+        ? otherParentId()
+        : undefined,
       person:
         mode() === "new"
           ? {
@@ -128,6 +185,10 @@ export function AddRelativeDialog(props: {
       mode() === "new" ? "Person added and connected." : "People connected.",
       "success",
     );
+    if (shouldKeepOpen) {
+      resetForNext();
+      return;
+    }
     props.onAdded?.(result.data.personId);
     props.onClose();
   }
@@ -143,6 +204,15 @@ export function AddRelativeDialog(props: {
           <Button variant="ghost" type="button" onClick={props.onClose}>
             Cancel
           </Button>
+          <Button
+            variant="secondary"
+            type="submit"
+            form="relative-form"
+            data-keep-open="true"
+            disabled={pending()}
+          >
+            Connect and add more
+          </Button>
           <Button type="submit" form="relative-form" disabled={pending()}>
             {pending() ? "Connecting…" : "Connect"}
           </Button>
@@ -153,9 +223,10 @@ export function AddRelativeDialog(props: {
         <div class="grid grid-cols-3 gap-2">
           <RelationChoice
             active={relation() === "parent"}
+            disabled={parentDisabled()}
             icon={<ArrowUp size={17} />}
             label="Parent"
-            hint="They came before"
+            hint={parentDisabled() ? "Already has two parents" : "They came before"}
             onClick={() => setRelation("parent")}
           />
           <RelationChoice
@@ -187,6 +258,34 @@ export function AddRelativeDialog(props: {
               )}
             >
               <SelectTrigger id="parent-type" class="w-full" aria-label="Relationship type">
+                <SelectValue<{ value: string; label: string }>>
+                  {state => state.selectedOption().label}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectPortal>
+                <SelectContent />
+              </SelectPortal>
+            </Select>
+          </Field>
+        </Show>
+
+        <Show when={relation() === "child"}>
+          <Field
+            label="Other parent"
+            for="other-parent"
+            hint="Optional. Connects this child to both parents in one step."
+          >
+            <Select
+              options={otherParentOptions()}
+              optionValue="value"
+              optionTextValue="label"
+              value={otherParentOption()}
+              onChange={option => option && setOtherParentId(option.value)}
+              itemComponent={itemProps => (
+                <SelectItem item={itemProps.item}>{itemProps.item.rawValue.label}</SelectItem>
+              )}
+            >
+              <SelectTrigger id="other-parent" class="w-full" aria-label="Other parent">
                 <SelectValue<{ value: string; label: string }>>
                   {state => state.selectedOption().label}
                 </SelectValue>
@@ -344,19 +443,27 @@ function RelationChoice(props: {
   icon: any;
   label: string;
   hint: string;
+  disabled?: boolean;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
+      disabled={props.disabled}
+      aria-disabled={props.disabled}
       class={`flex flex-col items-center gap-1 rounded-2xl border px-2 py-3 text-center transition ${
-        props.active
-          ? "border-primary bg-accent text-foreground"
-          : "border-border bg-background text-muted-foreground hover:border-primary/30 hover:text-foreground"
+        props.disabled
+          ? "cursor-not-allowed border-border bg-muted/40 text-muted-foreground/50"
+          : props.active
+            ? "border-primary bg-accent text-foreground"
+            : "border-border bg-background text-muted-foreground hover:border-primary/30 hover:text-foreground"
       }`}
-      onClick={props.onClick}
+      onClick={() => {
+        if (props.disabled) return;
+        props.onClick();
+      }}
     >
-      <span class={props.active ? "text-primary" : ""}>{props.icon}</span>
+      <span class={props.active && !props.disabled ? "text-primary" : ""}>{props.icon}</span>
       <span class="text-sm font-semibold">{props.label}</span>
       <span class="text-[0.62rem] leading-tight">{props.hint}</span>
     </button>
