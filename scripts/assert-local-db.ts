@@ -12,17 +12,20 @@ if (process.env.ALLOW_REMOTE_DB === "1") {
   process.exit(0);
 }
 
-const allowDeployed = process.argv.includes("--allow-deployed");
-if (allowDeployed && process.env.RAILWAY_ENVIRONMENT) {
-  process.exit(0);
-}
-
 let host: string;
 try {
   host = new URL(databaseUrl).hostname;
 } catch {
   console.error("DATABASE_URL is not a valid connection string.");
   process.exit(1);
+}
+
+const allowDeployed = process.argv.includes("--allow-deployed");
+if (
+  allowDeployed &&
+  (process.env.RAILWAY_ENVIRONMENT || host.endsWith(".railway.internal"))
+) {
+  process.exit(0);
 }
 
 if (!localHosts.has(host)) {
