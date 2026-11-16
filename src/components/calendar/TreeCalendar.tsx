@@ -121,19 +121,18 @@ export function TreeCalendar(props: TreeCalendarProps) {
               const isToday = () => sameDate(cell.date, today);
               const isSelected = () => sameDate(cell.date, agendaDay());
               return (
-                <button
-                  type="button"
+                <div
                   class={cx(
-                    "relative flex min-h-14 flex-col gap-1 border-b border-r border-border/70 p-1.5 text-left align-top transition last:border-r-0 sm:min-h-24 sm:p-2",
+                    "relative flex min-h-14 cursor-pointer flex-col gap-1 border-b border-r border-border/70 p-1.5 text-left align-top transition last:border-r-0 sm:min-h-24 sm:p-2",
                     cell.inMonth
                       ? "bg-card hover:bg-accent/40"
                       : "bg-muted/25 text-muted-foreground hover:bg-accent/20",
                     isSelected() && "ring-2 ring-inset ring-primary/45",
                   )}
-                  aria-label={formatMonthDay(cell.date)}
                   onClick={() => setSelected(cell.date)}
                 >
-                  <span
+                  <button
+                    type="button"
                     class={cx(
                       "grid size-6 place-items-center rounded-full text-xs font-semibold",
                       isToday()
@@ -142,9 +141,14 @@ export function TreeCalendar(props: TreeCalendarProps) {
                           ? "text-foreground"
                           : "text-muted-foreground",
                     )}
+                    aria-label={`Select ${formatMonthDay(cell.date)}`}
+                    onClick={event => {
+                      event.stopPropagation();
+                      setSelected(cell.date);
+                    }}
                   >
                     {cell.date.day}
-                  </span>
+                  </button>
 
                   <span class="hidden flex-1 flex-col gap-1 sm:flex">
                     <For each={dayEvents().slice(0, 2)}>
@@ -175,7 +179,7 @@ export function TreeCalendar(props: TreeCalendarProps) {
                       )}
                     </For>
                   </span>
-                </button>
+                </div>
               );
             }}
           </For>
