@@ -115,7 +115,6 @@ export function LandingPage() {
             <IconButton
               label={theme() === "dark" ? "Switch to light theme" : "Switch to dark theme"}
               onClick={toggle}
-              class="hidden sm:inline-flex"
             >
               <Show when={theme() === "dark"} fallback={<Moon size={18} />}>
                 <Sun size={18} />
