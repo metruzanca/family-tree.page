@@ -1,6 +1,6 @@
 import { A, createAsync } from "@solidjs/router";
 import { For, Show, createSignal } from "solid-js";
-import { ArrowUpRight, Plus, Sprout, Users } from "lucide-solid";
+import { ArrowUpRight, CalendarDays, Plus, Sprout, Users } from "lucide-solid";
 import { getMyTrees, requireUserPage } from "~/api";
 import { AppHeader } from "~/components/app/AppHeader";
 import { VerifyEmailNotice } from "~/components/auth/VerifyEmailNotice";
@@ -76,42 +76,55 @@ export default function TreesPage() {
                 <div class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   <For each={trees()}>
                     {tree => (
-                      <A href={`/trees/${tree.id}`} class="group block focus-visible:outline-none">
-                        <Card class="h-full min-h-56 justify-between gap-0 p-5 transition duration-200 group-hover:-translate-y-0.5 group-hover:border-primary/35 group-hover:shadow-[var(--shadow-card)] group-focus-visible:ring-[3px] group-focus-visible:ring-ring/35">
-                          <div>
-                            <div class="flex items-start justify-between gap-3">
-                              <span class="grid size-11 place-items-center rounded-2xl bg-accent text-accent-foreground">
-                                <Sprout size={20} />
-                              </span>
-                              <Badge variant="secondary" class="uppercase tracking-wide">
-                                {roleLabel(tree.role)}
-                              </Badge>
-                            </div>
-                            <h2 class="mt-5 font-display text-2xl leading-tight tracking-tight">
-                              {tree.name}
-                            </h2>
-                            <Show when={tree.description}>
-                              <p class="mt-2 line-clamp-2 text-sm leading-relaxed text-muted-foreground">
-                                {tree.description}
-                              </p>
-                            </Show>
+                      <Card class="group relative flex h-full min-h-56 flex-col justify-between gap-0 p-5 transition duration-200 hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-[var(--shadow-card)]">
+                        <A
+                          href={`/trees/${tree.id}`}
+                          class="absolute inset-0 z-0 rounded-xl focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/35"
+                          aria-label={`Open ${tree.name}`}
+                        />
+                        <div class="pointer-events-none relative z-10">
+                          <div class="flex items-start justify-between gap-3">
+                            <span class="grid size-11 place-items-center rounded-2xl bg-accent text-accent-foreground">
+                              <Sprout size={20} />
+                            </span>
+                            <Badge variant="secondary" class="uppercase tracking-wide">
+                              {roleLabel(tree.role)}
+                            </Badge>
                           </div>
-                          <div class="mt-6 flex items-center justify-between border-t border-border pt-3 text-xs text-muted-foreground">
-                            <span class="flex items-center gap-1.5">
-                              <Users size={13} />
-                              {tree.memberCount} {tree.memberCount === 1 ? "member" : "members"}
-                            </span>
-                            <span>
-                              {tree.peopleCount} {tree.peopleCount === 1 ? "person" : "people"}
-                            </span>
-                            <span>{formatRelative(tree.updatedAt)}</span>
+                          <h2 class="mt-5 font-display text-2xl leading-tight tracking-tight">
+                            {tree.name}
+                          </h2>
+                          <Show when={tree.description}>
+                            <p class="mt-2 line-clamp-2 text-sm leading-relaxed text-muted-foreground">
+                              {tree.description}
+                            </p>
+                          </Show>
+                        </div>
+                        <div class="pointer-events-none relative z-10 mt-6 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-border pt-3 text-xs text-muted-foreground">
+                          <span class="flex items-center gap-1.5">
+                            <Users size={13} />
+                            {tree.memberCount} {tree.memberCount === 1 ? "member" : "members"}
+                          </span>
+                          <span>
+                            {tree.peopleCount} {tree.peopleCount === 1 ? "person" : "people"}
+                          </span>
+                          <span>{formatRelative(tree.updatedAt)}</span>
+                          <span class="ml-auto flex items-center gap-2">
+                            <A
+                              href={`/trees/${tree.id}/calendar`}
+                              class="pointer-events-auto inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-1 text-[0.68rem] font-semibold text-foreground transition hover:border-primary/40 hover:bg-accent/60 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/35"
+                              aria-label={`Open ${tree.name} calendar`}
+                            >
+                              <CalendarDays size={13} />
+                              Calendar
+                            </A>
                             <ArrowUpRight
                               size={15}
                               class="text-primary opacity-0 transition group-hover:opacity-100"
                             />
-                          </div>
-                        </Card>
-                      </A>
+                          </span>
+                        </div>
+                      </Card>
                     )}
                   </For>
                   <button

@@ -22,7 +22,6 @@ import type { PresencePeer, PresenceStatus } from "~/lib/presence-protocol";
 import type { TreeRole } from "~/server/guards";
 import { roleLabel } from "~/lib/format";
 import { PresenceBar } from "../presence/PresenceBar";
-import { TreeViewTabs } from "../trees/TreeViewTabs";
 import { Badge } from "./../ui/badge";
 import { Kbd } from "./../ui/kbd";
 import {
@@ -84,10 +83,6 @@ export function GraphToolbar(props: ToolbarProps) {
           >
             {roleLabel(props.role)}
           </Badge>
-        </div>
-
-        <div class="hidden sm:block">
-          <TreeViewTabs treeId={props.treeId} active="graph" />
         </div>
 
         <PresenceBar
@@ -156,6 +151,9 @@ export function GraphToolbar(props: ToolbarProps) {
             </ToolButton>
             <ToolButton label="Reset layout" onClick={props.onResetLayout}>
               <RotateCcw size={17} />
+            </ToolButton>
+            <ToolButton label="Calendar" href={`/trees/${props.treeId}/calendar`}>
+              <CalendarDays size={17} />
             </ToolButton>
             <ToolButton label="Tree settings" href={`/trees/${props.treeId}/settings`}>
               <Settings size={17} />

@@ -1,10 +1,11 @@
 import { Show, Suspense } from "solid-js";
-import { createAsync, useParams } from "@solidjs/router";
+import { A, createAsync, useParams } from "@solidjs/router";
+import { Network } from "lucide-solid";
 import { getTreeGraph, requireUserPage } from "~/api";
 import { AppHeader } from "~/components/app/AppHeader";
 import { TreeCalendar } from "~/components/calendar/TreeCalendar";
+import { buttonVariants } from "~/components/ui/button";
 import { LoadingScreen } from "~/components/ui/Loading";
-import { TreeViewTabs } from "~/components/trees/TreeViewTabs";
 
 export const route = {
   preload: ({ params }: { params: { treeId: string } }) => {
@@ -47,7 +48,13 @@ function TreeCalendarInner() {
                       counted forward so you never miss a birthday.
                     </p>
                   </div>
-                  <TreeViewTabs treeId={params.treeId} active="calendar" variant="page" />
+                  <A
+                    href={`/trees/${params.treeId}`}
+                    class={buttonVariants({ variant: "secondary", size: "sm" })}
+                  >
+                    <Network size={15} />
+                    Open graph
+                  </A>
                 </div>
 
                 <TreeCalendar treeId={params.treeId} people={graph().people} />
