@@ -256,6 +256,21 @@ textarea.input {
   }
 }
 
+/**
+ * Embedded graphs (the landing hero) live inside a scrolling page, so a swipe
+ * must scroll the page instead of being swallowed by the canvas. Taps still
+ * reach the node hit testing.
+ */
+@utility landing-graph {
+  & .graph-canvas {
+    touch-action: pan-y;
+  }
+
+  & canvas {
+    touch-action: pan-y;
+  }
+}
+
 @utility graph-vignette {
   pointer-events: none;
   position: absolute;

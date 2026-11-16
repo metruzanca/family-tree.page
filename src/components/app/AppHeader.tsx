@@ -15,9 +15,9 @@ import {
 } from "../ui/dropdown-menu";
 import { useTheme } from "../ui/Theme";
 
-export function BrandMark(props: { compact?: boolean }) {
+export function BrandMark(props: { compact?: boolean; href?: string }) {
   return (
-    <A href="/trees" class="inline-flex items-center gap-2.5">
+    <A href={props.href ?? "/trees"} class="inline-flex items-center gap-2.5">
       <span class="grid h-9 w-9 place-items-center rounded-xl bg-[#22331f] text-[#f5efe2] shadow-sm">
         <svg viewBox="0 0 64 64" class="h-5 w-5" aria-hidden="true">
           <path d="M32 52V30" stroke="currentColor" stroke-width="6" stroke-linecap="round" />

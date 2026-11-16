@@ -4,6 +4,7 @@ import type { TreeGraph } from "~/api/people-server";
 import type { TreeRole } from "~/server/guards";
 import type { PresencePeer } from "~/lib/presence-protocol";
 import { presenceColor } from "~/lib/presence-color";
+import { cx } from "~/lib/utils";
 import {
   branchColor,
   buildGraphModel,
@@ -37,6 +38,19 @@ type GraphViewProps = {
   generationDirection: GenerationDirection;
   presence?: PresencePeer[];
   selfPeerId?: string | null;
+  /** Extra classes for the graph shell, for example a fixed height when embedded. */
+  class?: string;
+  /** Override where thumbnails are loaded from, used by the public landing demo. */
+  thumbUrlFor?: (fileId: string) => string;
+  /** Padding used by zoom-to-fit. The full-screen app wants more than an embed. */
+  fitPadding?: number;
+  /** Warmup and cooldown ticks. The app stops immediately after warmup; an embed can relax further. */
+  warmupTicks?: number;
+  cooldownTicks?: number;
+  /** Optional shorter label for a node, used by the landing demo to show first names. */
+  nodeLabel?: (node: GraphNode) => string;
+  /** Optional deterministic positions. When set, the simulation is skipped and the graph is drawn as authored. */
+  fixedLayout?: (node: GraphNode) => { x: number; y: number } | null;
   onSelect: (id: string | null) => void;
   onFileSelect: (fileId: string) => void;
   onGroupSelect: (groupId: string) => void;
@@ -65,6 +79,14 @@ export function GraphView(props: GraphViewProps) {
   const [ready, setReady] = createSignal(false);
   const [paintVersion, setPaintVersion] = createSignal(0);
   const images = new Map<string, HTMLImageElement>();
+  let disposeGraph: (() => void) | undefined;
+  let disposed = false;
+
+  // Register synchronously so the cleanup survives the async import below.
+  onCleanup(() => {
+    disposed = true;
+    disposeGraph?.();
+  });
 
   const activeId = createMemo(() => hovered() ?? props.selectedId);
   const active = createMemo(() => {
@@ -96,9 +118,22 @@ export function GraphView(props: GraphViewProps) {
     graph.linkColor(linkColor);
   }
 
+  function applyFixedLayout(target: GraphModel) {
+    if (!props.fixedLayout) return;
+    for (const node of target.nodes) {
+      const position = props.fixedLayout(node);
+      if (!position) continue;
+      node.x = position.x;
+      node.y = position.y;
+      node.vx = 0;
+      node.vy = 0;
+    }
+  }
+
   function hitTestNode(clientX: number, clientY: number): GraphNode | null {
     if (!graph) return null;
-    const point = graph.screen2GraphCoords(clientX, clientY);
+    const rect = container.getBoundingClientRect();
+    const point = graph.screen2GraphCoords(clientX - rect.left, clientY - rect.top);
     const zoom = graph.zoom();
     const nodes = graph.graphData().nodes as GraphNode[];
     for (let index = nodes.length - 1; index >= 0; index -= 1) {
@@ -156,7 +191,8 @@ export function GraphView(props: GraphViewProps) {
   }
 
   function avatarUrl(fileId: string | null | undefined) {
-    return fileId ? `/api/files/${fileId}/thumb` : null;
+    if (!fileId) return null;
+    return props.thumbUrlFor ? props.thumbUrlFor(fileId) : `/api/files/${fileId}/thumb`;
   }
 
   function setCanvasCursor(cursor: "default" | "pointer") {
@@ -351,7 +387,7 @@ export function GraphView(props: GraphViewProps) {
         context.font = `600 ${fontSize}px ui-sans-serif, system-ui, sans-serif`;
         context.textAlign = "center";
         context.textBaseline = "top";
-        const label = node.name;
+        const label = props.nodeLabel ? props.nodeLabel(node) : node.name;
         const labelY = (node.y ?? 0) + radius + 5 / globalScale;
         context.lineWidth = 3.2 / globalScale;
         context.strokeStyle = "rgba(17,20,16,0.92)";
@@ -433,7 +469,7 @@ export function GraphView(props: GraphViewProps) {
       const x = (node.x ?? 0) - width / 2;
       const y = (node.y ?? 0) - height / 2;
       const coverUrl = node.group?.coverFileId
-        ? `/api/files/${node.group.coverFileId}/thumb`
+        ? avatarUrl(node.group.coverFileId)
         : null;
       const image = coverUrl ? imageFor(coverUrl) : null;
       const hasCover = Boolean(image?.complete && image.naturalWidth > 0);
@@ -567,11 +603,12 @@ export function GraphView(props: GraphViewProps) {
   }
 
   function fit() {
-    graph.zoomToFit(0, 110);
+    graph.zoomToFit(0, props.fitPadding ?? 110);
   }
 
   function reset() {
     const fresh = buildGraphModel(props.data, props.showMedia, props.generationDirection);
+    applyFixedLayout(fresh);
     model = fresh;
     graph?.graphData({
       nodes: fresh.nodes,
@@ -580,7 +617,7 @@ export function GraphView(props: GraphViewProps) {
     packComponentBands();
     snapPartnerRows();
     needsFit = true;
-    setTimeout(() => graph?.zoomToFit(0, 110), 80);
+    setTimeout(() => graph?.zoomToFit(0, props.fitPadding ?? 110), 80);
   }
 
   function applyLayout(mode: "generations" | "freeform") {
@@ -639,9 +676,11 @@ export function GraphView(props: GraphViewProps) {
 
   function settleLayout() {
     if (!graph) return;
-    graph.warmupTicks(300);
+    graph.warmupTicks(props.warmupTicks ?? 300);
     const data = graph.graphData();
     graph.graphData({ nodes: [...data.nodes], links: [...data.links] });
+    needsFit = true;
+    if (props.cooldownTicks) graph.d3ReheatSimulation();
     packComponentBands();
     snapPartnerRows();
     fit();
@@ -745,6 +784,7 @@ export function GraphView(props: GraphViewProps) {
 
   onMount(async () => {
     const { default: ForceGraph } = await import("force-graph");
+    if (disposed) return;
     const ForceGraphAny = ForceGraph as any;
     graph = new ForceGraphAny(container)
       .width(container.clientWidth || window.innerWidth)
@@ -777,9 +817,9 @@ export function GraphView(props: GraphViewProps) {
           fit();
         }
       })
-      .warmupTicks(300)
-      .cooldownTicks(0)
-      .cooldownTime(0)
+      .warmupTicks(props.warmupTicks ?? 300)
+      .cooldownTicks(props.cooldownTicks ?? 0)
+      .cooldownTime(props.cooldownTicks ? 15_000 : 0)
       .minZoom(0.2)
       .maxZoom(4.5)
       .enableNodeDrag(false)
@@ -787,7 +827,9 @@ export function GraphView(props: GraphViewProps) {
       .autoPauseRedraw(true);
 
     applyLayout(props.layout);
+    applyFixedLayout(model);
     graph.graphData({ nodes: model.nodes, links: model.links });
+    if (props.cooldownTicks) graph.d3ReheatSimulation();
     snapPartnerRows();
     if (import.meta.env.DEV) {
       (window as any).__familyTreeGraph = graph;
@@ -907,7 +949,7 @@ export function GraphView(props: GraphViewProps) {
     container.addEventListener("pointerleave", onPointerLeave);
     window.addEventListener("click", onCaptureClick, true);
 
-    onCleanup(() => {
+    disposeGraph = () => {
       resizeObserver?.disconnect();
       container.removeEventListener("pointerdown", onPointerDown, { capture: true });
       window.removeEventListener("pointermove", onPointerMove);
@@ -917,7 +959,7 @@ export function GraphView(props: GraphViewProps) {
       window.removeEventListener("click", onCaptureClick, true);
       graph?._destructor?.();
       graph = undefined;
-    });
+    };
   });
 
   createEffect(() => {
@@ -945,8 +987,13 @@ export function GraphView(props: GraphViewProps) {
     } else {
       needsFit = true;
     }
+    applyFixedLayout(next);
     model = next;
     graph.graphData({ nodes: next.nodes, links: next.links });
+    if (props.cooldownTicks) {
+      needsFit = true;
+      graph.d3ReheatSimulation();
+    }
     packComponentBands();
     snapPartnerRows();
   });
@@ -971,7 +1018,7 @@ export function GraphView(props: GraphViewProps) {
   });
 
   return (
-    <div class="graph-shell">
+    <div class={cx("graph-shell", props.class)}>
       <div ref={container} class="graph-canvas" />
       <div class="graph-vignette" />
       <Show when={!ready()}>
