@@ -36,6 +36,13 @@
       "when": 1794842043194,
       "tag": "0004_flaky_deathstrike",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794846797549,
+      "tag": "0005_unknown_vargas",
+      "breakpoints": true
     }
   ]
 }

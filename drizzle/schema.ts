@@ -6,6 +6,7 @@ import {
   foreignKey,
   index,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   primaryKey,
@@ -34,6 +35,7 @@ export const partnershipStatus = pgEnum("partnership_status", [
 ]);
 export const fileKind = pgEnum("file_kind", ["image", "document", "other"]);
 export const fileStatus = pgEnum("file_status", ["uploading", "ready", "failed"]);
+export const fileTagSource = pgEnum("file_tag_source", ["manual", "face"]);
 export const authTokenKind = pgEnum("auth_token_kind", [
   "email_verification",
   "password_reset",
@@ -287,6 +289,7 @@ export const files = pgTable(
     sizeBytes: integer("size_bytes").notNull().default(0),
     width: integer("width"),
     height: integer("height"),
+    takenAt: date("taken_at", { mode: "string" }),
     status: fileStatus("status").notNull().default("uploading"),
     isAvatar: boolean("is_avatar").notNull().default(false),
     uploadedBy: uuid("uploaded_by").references(() => users.id, { onDelete: "set null" }),
@@ -309,6 +312,46 @@ export const files = pgTable(
     uniqueIndex("files_one_avatar_per_person")
       .on(t.personId)
       .where(sql`${t.isAvatar} = true`),
+    unique("files_id_tree_unique").on(t.id, t.treeId),
+  ],
+);
+
+export type FaceBox = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+export const fileTags = pgTable(
+  "file_tags",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    treeId: uuid("tree_id")
+      .notNull()
+      .references(() => trees.id, { onDelete: "cascade" }),
+    fileId: uuid("file_id").notNull(),
+    personId: uuid("person_id").notNull(),
+    source: fileTagSource("source").notNull().default("manual"),
+    faceBox: jsonb("face_box").$type<FaceBox>(),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  t => [
+    uniqueIndex("file_tags_file_person_unique").on(t.fileId, t.personId),
+    index("file_tags_file_idx").on(t.fileId),
+    index("file_tags_person_idx").on(t.personId),
+    index("file_tags_tree_idx").on(t.treeId),
+    foreignKey({
+      columns: [t.fileId, t.treeId],
+      foreignColumns: [files.id, files.treeId],
+      name: "file_tags_file_fk",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [t.personId, t.treeId],
+      foreignColumns: [people.id, people.treeId],
+      name: "file_tags_person_fk",
+    }).onDelete("cascade"),
   ],
 );
 
@@ -323,3 +366,4 @@ export type ParentChild = typeof parentChild.$inferSelect;
 export type Partnership = typeof partnerships.$inferSelect;
 export type FileGroup = typeof fileGroups.$inferSelect;
 export type StoredFile = typeof files.$inferSelect;
+export type FileTag = typeof fileTags.$inferSelect;
