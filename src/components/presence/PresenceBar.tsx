@@ -1,6 +1,6 @@
 import { For, Show, createMemo } from "solid-js";
 import type { PresencePeer, PresenceStatus } from "~/lib/presence-protocol";
-import { avatarColors } from "~/lib/avatar-color";
+import { presenceColor } from "~/lib/presence-color";
 import { Avatar } from "~/components/ui/Avatar";
 import {
   DropdownMenu,
@@ -60,11 +60,12 @@ export function PresenceBar(props: PresenceBarProps) {
           <span class="flex -space-x-1.5">
             <For each={users().slice(0, 3)}>
               {user => (
-                <Avatar
-                  name={user.displayName}
-                  size={24}
-                  class="ring-2 ring-[#161b14]"
-                />
+                <span
+                  class="inline-flex rounded-full"
+                  style={{ "box-shadow": `0 0 0 2px ${presenceColor(user.userId)}` }}
+                >
+                  <Avatar name={user.displayName} size={24} />
+                </span>
               )}
             </For>
           </span>
@@ -88,7 +89,7 @@ export function PresenceBar(props: PresenceBarProps) {
               <div class="flex items-center gap-2 rounded-xl px-3 py-2">
                 <span
                   class="h-1.5 w-1.5 shrink-0 rounded-full"
-                  style={{ "background-color": avatarColors(user.displayName)[1] }}
+                  style={{ "background-color": presenceColor(user.userId) }}
                 />
                 <div class="min-w-0 flex-1">
                   <div class="truncate text-xs font-semibold text-white/85">
