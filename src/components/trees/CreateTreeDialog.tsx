@@ -6,6 +6,7 @@ import { Button } from "../ui/button";
 import { Field } from "../ui/Field";
 import { Modal } from "../ui/Modal";
 import { useToast } from "../ui/Toast";
+import { attemptAction } from "~/lib/action-result";
 import { track } from "~/lib/analytics";
 
 export function CreateTreeDialog(props: {
@@ -24,7 +25,7 @@ export function CreateTreeDialog(props: {
     if (pending()) return;
     setPending(true);
     setError("");
-    const result = await createTree({ name: name(), description: description() });
+    const result = await attemptAction(() => createTree({ name: name(), description: description() }));
     setPending(false);
     if (!result.ok) {
       setError(result.error);

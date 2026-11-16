@@ -8,6 +8,7 @@ import { Button } from "../ui/button";
 import { Field } from "../ui/Field";
 import { Modal } from "../ui/Modal";
 import { useToast } from "../ui/Toast";
+import { attemptAction } from "~/lib/action-result";
 import { track } from "~/lib/analytics";
 
 export type PersonFormState = {
@@ -83,9 +84,11 @@ export function PersonFormDialog(props: {
       deathPlace: form.deathPlace,
       bio: form.bio,
     };
-    const result = props.person
-      ? await updatePerson({ treeId: props.treeId, personId: props.person.id, ...payload })
-      : await createPerson({ treeId: props.treeId, ...payload });
+    const result = await attemptAction(() =>
+      props.person
+        ? updatePerson({ treeId: props.treeId, personId: props.person.id, ...payload })
+        : createPerson({ treeId: props.treeId, ...payload }),
+    );
     setPending(false);
     if (!result.ok) {
       setError(result.error);

@@ -18,6 +18,7 @@ import {
 } from "../ui/select";
 import { Modal } from "../ui/Modal";
 import { useToast } from "../ui/Toast";
+import { attemptAction } from "~/lib/action-result";
 import { track } from "~/lib/analytics";
 
 type Relation = "parent" | "partner" | "child";
@@ -146,7 +147,8 @@ export function AddRelativeDialog(props: {
 
   async function submit(event: SubmitEvent) {
     event.preventDefault();
-    if (!props.anchor || pending()) return;
+    const anchor = props.anchor;
+    if (!anchor || pending()) return;
     const shouldKeepOpen =
       (event.submitter as HTMLButtonElement | null)?.dataset.keepOpen === "true";
     if (mode() === "existing" && !selectedId()) {
@@ -155,31 +157,39 @@ export function AddRelativeDialog(props: {
     }
     setPending(true);
     setError("");
-    const result = await addRelative({
-      mode: mode(),
-      treeId: props.treeId,
-      anchorPersonId: props.anchor.id,
-      relation: relation(),
-      personId: selectedId() ?? undefined,
-      otherParentId:
-        relation() === "child" && otherParentId() !== "none" ? otherParentId() : undefined,
-      person:
-        mode() === "new"
-          ? {
-              firstName: form.firstName,
-              lastName: form.lastName,
-              nickname: form.nickname,
-              birthDate: form.birthDate,
-              deathDate: form.deathDate,
-              maidenName: "",
-              birthPlace: "",
-              deathPlace: "",
-              bio: "",
-            }
-          : undefined,
-      parentType: parentType() as "biological" | "adoptive" | "foster" | "step" | "unknown",
-      status: status() as "married" | "partnered" | "divorced" | "separated" | "widowed" | "unknown",
-    });
+    const result = await attemptAction(() =>
+      addRelative({
+        mode: mode(),
+        treeId: props.treeId,
+        anchorPersonId: anchor.id,
+        relation: relation(),
+        personId: selectedId() ?? undefined,
+        otherParentId:
+          relation() === "child" && otherParentId() !== "none" ? otherParentId() : undefined,
+        person:
+          mode() === "new"
+            ? {
+                firstName: form.firstName,
+                lastName: form.lastName,
+                nickname: form.nickname,
+                birthDate: form.birthDate,
+                deathDate: form.deathDate,
+                maidenName: "",
+                birthPlace: "",
+                deathPlace: "",
+                bio: "",
+              }
+            : undefined,
+        parentType: parentType() as "biological" | "adoptive" | "foster" | "step" | "unknown",
+        status: status() as
+          | "married"
+          | "partnered"
+          | "divorced"
+          | "separated"
+          | "widowed"
+          | "unknown",
+      }),
+    );
     setPending(false);
     if (!result.ok) {
       setError(result.error);

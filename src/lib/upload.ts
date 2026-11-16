@@ -1,4 +1,5 @@
 import { cancelUpload, finalizeUpload, prepareUpload } from "~/api/files-server";
+import { friendlyMessage } from "./action-result";
 import { formatExifDate } from "./exif";
 import { makeThumbnail, mimeForFile } from "./image-thumb";
 
@@ -18,7 +19,7 @@ export async function uploadPersonFile(options: UploadOptions): Promise<UploadRe
 
   let thumb: Awaited<ReturnType<typeof makeThumbnail>> = null;
   if (mimeType.startsWith("image/")) {
-    thumb = await makeThumbnail(options.file);
+    thumb = await makeThumbnail(options.file).catch(() => null);
     if ((mimeType === "image/heic" || mimeType === "image/heif") && !thumb) {
       return {
         ok: false,
@@ -29,18 +30,23 @@ export async function uploadPersonFile(options: UploadOptions): Promise<UploadRe
 
   const takenAt = mimeType.startsWith("image/") ? await readTakenAt(options.file) : null;
 
-  const prepared = await prepareUpload({
-    treeId: options.treeId,
-    personId: options.personId,
-    groupId: options.groupId ?? null,
-    fileName: options.file.name,
-    mimeType,
-    sizeBytes: options.file.size,
-    thumbMime: thumb?.mime ?? null,
-    width: thumb?.width ?? null,
-    height: thumb?.height ?? null,
-    takenAt,
-  });
+  let prepared: Awaited<ReturnType<typeof prepareUpload>>;
+  try {
+    prepared = await prepareUpload({
+      treeId: options.treeId,
+      personId: options.personId,
+      groupId: options.groupId ?? null,
+      fileName: options.file.name,
+      mimeType,
+      sizeBytes: options.file.size,
+      thumbMime: thumb?.mime ?? null,
+      width: thumb?.width ?? null,
+      height: thumb?.height ?? null,
+      takenAt,
+    });
+  } catch (error) {
+    return { ok: false, error: friendlyMessage(error) };
+  }
 
   if (!prepared.ok) return { ok: false, error: prepared.error };
   options.onProgress?.(0.08);
@@ -82,7 +88,7 @@ export async function uploadPersonFile(options: UploadOptions): Promise<UploadRe
     await cancelUpload(fileId).catch(() => undefined);
     return {
       ok: false,
-      error: error instanceof Error ? error.message : "The upload did not finish. Please try again.",
+      error: friendlyMessage(error),
     };
   }
 }

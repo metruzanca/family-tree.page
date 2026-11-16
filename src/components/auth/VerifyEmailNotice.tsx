@@ -5,6 +5,7 @@ import { resendVerificationEmail } from "~/api/auth-server";
 import { getUser, requireUserPage } from "~/api";
 import { Button } from "~/components/ui/button";
 import { useToast } from "~/components/ui/Toast";
+import { attemptAction } from "~/lib/action-result";
 
 export function VerifyEmailNotice(props: { email: string; class?: string }) {
   const toast = useToast();
@@ -13,7 +14,7 @@ export function VerifyEmailNotice(props: { email: string; class?: string }) {
   async function resend() {
     if (pending()) return;
     setPending(true);
-    const result = await resendVerificationEmail();
+    const result = await attemptAction(() => resendVerificationEmail());
     setPending(false);
     if (!result.ok) {
       toast.show(result.error, "error");
