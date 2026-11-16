@@ -29,6 +29,7 @@ The graph is the main view. People are nodes, parent and partner relationships a
 - Partners are aligned on the same row and placed side by side
 - Parent pairs join at one small junction before branching to their children, so each child gets one parent-line arrow
 - Direction flip for oldest-at-top or oldest-at-bottom layouts
+- Disconnected groups inside a tree get their own side-by-side space, so a new unconnected person never overlaps the rest of the tree
 - Search, neighbor highlighting, zoom and pan
 - Calendar tab with birth and death anniversaries, plus upcoming birthdays for living relatives
 - Email birthday reminders, with one-week, day-before, and day-of toggles in account settings

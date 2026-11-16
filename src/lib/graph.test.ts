@@ -2,12 +2,16 @@ import { describe, expect, it } from "vitest";
 import {
   buildGraphModel,
   clampToGenerationBand,
+  COMPONENT_GAP,
   computeGenerations,
   fileCardSize,
   generationRowY,
   mediaAspect,
   nodeRadius,
+  packComponents,
   partnerGroups,
+  personComponents,
+  type GraphModel,
   type GraphNode,
 } from "./graph";
 import type { GraphPerson, GraphRelationship, TreeGraph } from "../api/people-server";
@@ -247,6 +251,133 @@ describe("buildGraphModel", () => {
     expect(
       model.links.filter(link => link.kind === "parent" && !link.viaUnion),
     ).toHaveLength(0);
+  });
+});
+
+function treeWith(
+  people: GraphPerson[],
+  relationships: GraphRelationship[],
+): TreeGraph {
+  return {
+    tree: { id: "tree", name: "Test", description: null },
+    role: "owner",
+    people,
+    relationships,
+    files: [],
+    groups: [],
+  };
+}
+
+function nodeX(model: GraphModel, id: string) {
+  const node = model.nodes.find(candidate => candidate.id === id);
+  if (!node || node.x == null) throw new Error(`missing node ${id}`);
+  return node.x;
+}
+
+describe("disconnected components", () => {
+  const data = treeWith(
+    ["a", "b", "c", "d"].map(id => person(id)),
+    [parent("r1", "a", "b"), parent("r2", "c", "d")],
+  );
+
+  it("merges related people and keeps strangers in their own component", () => {
+    const people = ["a", "b", "c", "loner"].map(id => person(id));
+    const relationships = [partner("p1", "a", "b"), parent("r1", "b", "c")];
+    const { components, byPerson } = personComponents(
+      people,
+      relationships,
+      computeGenerations(people, relationships),
+    );
+    expect(components).toHaveLength(2);
+    expect(byPerson.get("c")).toBe(byPerson.get("a"));
+    expect(byPerson.get("loner")).not.toBe(byPerson.get("a"));
+  });
+
+  it("gives each disconnected family its own horizontal band", () => {
+    const model = buildGraphModel(data, false, "oldest-top");
+    expect(model.components).toHaveLength(2);
+    const [first, second] = model.components;
+    expect(first.centerX + first.width / 2 + COMPONENT_GAP).toBeLessThanOrEqual(
+      second.centerX - second.width / 2,
+    );
+    for (const component of model.components) {
+      for (const personId of component.personIds) {
+        expect(Math.abs(nodeX(model, personId) - component.centerX)).toBeLessThanOrEqual(
+          component.width / 2,
+        );
+      }
+    }
+  });
+
+  it("places a newly added stranger away from the existing tree", () => {
+    const model = buildGraphModel(
+      treeWith([person("a"), person("b"), person("newcomer")], [parent("r1", "a", "b")]),
+      false,
+      "oldest-top",
+    );
+    expect(nodeX(model, "newcomer")).toBeGreaterThan(
+      Math.max(nodeX(model, "a"), nodeX(model, "b")),
+    );
+    expect(model.byNode.get("newcomer")?.personIds).toEqual(["newcomer"]);
+  });
+
+  it("does not move people when media visibility or direction changes", () => {
+    const withMedia = buildGraphModel(data, true, "oldest-top");
+    const withoutMedia = buildGraphModel(data, false, "oldest-top");
+    const flipped = buildGraphModel(data, false, "oldest-bottom");
+    expect(nodeX(withMedia, "a")).toBe(nodeX(withoutMedia, "a"));
+    expect(nodeX(flipped, "a")).toBe(nodeX(withoutMedia, "a"));
+  });
+
+  it("keeps media nodes in their owner's component", () => {
+    const model = buildGraphModel(
+      {
+        ...treeWith([person("a"), person("b")], [parent("r1", "a", "b")]),
+        files: [
+          {
+            id: "doc",
+            personId: "b",
+            groupId: null,
+            name: "letter.pdf",
+            mimeType: "application/pdf",
+            kind: "document",
+            thumbUrl: null,
+            width: null,
+            height: null,
+            sizeBytes: 2000,
+            createdAt: new Date(),
+            isAvatar: false,
+          },
+        ],
+      },
+      true,
+      "oldest-top",
+    );
+    expect(model.byNode.get("file:doc")).toBe(model.byNode.get("b"));
+  });
+
+  it("pushes overlapping bands apart without changing rows", () => {
+    const model = buildGraphModel(data, false, "oldest-top");
+    const rows = new Map(model.nodes.map(node => [node.id, node.y]));
+    for (const node of model.nodes) node.x = 0;
+
+    packComponents(model.nodes, model.components, model.byNode);
+
+    const spans = model.components
+      .map(component => {
+        const nodes = model.nodes.filter(node => model.byNode.get(node.id) === component);
+        return {
+          min: Math.min(...nodes.map(node => (node.x ?? 0) - nodeRadius(node))),
+          max: Math.max(...nodes.map(node => (node.x ?? 0) + nodeRadius(node))),
+        };
+      })
+      .sort((a, b) => a.min - b.min);
+    expect(spans[0].max + COMPONENT_GAP).toBeLessThanOrEqual(spans[1].min);
+    for (const node of model.nodes) expect(node.y).toBe(rows.get(node.id));
+
+    const packed = model.nodes.map(node => node.x);
+    packComponents(model.nodes, model.components, model.byNode);
+    expect(model.nodes.map(node => node.x)).toEqual(packed);
   });
 });
 

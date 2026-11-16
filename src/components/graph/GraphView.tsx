@@ -13,6 +13,7 @@ import {
   initialsOf,
   neighborsOf,
   nodeRadius,
+  packComponents,
   partnerGroups,
   type GenerationDirection,
   type GraphLink,
@@ -576,6 +577,7 @@ export function GraphView(props: GraphViewProps) {
       nodes: fresh.nodes,
       links: fresh.links,
     });
+    packComponentBands();
     snapPartnerRows();
     needsFit = true;
     setTimeout(() => graph?.zoomToFit(0, 110), 80);
@@ -624,6 +626,10 @@ export function GraphView(props: GraphViewProps) {
     graph.d3Force("partnerRow", partnerRowForce());
     graph.d3Force("unionPosition", unionPositionForce());
     graph.d3Force(
+      "componentColumn",
+      componentColumnForce(mode === "generations" ? 0.12 : 0.05),
+    );
+    graph.d3Force(
       "collide",
       (forceCollide as any)((node: GraphNode) =>
         nodeRadius(node) + (node.kind === "union" ? 18 : 28),
@@ -636,6 +642,7 @@ export function GraphView(props: GraphViewProps) {
     graph.warmupTicks(300);
     const data = graph.graphData();
     graph.graphData({ nodes: [...data.nodes], links: [...data.links] });
+    packComponentBands();
     snapPartnerRows();
     fit();
   }
@@ -687,6 +694,33 @@ export function GraphView(props: GraphViewProps) {
     return force;
   }
 
+  /**
+   * A gentle pull toward each disconnected component's own horizontal band.
+   * Disconnected families therefore settle side by side instead of drifting
+   * into the same space. Media and junction nodes follow their links.
+   */
+  function componentColumnForce(strength: number) {
+    let nodes: GraphNode[] = [];
+    const force = (alpha: number) => {
+      const byNode = model.byNode;
+      for (const node of nodes) {
+        if (node.kind !== "person") continue;
+        const component = byNode.get(node.id);
+        if (!component) continue;
+        node.vx = (node.vx ?? 0) + (component.centerX - (node.x ?? 0)) * strength * alpha;
+      }
+    };
+    (force as any).initialize = (next: GraphNode[]) => {
+      nodes = next;
+    };
+    return force;
+  }
+
+  function packComponentBands() {
+    if (!graph) return;
+    packComponents(graph.graphData().nodes as GraphNode[], model.components, model.byNode);
+  }
+
   function snapPartnerRows() {
     if (!graph) return;
     const groups = partnerGroups(props.data.relationships);
@@ -735,6 +769,7 @@ export function GraphView(props: GraphViewProps) {
       )
       .onEngineStop(() => {
         if (import.meta.env.DEV) (window as any).__rootsStoppedAt = Date.now();
+        packComponentBands();
         snapPartnerRows();
         updateHoverAt(pointer.x, pointer.y);
         if (needsFit) {
@@ -912,6 +947,7 @@ export function GraphView(props: GraphViewProps) {
     }
     model = next;
     graph.graphData({ nodes: next.nodes, links: next.links });
+    packComponentBands();
     snapPartnerRows();
   });
 

@@ -10,6 +10,10 @@ import { analyzeRelationships } from "./relationships";
 export type GenerationDirection = "oldest-top" | "oldest-bottom";
 export const GENERATION_SPACING = 190;
 export const GENERATION_BAND = 58;
+export const COMPONENT_GAP = 140;
+export const COMPONENT_MIN_WIDTH = 200;
+export const COMPONENT_PERSON_SPACING = 120;
+const COMPONENT_NODE_PADDING = 14;
 
 export type GraphNode = {
   id: string;
@@ -42,11 +46,22 @@ export type GraphLink = {
   status?: string;
 };
 
+export type GraphComponent = {
+  id: string;
+  anchor: string;
+  personIds: string[];
+  nodeIds: string[];
+  centerX: number;
+  width: number;
+};
+
 export type GraphModel = {
   nodes: GraphNode[];
   links: GraphLink[];
   semanticLinks: GraphLink[];
   generations: Map<string, number>;
+  components: GraphComponent[];
+  byNode: Map<string, GraphComponent>;
 };
 
 export function fileNodeId(fileId: string) {
@@ -63,6 +78,11 @@ export function buildGraphModel(
   direction: GenerationDirection = "oldest-top",
 ): GraphModel {
   const generations = computeGenerations(data.people, data.relationships);
+  const { components, byPerson } = personComponents(
+    data.people,
+    data.relationships,
+    generations,
+  );
   const degree = new Map<string, number>();
   for (const relationship of data.relationships) {
     degree.set(relationship.source, (degree.get(relationship.source) ?? 0) + 1);
@@ -72,7 +92,10 @@ export function buildGraphModel(
   const nodes: GraphNode[] = [];
   for (const person of data.people) {
     const level = generations.get(person.id) ?? 0;
-    const spot = initialSpot(person.id, level, direction);
+    const component = byPerson.get(person.id);
+    const centerX = component?.centerX ?? 0;
+    const spreadX = component ? Math.max(60, component.width / 2 - 60) : 90;
+    const spot = initialSpot(person.id, level, direction, centerX, spreadX);
     nodes.push({
       id: person.id,
       kind: "person",
@@ -272,7 +295,161 @@ export function buildGraphModel(
     }
   }
 
-  return { nodes, links, semanticLinks, generations };
+  const byNode = new Map<string, GraphComponent>();
+  for (const node of nodes) {
+    const ownerId =
+      node.kind === "person"
+        ? node.id
+        : node.kind === "union"
+          ? node.parentIds?.[0]
+          : node.file?.personId ?? node.group?.personId;
+    const component = ownerId ? byPerson.get(ownerId) : undefined;
+    if (!component) continue;
+    component.nodeIds.push(node.id);
+    byNode.set(node.id, component);
+  }
+
+  return { nodes, links, semanticLinks, generations, components, byNode };
+}
+
+/**
+ * Splits people into their connected families and gives each one a horizontal
+ * band. A person who is not related to anyone yet is a component of their own,
+ * so a newly added person never lands on top of the rest of the tree.
+ */
+export function personComponents(
+  people: GraphPerson[],
+  relationships: GraphRelationship[],
+  levels: Map<string, number>,
+): { components: GraphComponent[]; byPerson: Map<string, GraphComponent> } {
+  const parent = new Map<string, string>();
+  const find = (id: string): string => {
+    const current = parent.get(id) ?? id;
+    if (current === id) {
+      parent.set(id, id);
+      return id;
+    }
+    const root = find(current);
+    parent.set(id, root);
+    return root;
+  };
+  const union = (a: string, b: string) => {
+    const rootA = find(a);
+    const rootB = find(b);
+    if (rootA !== rootB) parent.set(rootA, rootB);
+  };
+
+  const known = new Set(people.map(person => person.id));
+  for (const personId of known) parent.set(personId, personId);
+  for (const relationship of relationships) {
+    if (!known.has(relationship.source) || !known.has(relationship.target)) continue;
+    union(relationship.source, relationship.target);
+  }
+
+  const grouped = new Map<string, string[]>();
+  for (const personId of known) {
+    const root = find(personId);
+    const list = grouped.get(root) ?? [];
+    list.push(personId);
+    grouped.set(root, list);
+  }
+
+  const components: GraphComponent[] = [...grouped.values()].map(personIds => {
+    const anchor = [...personIds].sort((a, b) => a.localeCompare(b))[0];
+    const rowCounts = new Map<number, number>();
+    for (const personId of personIds) {
+      const level = levels.get(personId) ?? 0;
+      rowCounts.set(level, (rowCounts.get(level) ?? 0) + 1);
+    }
+    const widestRow = Math.max(1, ...rowCounts.values());
+    return {
+      id: anchor,
+      anchor,
+      personIds,
+      nodeIds: [],
+      centerX: 0,
+      width: Math.max(COMPONENT_MIN_WIDTH, widestRow * COMPONENT_PERSON_SPACING),
+    };
+  });
+
+  components.sort((a, b) => a.anchor.localeCompare(b.anchor));
+
+  const total =
+    components.reduce((sum, component) => sum + component.width, 0) +
+    COMPONENT_GAP * Math.max(0, components.length - 1);
+  let cursor = -total / 2;
+  for (const component of components) {
+    component.centerX = cursor + component.width / 2;
+    cursor += component.width + COMPONENT_GAP;
+  }
+
+  const byPerson = new Map<string, GraphComponent>();
+  for (const component of components) {
+    for (const personId of component.personIds) byPerson.set(personId, component);
+  }
+
+  return { components, byPerson };
+}
+
+function componentNodeHalfWidth(node: GraphNode) {
+  if (node.kind === "person") return nodeRadius(node) + COMPONENT_NODE_PADDING;
+  if (node.kind === "union") return 6 + COMPONENT_NODE_PADDING;
+  return Math.max(fileCardSize(node).width, fileCardSize(node).height) / 2 +
+    COMPONENT_NODE_PADDING;
+}
+
+/**
+ * Guarantees the bands stay apart after the simulation has run. Whole
+ * components are shifted on the x axis only, so generation rows survive, and a
+ * component that already has room is left untouched.
+ */
+export function packComponents(
+  nodes: GraphNode[],
+  components: GraphComponent[],
+  byNode: Map<string, GraphComponent>,
+  gap = COMPONENT_GAP,
+) {
+  const byId = new Map(nodes.map(node => [node.id, node]));
+  const spans = components
+    .map(component => {
+      const members: GraphNode[] = [];
+      let minX = Number.POSITIVE_INFINITY;
+      let maxX = Number.NEGATIVE_INFINITY;
+      for (const nodeId of component.nodeIds) {
+        const node = byId.get(nodeId);
+        if (!node || node.x == null) continue;
+        members.push(node);
+        const half = componentNodeHalfWidth(node);
+        minX = Math.min(minX, node.x - half);
+        maxX = Math.max(maxX, node.x + half);
+      }
+      return { component, members, minX, maxX };
+    })
+    .filter(span => Number.isFinite(span.minX))
+    .sort(
+      (a, b) =>
+        a.minX - b.minX || a.component.anchor.localeCompare(b.component.anchor),
+    );
+
+  let cursor: number | null = null;
+  for (const span of spans) {
+    if (cursor == null) {
+      cursor = span.maxX + gap;
+      span.component.centerX = (span.minX + span.maxX) / 2;
+      continue;
+    }
+    const shift = Math.max(0, cursor - span.minX);
+    if (shift > 0) {
+      for (const node of span.members) {
+        node.x = (node.x ?? 0) + shift;
+        node.vx = 0;
+      }
+      span.minX += shift;
+      span.maxX += shift;
+    }
+    span.component.centerX = (span.minX + span.maxX) / 2;
+    cursor = span.maxX + gap;
+  }
 }
 
 export function computeGenerations(
@@ -340,12 +517,14 @@ export function initialSpot(
   id: string,
   level: number,
   direction: GenerationDirection = "oldest-top",
+  centerX = 0,
+  spreadX = 90,
 ) {
   const hash = hashString(id);
   const angle = ((hash % 1000) / 1000) * Math.PI * 2;
   const radius = 70 + (hash % 180);
   return {
-    x: Math.cos(angle) * radius,
+    x: centerX + Math.cos(angle) * Math.min(spreadX, radius),
     y: generationRowY(level, direction) + Math.sin(angle) * 48,
   };
 }
