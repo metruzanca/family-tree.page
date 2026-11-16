@@ -14,16 +14,23 @@ import { Avatar } from "../ui/Avatar";
 import { Badge } from "../ui/badge";
 import { Button, buttonVariants } from "../ui/button";
 import { IconButton } from "../ui/icon-button";
+import { FilePeopleSection } from "./FilePeopleSection";
+import { TakenAtField } from "./TakenAtField";
 import { formatBytes, formatDate, formatRelative } from "~/lib/format";
 
 type FilePanelProps = {
   file: GraphFile;
   person: GraphPerson | undefined;
+  people: GraphPerson[];
   role: TreeRole;
+  tagPending?: boolean;
+  takenAtPending?: boolean;
   onClose: () => void;
   onPreview: () => void;
   onSelectPerson: (id: string) => void;
   onSetAvatar: (fileId: string | null) => void;
+  onSaveTags: (personIds: string[]) => void;
+  onSetTakenAt: (value: string | null) => void;
   onDelete: () => void;
 };
 
@@ -138,6 +145,19 @@ export function FilePanel(props: FilePanelProps) {
               <dt class="text-[0.68rem] text-muted-foreground">Added</dt>
               <dd class="mt-0.5">{formatDate(props.file.createdAt)}</dd>
             </div>
+            <Show when={isImage()}>
+              <div>
+                <dt class="text-[0.68rem] text-muted-foreground">Taken</dt>
+                <dd class="mt-0.5">
+                  <TakenAtField
+                    value={props.file.takenAt}
+                    editable={editable()}
+                    pending={props.takenAtPending}
+                    onChange={value => props.onSetTakenAt(value)}
+                  />
+                </dd>
+              </div>
+            </Show>
           </dl>
         </section>
 
@@ -168,6 +188,19 @@ export function FilePanel(props: FilePanelProps) {
             )}
           </Show>
         </section>
+
+        <Show when={isImage()}>
+          <div class="mt-6">
+            <FilePeopleSection
+              people={props.people}
+              primaryPerson={props.person}
+              taggedPersonIds={props.file.taggedPersonIds}
+              editable={editable()}
+              pending={props.tagPending}
+              onSave={props.onSaveTags}
+            />
+          </div>
+        </Show>
 
         <p class="mt-6 text-[0.68rem] leading-relaxed text-muted-foreground">
           Files stay private to this tree. Downloads use a short-lived signed link.

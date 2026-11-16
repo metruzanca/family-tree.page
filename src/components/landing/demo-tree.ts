@@ -211,6 +211,8 @@ const file = (
   width: 360,
   height: 240,
   sizeBytes: 18_000,
+  takenAt: options.createdAt ? options.createdAt.slice(0, 10) : null,
+  taggedPersonIds: [],
   createdAt: new Date(options.createdAt ?? "2017-05-12T00:00:00Z"),
   isAvatar: false,
 });

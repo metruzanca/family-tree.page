@@ -58,6 +58,14 @@ export function PersonPanel(props: PersonPanelProps) {
       file => file.personId === props.person.id && !file.groupId,
     ),
   );
+  const taggedPhotos = createMemo(() =>
+    props.data.files.filter(
+      file =>
+        file.kind === "image" &&
+        file.personId !== props.person.id &&
+        file.taggedPersonIds.includes(props.person.id),
+    ),
+  );
   const mediaCount = () => groups().length + files().length;
   const parents = createMemo(() =>
     props.data.relationships
@@ -273,6 +281,28 @@ export function PersonPanel(props: PersonPanelProps) {
             </div>
           </Show>
         </section>
+
+        <Show when={taggedPhotos().length}>
+          <section class="mt-6">
+            <div class="flex items-center justify-between">
+              <h3 class="field-label">Also in photos</h3>
+              <span class="text-[0.7rem] text-muted-foreground">{taggedPhotos().length}</span>
+            </div>
+            <p class="mt-1 text-[0.68rem] leading-relaxed text-muted-foreground">
+              Photos filed under someone else where {firstName(props.person)} is tagged.
+            </p>
+            <div class="mt-2 grid grid-cols-3 gap-2">
+              <For each={taggedPhotos()}>
+                {file => (
+                  <TaggedPhotoTile
+                    file={file}
+                    onOpen={() => props.onSelectFile(file)}
+                  />
+                )}
+              </For>
+            </div>
+          </section>
+        </Show>
       </div>
     </aside>
   );
@@ -426,6 +456,34 @@ function FileTile(props: {
         </div>
       </Show>
     </div>
+  );
+}
+
+function TaggedPhotoTile(props: { file: GraphFile; onOpen: () => void }) {
+  return (
+    <button
+      type="button"
+      class="group relative aspect-square overflow-hidden rounded-xl border border-border bg-background"
+      title={props.file.name}
+      aria-label={`Open ${props.file.name}`}
+      onClick={props.onOpen}
+    >
+      <Show
+        when={props.file.thumbUrl}
+        fallback={
+          <span class="flex h-full w-full items-center justify-center text-muted-foreground">
+            <ImageIcon size={22} />
+          </span>
+        }
+      >
+        <img
+          src={props.file.thumbUrl!}
+          alt={props.file.name}
+          class="h-full w-full object-cover transition group-hover:scale-[1.03]"
+          loading="lazy"
+        />
+      </Show>
+    </button>
   );
 }
 

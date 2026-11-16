@@ -25,6 +25,8 @@ import { Avatar } from "../ui/Avatar";
 import { Badge } from "../ui/badge";
 import { Button, buttonVariants } from "../ui/button";
 import { IconButton } from "../ui/icon-button";
+import { FilePeopleSection } from "./FilePeopleSection";
+import { TakenAtField } from "./TakenAtField";
 import { formatBytes, formatDate, formatRelative } from "~/lib/format";
 
 type MediaLightboxProps = {
@@ -33,10 +35,15 @@ type MediaLightboxProps = {
   title: string;
   group?: GraphFileGroup | null;
   person?: GraphPerson;
+  people: GraphPerson[];
   role: TreeRole;
+  tagPending?: boolean;
+  takenAtPending?: boolean;
   onClose: () => void;
   onSelectPerson: (id: string) => void;
   onSetAvatar: (personId: string, fileId: string | null) => void;
+  onSaveTags: (fileId: string, personIds: string[]) => void;
+  onSetTakenAt: (fileId: string, value: string | null) => void;
   onDeleteFile: (file: GraphFile) => void;
   onRenameGroup?: (name: string) => void;
   onDeleteGroup?: () => void;
@@ -345,6 +352,19 @@ export function MediaLightbox(props: MediaLightboxProps) {
                       <dt class="text-[0.68rem] text-muted-foreground">Added</dt>
                       <dd class="mt-0.5">{formatDate(file().createdAt)}</dd>
                     </div>
+                    <Show when={file().kind === "image"}>
+                      <div>
+                        <dt class="text-[0.68rem] text-muted-foreground">Taken</dt>
+                        <dd class="mt-0.5">
+                          <TakenAtField
+                            value={file().takenAt}
+                            editable={editable()}
+                            pending={props.takenAtPending}
+                            onChange={value => props.onSetTakenAt(file().id, value)}
+                          />
+                        </dd>
+                      </div>
+                    </Show>
                   </dl>
                 </section>
               )}
@@ -377,6 +397,23 @@ export function MediaLightbox(props: MediaLightboxProps) {
                 )}
               </Show>
             </section>
+
+            <Show when={current()}>
+              {file => (
+                <Show when={file().kind === "image"}>
+                  <div class="mt-5">
+                    <FilePeopleSection
+                      people={props.people}
+                      primaryPerson={props.person}
+                      taggedPersonIds={file().taggedPersonIds}
+                      editable={editable()}
+                      pending={props.tagPending}
+                      onSave={personIds => props.onSaveTags(file().id, personIds)}
+                    />
+                  </div>
+                </Show>
+              )}
+            </Show>
 
             <Show when={props.group && editable()}>
               <section class="mt-5 border-t border-border pt-4">

@@ -14,6 +14,8 @@ import {
   deleteFileGroup,
   renameFileGroup,
   setAvatar,
+  updateFileTags,
+  updateFileTakenAt,
 } from "~/api/files-server";
 import { getMyTrees, getTreeGraph, getTreeOverview } from "~/api";
 import { GraphView, type GraphHandle } from "~/components/graph/GraphView";
@@ -65,6 +67,8 @@ function TreePageInner() {
   const [deleteFileTarget, setDeleteFileTarget] = createSignal<GraphFile | null>(null);
   const [deleteGroupTarget, setDeleteGroupTarget] = createSignal<GraphFileGroup | null>(null);
   const [pendingDelete, setPendingDelete] = createSignal(false);
+  const [tagPending, setTagPending] = createSignal(false);
+  const [takenAtPending, setTakenAtPending] = createSignal(false);
   const [uploading, setUploading] = createSignal(false);
   const [uploadProgress, setUploadProgress] = createSignal(0);
 
@@ -330,6 +334,32 @@ function TreePageInner() {
     toast.show(fileId ? "Portrait updated." : "Portrait removed.", "success");
   }
 
+  async function handleSaveTags(fileId: string, personIds: string[]) {
+    setTagPending(true);
+    const result = await updateFileTags({ treeId: params.treeId, fileId, personIds });
+    setTagPending(false);
+    if (!result.ok) {
+      toast.show(result.error, "error");
+      return;
+    }
+    await revalidate(getTreeGraph.key);
+    track("file_people_tagged", { count: result.data.length });
+    toast.show("Photo tags updated.", "success");
+  }
+
+  async function handleSetTakenAt(fileId: string, value: string | null) {
+    setTakenAtPending(true);
+    const result = await updateFileTakenAt({ treeId: params.treeId, fileId, takenAt: value });
+    setTakenAtPending(false);
+    if (!result.ok) {
+      toast.show(result.error, "error");
+      return;
+    }
+    await revalidate(getTreeGraph.key);
+    track("file_date_taken_set", { cleared: !value });
+    toast.show(value ? "Date taken updated." : "Date taken cleared.", "success");
+  }
+
   async function handleDeleteFile() {
     const file = deleteFileTarget();
     if (!file) return;
@@ -557,10 +587,15 @@ function TreePageInner() {
               title={lightboxTitle()}
               group={effectiveGroup()}
               person={activeMediaPerson()}
+              people={graph().people}
               role={graph().role}
+              tagPending={tagPending()}
+              takenAtPending={takenAtPending()}
               onClose={() => selectPerson(null)}
               onSelectPerson={focusPerson}
               onSetAvatar={handleSetAvatar}
+              onSaveTags={handleSaveTags}
+              onSetTakenAt={handleSetTakenAt}
               onDeleteFile={file => setDeleteFileTarget(file)}
               onRenameGroup={handleRenameGroup}
               onDeleteGroup={() => {
@@ -575,11 +610,16 @@ function TreePageInner() {
               <FilePanel
                 file={file()}
                 person={activeMediaPerson()}
+                people={graph().people}
                 role={graph().role}
+                tagPending={tagPending()}
+                takenAtPending={takenAtPending()}
                 onClose={() => selectPerson(null)}
                 onPreview={() => undefined}
                 onSelectPerson={focusPerson}
                 onSetAvatar={fileId => handleSetAvatar(file().personId, fileId)}
+                onSaveTags={personIds => handleSaveTags(file().id, personIds)}
+                onSetTakenAt={value => handleSetTakenAt(file().id, value)}
                 onDelete={() => setDeleteFileTarget(file())}
               />
             )}
