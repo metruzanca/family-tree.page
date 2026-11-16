@@ -39,6 +39,8 @@ The graph is the main view. People are nodes, parent and partner relationships a
 - Live presence: see who else has the tree open, which person, file, or album they are looking at, and a colored ring and name tag around that node
 - Pointer cursor only over nodes, not links or empty canvas
 - Person and document info panels on desktop and mobile
+- Nightly PostgreSQL and media backups to a second private bucket, with checksum verification and a one-command restore
+- Optional Sentry error tracking with PII scrubbing
 - Optional Umami analytics with page views and product events, enabled by environment variables
 - Full-screen image lightbox with a details sidebar
 - Tag other people in a photo, with an "Also in photos" section on each tagged person's profile
@@ -131,6 +133,18 @@ Copy `.env.example` to `.env`. The important variables:
 | `S3_ACCESS_KEY_ID` | Bucket access key |
 | `S3_SECRET_ACCESS_KEY` | Bucket secret |
 | `S3_FORCE_PATH_STYLE` | `true` for local s3rver, `false` for Railway buckets |
+| `BACKUP_S3_ENDPOINT` | Backup bucket endpoint |
+| `BACKUP_S3_REGION` | Backup bucket region |
+| `BACKUP_S3_BUCKET` | Backup bucket name |
+| `BACKUP_S3_ACCESS_KEY_ID` | Backup bucket access key |
+| `BACKUP_S3_SECRET_ACCESS_KEY` | Backup bucket secret |
+| `BACKUP_S3_FORCE_PATH_STYLE` | `true` for local s3rver, `false` for Railway buckets |
+| `BACKUP_MEDIA` | Set to `off` to back up PostgreSQL only |
+| `SENTRY_DSN` | Optional server Sentry DSN |
+| `VITE_SENTRY_DSN` | Optional browser Sentry DSN, inlined at build time |
+| `SENTRY_ENVIRONMENT` / `VITE_SENTRY_ENVIRONMENT` | Optional Sentry environment labels |
+| `VITE_RELEASE` | Optional browser release name |
+| `SENTRY_ORG` / `SENTRY_PROJECT` / `SENTRY_AUTH_TOKEN` | Optional source map upload during the build |
 | `UMAMI_SCRIPT_URL` | Optional Umami script URL, for example `https://analytics.example.com/script.js` |
 | `UMAMI_WEBSITE_ID` | Optional Umami website ID that pairs with the script URL |
 
@@ -194,13 +208,74 @@ Account settings has a Calendar subscription card. It creates one private iCal U
 
 The link is a bearer secret: anyone who has it can read names and birthdays from that user's trees. Treat it like a password. Calendar apps refresh subscribed feeds on their own schedule, so edits are not instant.
 
+## Backups
+
+Production keeps two private Railway Storage Buckets in `iad`: the live bucket (`roots-files`) and a backup bucket (`roots-backups`). A Railway cron service runs `pnpm backup` daily at 03:00 UTC from `Dockerfile.backup`.
+
+Each run:
+
+1. Writes a compressed `pg_dump` to `postgres/<timestamp>.dump` and updates `postgres/latest.json` with the size, SHA-256, git SHA, and media status.
+2. Copies media keys under `trees/` to `media/trees/` in the backup bucket. Storage keys are immutable, so only missing objects are copied.
+3. Deletes backup media whose source object no longer exists, so deleted photos and accounts do not linger. That step is skipped when the source bucket is empty.
+4. Deletes database dumps older than 30 days, except the first dump of each month, which is kept for 12 months.
+
+```text
+pnpm backup                   dump PostgreSQL and sync media now
+pnpm backup --dry-run         show what would change
+pnpm backup --skip-media      database only
+pnpm backup --keep-deleted-media
+pnpm backup:verify            check the latest checksum and archive
+pnpm backup:restore --yes     restore the latest dump into a local database
+```
+
+`pnpm backup:verify` reads `postgres/latest.json` unless you pass `--key <object key>`. `pnpm backup:restore` refuses a remote `DATABASE_URL` and requires `--yes`. Restore into a scratch database, never production.
+
+Media restore is manual: copy `media/trees/` from the backup bucket back to `trees/` in the live bucket with `aws s3 sync` or the Railway dashboard. Storage keys are stable, so the database rows point at the restored objects without changes.
+
+Set up the cron service on Railway:
+
+1. Add a second Storage Bucket in the same project and region.
+2. Add a service from this repository and set its config file path to `/railway.backup.json`. It builds `Dockerfile.backup` and runs `pnpm backup` on the cron schedule.
+3. Set these variables on the backup service:
+
+```text
+DATABASE_URL=${{Postgres.DATABASE_URL}}
+S3_ENDPOINT=${{roots-files.ENDPOINT}}
+S3_REGION=${{roots-files.REGION}}
+S3_BUCKET=${{roots-files.BUCKET}}
+S3_ACCESS_KEY_ID=${{roots-files.ACCESS_KEY_ID}}
+S3_SECRET_ACCESS_KEY=${{roots-files.SECRET_ACCESS_KEY}}
+S3_FORCE_PATH_STYLE=false
+BACKUP_S3_ENDPOINT=${{roots-backups.ENDPOINT}}
+BACKUP_S3_REGION=${{roots-backups.REGION}}
+BACKUP_S3_BUCKET=${{roots-backups.BUCKET}}
+BACKUP_S3_ACCESS_KEY_ID=${{roots-backups.ACCESS_KEY_ID}}
+BACKUP_S3_SECRET_ACCESS_KEY=${{roots-backups.SECRET_ACCESS_KEY}}
+BACKUP_S3_FORCE_PATH_STYLE=false
+```
+
+4. Disable the HTTP health check and keep the restart policy at `NEVER`.
+5. Enable Postgres point-in-time recovery as the first line of defense between dumps.
+
+The backup bucket is private, but the dumps are not encrypted by the app. Both buckets live in the same provider and region, so a Railway account or regional failure loses both. The upgrade path is an external S3-compatible target, `age` encryption, and object versioning.
+
+## Error tracking
+
+Sentry is optional and off by default. Set `SENTRY_DSN` on the server and `VITE_SENTRY_DSN` at build time for the browser. Without a DSN both sides do nothing.
+
+The server captures unexpected errors in `runAction`, the Nitro error hook, the presence socket, and the birthday scheduler. The browser captures route errors and unhandled errors. Data collection is disabled for user info, cookies, headers, bodies, query strings, and database values, and `beforeSend` removes any request or user fields that still appear.
+
+Set `SENTRY_ORG`, `SENTRY_PROJECT`, and `SENTRY_AUTH_TOKEN` to upload source maps during `pnpm build`. All three are required, otherwise the Vite plugin is skipped. `SENTRY_ENVIRONMENT` and `VITE_SENTRY_ENVIRONMENT` label events, and `VITE_RELEASE` sets the browser release.
+
+Add an external uptime check on `/api/health`. It returns `503` when the database is unreachable.
+
 ## Railway deployment
 
 Create a Railway project with:
 
 - One app service from this repository
 - One PostgreSQL service
-- One Storage Bucket
+- Two Storage Buckets: one for live media and one for backups
 
 Keep all three in the same region. Set the app service variables with references:
 
@@ -217,11 +292,15 @@ S3_BUCKET=${{BucketName.BUCKET}}
 S3_ACCESS_KEY_ID=${{BucketName.ACCESS_KEY_ID}}
 S3_SECRET_ACCESS_KEY=${{BucketName.SECRET_ACCESS_KEY}}
 S3_FORCE_PATH_STYLE=false
+SENTRY_DSN=<optional server DSN>
+VITE_SENTRY_DSN=<optional browser DSN>
+SENTRY_ENVIRONMENT=production
+VITE_SENTRY_ENVIRONMENT=production
 UMAMI_SCRIPT_URL=<optional Umami script URL>
 UMAMI_WEBSITE_ID=<optional Umami website ID>
 ```
 
-`railway.json` configures the build, start command, health check, and the `pnpm db:migrate` pre-deploy command.
+`railway.json` configures the build, start command, health check, and the `pnpm db:migrate` pre-deploy command. The backup service is separate and uses `railway.backup.json`; see [Backups](#backups).
 
 After a domain is assigned, apply bucket CORS with the production credentials:
 
@@ -247,6 +326,9 @@ pnpm db:seed        seed the demo tree
 pnpm db:pull        copy the linked Railway Postgres into the local database
 pnpm db:check       report contradictory parent and partner relationships
 pnpm storage:cors   set bucket CORS from APP_URL and CORS_ORIGINS
+pnpm backup         dump PostgreSQL and sync media to the backup bucket
+pnpm backup:verify  check the latest dump checksum and archive
+pnpm backup:restore restore a dump into a local scratch database
 pnpm dev:services   start local Postgres and S3
 pnpm dev:reset-db   delete and re-create the local Postgres cluster
 ```
@@ -291,7 +373,7 @@ Account settings has three exits for your own data:
 - No realtime co-editing. Presence is live, but the graph still refreshes after changes.
 - Presence is held in the app process. It works as-is on a single Railway replica. Running more than one replica needs a shared presence store, such as Redis or Postgres `LISTEN`/`NOTIFY`.
 - HEIC photos work only when the browser can decode them; otherwise the user is asked to export as JPEG.
-- Railway buckets do not have automatic backups. PostgreSQL point-in-time recovery should be enabled on the database.
+- Backups live in a second Railway bucket in the same region and are not encrypted by the app. Backups run daily, so enable PostgreSQL point-in-time recovery for the gap between dumps.
 - No GEDCOM import/export, public share links, OCR, or face detection yet.
 
 ## License
