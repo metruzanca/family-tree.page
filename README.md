@@ -264,4 +264,4 @@ The interface uses [shadcn-solid](https://shadcn-solid.com) components on top of
 
 ## License
 
-Private project.
+[MIT](LICENSE)
