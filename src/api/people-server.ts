@@ -25,6 +25,14 @@ import {
   type PersonInput,
 } from "../server/validation";
 import { deletePrefix, TREE_PREFIX } from "../server/storage";
+import {
+  assertRelationshipInvariants,
+  dedupeParentEdges,
+  type ParentEdgeRecord,
+  type PartnershipRecord,
+} from "../server/relationship-rules";
+
+type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 export type GraphFile = {
   id: string;
@@ -284,19 +292,39 @@ export async function createParentChild(input: {
     const access = await requireTreeMember(input.treeId, "editor");
     const parsed = parentChildSchema.parse(input);
     await assertPeopleInTree(access.tree.id, [parsed.parentId, parsed.childId]);
-    if (parsed.parentId === parsed.childId) throw new AppError("A person cannot be their own parent.");
-    await assertNoCycle(access.tree.id, parsed.parentId, parsed.childId);
-    const [relationship] = await db
-      .insert(parentChild)
-      .values({
-        treeId: access.tree.id,
-        parentId: parsed.parentId,
-        childId: parsed.childId,
-        parentType: parsed.parentType,
-      })
-      .returning();
-    await touchTree(access.tree.id);
-    return { id: relationship.id };
+
+    return db.transaction(async tx => {
+      await lockTree(tx, access.tree.id);
+      const parentEdges = await loadParentEdges(tx, access.tree.id);
+      const partnershipRows = await loadPartnerships(tx, access.tree.id);
+      if (
+        parentEdges.some(
+          edge => edge.parentId === parsed.parentId && edge.childId === parsed.childId,
+        )
+      ) {
+        throw new AppError("Those two people are already connected as parent and child.");
+      }
+
+      assertRelationshipInvariants({
+        parentEdges,
+        partnerships: partnershipRows,
+        addParentEdges: [
+          { id: "new", parentId: parsed.parentId, childId: parsed.childId },
+        ],
+      });
+
+      const [relationship] = await tx
+        .insert(parentChild)
+        .values({
+          treeId: access.tree.id,
+          parentId: parsed.parentId,
+          childId: parsed.childId,
+          parentType: parsed.parentType,
+        })
+        .returning();
+      await tx.update(trees).set({ updatedAt: new Date() }).where(eq(trees.id, access.tree.id));
+      return { id: relationship.id };
+    });
   });
 }
 
@@ -329,22 +357,44 @@ export async function createPartnership(input: {
   return runAction(async () => {
     const access = await requireTreeMember(input.treeId, "editor");
     const parsed = partnershipSchema.parse(input);
-    if (parsed.personAId === parsed.personBId) throw new AppError("A person cannot be their own partner.");
+    if (parsed.personAId === parsed.personBId) {
+      throw new AppError("A person cannot be their own partner.");
+    }
     await assertPeopleInTree(access.tree.id, [parsed.personAId, parsed.personBId]);
     const [personAId, personBId] = [parsed.personAId, parsed.personBId].sort();
-    const [relationship] = await db
-      .insert(partnerships)
-      .values({
-        treeId: access.tree.id,
-        personAId,
-        personBId,
-        status: parsed.status,
-        startDate: parsed.startDate,
-        endDate: parsed.endDate,
-      })
-      .returning();
-    await touchTree(access.tree.id);
-    return { id: relationship.id };
+
+    return db.transaction(async tx => {
+      await lockTree(tx, access.tree.id);
+      const parentEdges = await loadParentEdges(tx, access.tree.id);
+      const partnershipRows = await loadPartnerships(tx, access.tree.id);
+      if (
+        partnershipRows.some(
+          row => row.personAId === personAId && row.personBId === personBId,
+        )
+      ) {
+        throw new AppError("Those two people are already partners.");
+      }
+
+      assertRelationshipInvariants({
+        parentEdges,
+        partnerships: partnershipRows,
+        addPartnership: { id: "new", personAId, personBId },
+      });
+
+      const [relationship] = await tx
+        .insert(partnerships)
+        .values({
+          treeId: access.tree.id,
+          personAId,
+          personBId,
+          status: parsed.status,
+          startDate: parsed.startDate,
+          endDate: parsed.endDate,
+        })
+        .returning();
+      await tx.update(trees).set({ updatedAt: new Date() }).where(eq(trees.id, access.tree.id));
+      return { id: relationship.id };
+    });
   });
 }
 
@@ -404,14 +454,27 @@ export async function addRelative(input: {
   relation: "parent" | "child" | "partner";
   personId?: string;
   person?: PersonInput;
+  otherParentId?: string;
   parentType?: "biological" | "adoptive" | "foster" | "step" | "unknown";
   status?: "married" | "partnered" | "divorced" | "separated" | "widowed" | "unknown";
-}): Promise<ActionResult<{ personId: string; relationshipId: string }>> {
+}): Promise<ActionResult<{ personId: string; relationshipIds: string[] }>> {
   return runAction(async () => {
     const access = await requireTreeMember(input.treeId, "editor");
     const parsed = addRelativeSchema.parse(input);
 
+    if (parsed.otherParentId && parsed.relation !== "child") {
+      throw new AppError("Choose another parent only when adding a child.");
+    }
+    if (parsed.otherParentId) {
+      if (parsed.otherParentId === parsed.anchorPersonId) {
+        throw new AppError("Choose someone other than this person.");
+      }
+      await assertPeopleInTree(access.tree.id, [parsed.otherParentId]);
+    }
+
     return db.transaction(async tx => {
+      await lockTree(tx, access.tree.id);
+
       const anchorRows = await tx
         .select({ id: people.id })
         .from(people)
@@ -451,10 +514,30 @@ export async function addRelative(input: {
       if (relativeId === parsed.anchorPersonId) {
         throw new AppError("Choose someone other than this person.");
       }
+      if (parsed.otherParentId && parsed.otherParentId === relativeId) {
+        throw new AppError("Choose someone other than this person.");
+      }
 
-      let relationshipId: string;
+      const parentEdges = await loadParentEdges(tx, access.tree.id);
+      const partnershipRows = await loadPartnerships(tx, access.tree.id);
+      const relationshipIds: string[] = [];
+
       if (parsed.relation === "partner") {
         const [personAId, personBId] = [relativeId, parsed.anchorPersonId].sort();
+        if (
+          partnershipRows.some(
+            row => row.personAId === personAId && row.personBId === personBId,
+          )
+        ) {
+          throw new AppError("Those two people are already partners.");
+        }
+
+        assertRelationshipInvariants({
+          parentEdges,
+          partnerships: partnershipRows,
+          addPartnership: { id: "new", personAId, personBId },
+        });
+
         const [relationship] = await tx
           .insert(partnerships)
           .values({
@@ -464,25 +547,62 @@ export async function addRelative(input: {
             status: parsed.status,
           })
           .returning();
-        relationshipId = relationship.id;
+        relationshipIds.push(relationship.id);
       } else {
-        const parentId = parsed.relation === "parent" ? relativeId : parsed.anchorPersonId;
-        const childId = parsed.relation === "parent" ? parsed.anchorPersonId : relativeId;
-        await assertNoCycle(access.tree.id, parentId, childId, tx);
-        const [relationship] = await tx
-          .insert(parentChild)
-          .values({
-            treeId: access.tree.id,
-            parentId,
-            childId,
-            parentType: parsed.parentType,
-          })
-          .returning();
-        relationshipId = relationship.id;
+        const proposed: ParentEdgeRecord[] = [];
+        if (parsed.relation === "parent") {
+          proposed.push({
+            id: "new-parent",
+            parentId: relativeId,
+            childId: parsed.anchorPersonId,
+          });
+        } else {
+          proposed.push({
+            id: "new-anchor-parent",
+            parentId: parsed.anchorPersonId,
+            childId: relativeId,
+          });
+          if (parsed.otherParentId) {
+            proposed.push({
+              id: "new-other-parent",
+              parentId: parsed.otherParentId,
+              childId: relativeId,
+            });
+          }
+        }
+
+        const existing = new Set(
+          parentEdges.map(edge => `${edge.parentId}:${edge.childId}`),
+        );
+        const missing = proposed.filter(
+          edge => !existing.has(`${edge.parentId}:${edge.childId}`),
+        );
+        if (!missing.length) {
+          throw new AppError("Those two people are already connected as parent and child.");
+        }
+
+        assertRelationshipInvariants({
+          parentEdges,
+          partnerships: partnershipRows,
+          addParentEdges: dedupeParentEdges(proposed),
+        });
+
+        for (const edge of missing) {
+          const [relationship] = await tx
+            .insert(parentChild)
+            .values({
+              treeId: access.tree.id,
+              parentId: edge.parentId,
+              childId: edge.childId,
+              parentType: parsed.parentType,
+            })
+            .returning({ id: parentChild.id });
+          relationshipIds.push(relationship.id);
+        }
       }
 
       await tx.update(trees).set({ updatedAt: new Date() }).where(eq(trees.id, access.tree.id));
-      return { personId: relativeId, relationshipId };
+      return { personId: relativeId, relationshipIds };
     });
   });
 }
@@ -500,33 +620,34 @@ async function assertPeopleInTree(treeId: string, personIds: string[]) {
   if (rows.length !== unique.length) throw new AppError("That person could not be found.");
 }
 
-async function assertNoCycle(
+async function lockTree(tx: Transaction, treeId: string) {
+  await tx.select({ id: trees.id }).from(trees).where(eq(trees.id, treeId)).for("update");
+}
+
+async function loadParentEdges(
+  tx: Transaction,
   treeId: string,
-  parentId: string,
-  childId: string,
-  tx: Pick<typeof db, "select"> = db,
-) {
-  if (parentId === childId) throw new AppError("A person cannot be their own parent.");
-  const edges = await tx
-    .select({ parentId: parentChild.parentId, childId: parentChild.childId })
+): Promise<ParentEdgeRecord[]> {
+  return tx
+    .select({
+      id: parentChild.id,
+      parentId: parentChild.parentId,
+      childId: parentChild.childId,
+    })
     .from(parentChild)
     .where(eq(parentChild.treeId, treeId));
-  const children = new Map<string, string[]>();
-  for (const edge of edges) {
-    const list = children.get(edge.parentId) ?? [];
-    list.push(edge.childId);
-    children.set(edge.parentId, list);
-  }
+}
 
-  const stack = [childId];
-  const seen = new Set<string>();
-  while (stack.length) {
-    const current = stack.pop()!;
-    if (current === parentId) {
-      throw new AppError("That relationship would create a loop in the family tree.");
-    }
-    if (seen.has(current)) continue;
-    seen.add(current);
-    for (const next of children.get(current) ?? []) stack.push(next);
-  }
+async function loadPartnerships(
+  tx: Transaction,
+  treeId: string,
+): Promise<PartnershipRecord[]> {
+  return tx
+    .select({
+      id: partnerships.id,
+      personAId: partnerships.personAId,
+      personBId: partnerships.personBId,
+    })
+    .from(partnerships)
+    .where(eq(partnerships.treeId, treeId));
 }
