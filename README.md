@@ -36,7 +36,7 @@ The graph is the main view. People are nodes, parent and partner relationships a
 - Live presence: see who else has the tree open, which person, file, or album they are looking at, and a colored ring and name tag around that node
 - Pointer cursor only over nodes, not links or empty canvas
 - Person and document info panels on desktop and mobile
-- Production Umami analytics with page views and product events
+- Optional Umami analytics with page views and product events, enabled by environment variables
 - Full-screen image lightbox with a details sidebar
 - Multi-file uploads become albums rendered as stacked nodes on the graph
 - Portraits stay on the person node and are not duplicated as file nodes
@@ -126,6 +126,10 @@ Copy `.env.example` to `.env`. The important variables:
 | `S3_ACCESS_KEY_ID` | Bucket access key |
 | `S3_SECRET_ACCESS_KEY` | Bucket secret |
 | `S3_FORCE_PATH_STYLE` | `true` for local s3rver, `false` for Railway buckets |
+| `UMAMI_SCRIPT_URL` | Optional Umami script URL, for example `https://analytics.example.com/script.js` |
+| `UMAMI_WEBSITE_ID` | Optional Umami website ID that pairs with the script URL |
+
+`UMAMI_SCRIPT_URL` and `UMAMI_WEBSITE_ID` are both optional. Set both to inject the Umami script into the document; leave either blank to disable analytics. Product events are sent through `src/lib/analytics.ts` and silently no-op when the script is absent.
 
 `CORS_ORIGINS` can hold extra comma-separated origins for `pnpm storage:cors`. Production does not need it: `RAILWAY_PUBLIC_DOMAIN` supplies the public origin.
 
@@ -188,6 +192,8 @@ S3_BUCKET=${{BucketName.BUCKET}}
 S3_ACCESS_KEY_ID=${{BucketName.ACCESS_KEY_ID}}
 S3_SECRET_ACCESS_KEY=${{BucketName.SECRET_ACCESS_KEY}}
 S3_FORCE_PATH_STYLE=false
+UMAMI_SCRIPT_URL=<optional Umami script URL>
+UMAMI_WEBSITE_ID=<optional Umami website ID>
 ```
 
 `railway.json` configures the build, start command, health check, and the `pnpm db:migrate` pre-deploy command.
