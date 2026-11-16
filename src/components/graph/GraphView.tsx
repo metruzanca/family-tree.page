@@ -8,6 +8,7 @@ import {
   branchColor,
   buildGraphModel,
   clampToGenerationBand,
+  fileCardSize,
   generationRowY,
   initialsOf,
   neighborsOf,
@@ -107,7 +108,11 @@ export function GraphView(props: GraphViewProps) {
       if (node.kind === "person") {
         if (Math.hypot(point.x - node.x, point.y - node.y) <= radius) return node;
       } else {
-        if (Math.abs(point.x - node.x) <= radius && Math.abs(point.y - node.y) <= radius) {
+        const card = fileCardSize(node);
+        if (
+          Math.abs(point.x - node.x) <= card.width / 2 + 14 / zoom &&
+          Math.abs(point.y - node.y) <= card.height / 2 + 14 / zoom
+        ) {
           return node;
         }
       }
@@ -206,7 +211,8 @@ export function GraphView(props: GraphViewProps) {
       if (image?.complete && image.naturalWidth > 0) {
         context.save();
         context.clip();
-        context.drawImage(
+        drawImageCropped(
+          context,
           image,
           (node.x ?? 0) - radius,
           (node.y ?? 0) - radius,
@@ -260,61 +266,73 @@ export function GraphView(props: GraphViewProps) {
         }
       }
     } else if (node.kind === "file") {
-      const size = radius * 2;
-      const x = (node.x ?? 0) - radius;
-      const y = (node.y ?? 0) - radius;
+      const card = fileCardSize(node);
+      const width = card.width;
+      const height = card.height;
+      const x = (node.x ?? 0) - width / 2;
+      const y = (node.y ?? 0) - height / 2;
       const url = node.file?.thumbUrl ? node.file.thumbUrl : null;
       const image = url ? imageFor(url) : null;
+      const hasImage = Boolean(image?.complete && image.naturalWidth > 0);
 
       context.beginPath();
-      context.roundRect(x, y, size, size, 5 / globalScale);
-      context.fillStyle = image?.complete && image.naturalWidth > 0 ? "#20261d" : "#2b3027";
+      context.roundRect(x, y, width, height, 5 / globalScale);
+      context.fillStyle = hasImage ? "#20261d" : "#2b3027";
       context.fill();
 
-      if (image?.complete && image.naturalWidth > 0) {
+      if (image && hasImage) {
         context.save();
         context.clip();
-        context.drawImage(image, x, y, size, size);
+        drawImageCropped(context, image, x, y, width, height);
         context.restore();
       } else {
         context.strokeStyle = "#c49a45";
         context.lineWidth = 1.2 / globalScale;
-        context.strokeRect(x + size * 0.28, y + size * 0.2, size * 0.44, size * 0.58);
+        context.strokeRect(
+          x + width * 0.28,
+          y + height * 0.2,
+          width * 0.44,
+          height * 0.58,
+        );
         context.beginPath();
-        context.moveTo(x + size * 0.36, y + size * 0.34);
-        context.lineTo(x + size * 0.48, y + size * 0.46);
-        context.lineTo(x + size * 0.6, y + size * 0.34);
+        context.moveTo(x + width * 0.36, y + height * 0.34);
+        context.lineTo(x + width * 0.48, y + height * 0.46);
+        context.lineTo(x + width * 0.6, y + height * 0.34);
         context.stroke();
       }
 
       context.beginPath();
-      context.roundRect(x, y, size, size, 5 / globalScale);
+      context.roundRect(x, y, width, height, 5 / globalScale);
       context.lineWidth = (isSelected ? 2.2 : 1) / globalScale;
       context.strokeStyle = isSelected ? "#e3bb68" : "rgba(243,238,227,0.28)";
       context.stroke();
 
       if (globalScale > 1.65 || isSelected || isHovered) {
         const fontSize = 9.5 / globalScale;
+        const labelY = y + height + 4 / globalScale;
         context.font = `500 ${fontSize}px ui-sans-serif, system-ui, sans-serif`;
         context.textAlign = "center";
         context.textBaseline = "top";
         context.lineWidth = 2.8 / globalScale;
         context.strokeStyle = "rgba(17,20,16,0.92)";
-        context.strokeText(node.name, node.x ?? 0, (node.y ?? 0) + radius + 4 / globalScale);
+        context.strokeText(node.name, node.x ?? 0, labelY);
         context.fillStyle = "rgba(243,238,227,0.82)";
-        context.fillText(node.name, node.x ?? 0, (node.y ?? 0) + radius + 4 / globalScale);
+        context.fillText(node.name, node.x ?? 0, labelY);
       }
     } else if (node.kind === "group") {
-      const size = radius * 2;
-      const x = (node.x ?? 0) - radius;
-      const y = (node.y ?? 0) - radius;
+      const card = fileCardSize(node);
+      const width = card.width;
+      const height = card.height;
+      const x = (node.x ?? 0) - width / 2;
+      const y = (node.y ?? 0) - height / 2;
       const coverUrl = node.group?.coverFileId
         ? `/api/files/${node.group.coverFileId}/thumb`
         : null;
       const image = coverUrl ? imageFor(coverUrl) : null;
+      const hasCover = Boolean(image?.complete && image.naturalWidth > 0);
 
       context.beginPath();
-      context.roundRect(x - 6, y - 6, size, size, 6 / globalScale);
+      context.roundRect(x - 6, y - 6, width, height, 6 / globalScale);
       context.fillStyle = "#20261d";
       context.fill();
       context.lineWidth = 1 / globalScale;
@@ -322,36 +340,36 @@ export function GraphView(props: GraphViewProps) {
       context.stroke();
 
       context.beginPath();
-      context.roundRect(x - 3, y - 3, size, size, 6 / globalScale);
+      context.roundRect(x - 3, y - 3, width, height, 6 / globalScale);
       context.fillStyle = "#283026";
       context.fill();
       context.stroke();
 
       context.beginPath();
-      context.roundRect(x, y, size, size, 6 / globalScale);
-      context.fillStyle = image?.complete && image.naturalWidth > 0 ? "#20261d" : "#2b3027";
+      context.roundRect(x, y, width, height, 6 / globalScale);
+      context.fillStyle = hasCover ? "#20261d" : "#2b3027";
       context.fill();
 
-      if (image?.complete && image.naturalWidth > 0) {
+      if (image && hasCover) {
         context.save();
         context.clip();
-        context.drawImage(image, x, y, size, size);
+        drawImageCropped(context, image, x, y, width, height);
         context.restore();
       } else {
         context.strokeStyle = "#c49a45";
         context.lineWidth = 1.2 / globalScale;
         for (let index = 0; index < 3; index += 1) {
           context.strokeRect(
-            x + size * 0.24,
-            y + size * (0.2 + index * 0.2),
-            size * 0.52,
-            size * 0.1,
+            x + width * 0.24,
+            y + height * (0.2 + index * 0.2),
+            width * 0.52,
+            height * 0.1,
           );
         }
       }
 
       context.beginPath();
-      context.roundRect(x, y, size, size, 6 / globalScale);
+      context.roundRect(x, y, width, height, 6 / globalScale);
       context.lineWidth = (isSelected ? 2.2 : 1.1) / globalScale;
       context.strokeStyle = isSelected ? "#e3bb68" : "rgba(243,238,227,0.4)";
       context.stroke();
@@ -359,8 +377,8 @@ export function GraphView(props: GraphViewProps) {
       const count = node.group?.count ?? 0;
       if (count > 1) {
         const badgeRadius = 9 / globalScale;
-        const badgeX = x + size - 2 / globalScale;
-        const badgeY = y + size - 2 / globalScale;
+        const badgeX = x + width - 2 / globalScale;
+        const badgeY = y + height - 2 / globalScale;
         context.beginPath();
         context.arc(badgeX, badgeY, badgeRadius, 0, Math.PI * 2);
         context.fillStyle = "#c49a45";
@@ -374,22 +392,15 @@ export function GraphView(props: GraphViewProps) {
 
       if (globalScale > 1.2 || isSelected || isHovered) {
         const fontSize = 10 / globalScale;
+        const labelY = y + height + 5 / globalScale;
         context.font = `600 ${fontSize}px ui-sans-serif, system-ui, sans-serif`;
         context.textAlign = "center";
         context.textBaseline = "top";
         context.lineWidth = 2.8 / globalScale;
         context.strokeStyle = "rgba(17,20,16,0.92)";
-        context.strokeText(
-          node.name,
-          node.x ?? 0,
-          (node.y ?? 0) + radius + 5 / globalScale,
-        );
+        context.strokeText(node.name, node.x ?? 0, labelY);
         context.fillStyle = "rgba(243,238,227,0.9)";
-        context.fillText(
-          node.name,
-          node.x ?? 0,
-          (node.y ?? 0) + radius + 5 / globalScale,
-        );
+        context.fillText(node.name, node.x ?? 0, labelY);
       }
     }
 
@@ -405,12 +416,14 @@ export function GraphView(props: GraphViewProps) {
         if (node.kind === "person") {
           context.arc(x, y, radius + gap, 0, Math.PI * 2);
         } else {
-          const half = radius + gap;
+          const card = fileCardSize(node);
+          const halfWidth = card.width / 2 + gap;
+          const halfHeight = card.height / 2 + gap;
           context.roundRect(
-            x - half,
-            y - half,
-            half * 2,
-            half * 2,
+            x - halfWidth,
+            y - halfHeight,
+            halfWidth * 2,
+            halfHeight * 2,
             (6 + index * 2) / globalScale,
           );
         }
@@ -828,6 +841,38 @@ export function GraphView(props: GraphViewProps) {
       </Show>
     </div>
   );
+}
+
+/**
+ * Draw an image into a box without stretching it. When the box aspect differs
+ * from the source, the longer side is center cropped, the same way the DOM
+ * avatars and thumbnails crop with object-fit: cover.
+ */
+function drawImageCropped(
+  context: CanvasRenderingContext2D,
+  image: HTMLImageElement,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+) {
+  const sourceWidth = image.naturalWidth;
+  const sourceHeight = image.naturalHeight;
+  if (!sourceWidth || !sourceHeight) return;
+  const targetAspect = width / height;
+  const sourceAspect = sourceWidth / sourceHeight;
+  let sx = 0;
+  let sy = 0;
+  let cropWidth = sourceWidth;
+  let cropHeight = sourceHeight;
+  if (sourceAspect > targetAspect) {
+    cropWidth = sourceHeight * targetAspect;
+    sx = (sourceWidth - cropWidth) / 2;
+  } else if (sourceAspect < targetAspect) {
+    cropHeight = sourceWidth / targetAspect;
+    sy = (sourceHeight - cropHeight) / 2;
+  }
+  context.drawImage(image, sx, sy, cropWidth, cropHeight, x, y, width, height);
 }
 
 function withAlpha(hex: string, alpha: number) {

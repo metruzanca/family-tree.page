@@ -47,6 +47,8 @@ export type GraphFileGroup = {
   name: string;
   count: number;
   coverFileId: string | null;
+  coverWidth: number | null;
+  coverHeight: number | null;
   createdAt: Date;
 };
 
@@ -128,6 +130,8 @@ export async function getTreeGraph(treeId: string): Promise<TreeGraph> {
         name: group.name,
         count: groupFiles.length,
         coverFileId: cover?.thumbKey ? cover.id : null,
+        coverWidth: cover?.width ?? null,
+        coverHeight: cover?.height ?? null,
         createdAt: group.createdAt,
       };
     })

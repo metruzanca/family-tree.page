@@ -402,10 +402,57 @@ export function neighborsOf(links: GraphLink[], id: string): Set<string> {
   return found;
 }
 
+const FILE_CARD_AREA = 22 * 22;
+const GROUP_CARD_AREA = 32 * 32;
+const MIN_MEDIA_ASPECT = 1 / 3;
+const MAX_MEDIA_ASPECT = 3;
+
+/**
+ * Aspect ratio for a media card. Uploaded photos keep the shape they were shot
+ * in, so the graph reads like scattered prints instead of a grid of squares.
+ * Extreme panoramas and very tall portraits are clamped so a single card cannot
+ * dominate the layout.
+ */
+export function mediaAspect(
+  width: number | null | undefined,
+  height: number | null | undefined,
+) {
+  if (!width || !height || width <= 0 || height <= 0) return 1;
+  return Math.min(MAX_MEDIA_ASPECT, Math.max(MIN_MEDIA_ASPECT, width / height));
+}
+
+export type MediaCardSize = {
+  width: number;
+  height: number;
+  aspect: number;
+};
+
+/**
+ * Card size for a media node, scaled so every card covers roughly the same
+ * area. A 3:2 photo and a 2:3 portrait therefore feel equally present while
+ * keeping their real proportions.
+ */
+export function fileCardSize(node: GraphNode): MediaCardSize {
+  const area = node.kind === "group" ? GROUP_CARD_AREA : FILE_CARD_AREA;
+  const aspect =
+    node.kind === "group"
+      ? mediaAspect(node.group?.coverWidth, node.group?.coverHeight)
+      : node.kind === "file" && node.file?.kind === "image"
+        ? mediaAspect(node.file.width, node.file.height)
+        : 1;
+  return {
+    width: Math.sqrt(area * aspect),
+    height: Math.sqrt(area / aspect),
+    aspect,
+  };
+}
+
 export function nodeRadius(node: GraphNode) {
   if (node.kind === "union") return 6;
-  if (node.kind === "file") return 11;
-  if (node.kind === "group") return 16;
+  if (node.kind === "file" || node.kind === "group") {
+    const card = fileCardSize(node);
+    return Math.max(card.width, card.height) / 2;
+  }
   return Math.min(28, 12 + Math.sqrt(node.degree) * 4.2);
 }
 

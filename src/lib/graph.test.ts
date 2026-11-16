@@ -3,8 +3,12 @@ import {
   buildGraphModel,
   clampToGenerationBand,
   computeGenerations,
+  fileCardSize,
   generationRowY,
+  mediaAspect,
+  nodeRadius,
   partnerGroups,
+  type GraphNode,
 } from "./graph";
 import type { GraphPerson, GraphRelationship, TreeGraph } from "../api/people-server";
 
@@ -190,6 +194,8 @@ describe("buildGraphModel", () => {
           name: "Summer",
           count: 2,
           coverFileId: "group-one",
+          coverWidth: 1600,
+          coverHeight: 1200,
           createdAt: new Date(),
         },
       ],
@@ -241,5 +247,111 @@ describe("buildGraphModel", () => {
     expect(
       model.links.filter(link => link.kind === "parent" && !link.viaUnion),
     ).toHaveLength(0);
+  });
+});
+
+function fileNode(
+  width: number | null,
+  height: number | null,
+  kind: "image" | "document" = "image",
+): GraphNode {
+  return {
+    id: "file:one",
+    kind: "file",
+    name: "photo.jpg",
+    file: {
+      id: "one",
+      personId: "a",
+      groupId: null,
+      name: "photo.jpg",
+      mimeType: kind === "image" ? "image/jpeg" : "application/pdf",
+      kind,
+      thumbUrl: "/api/files/one/thumb",
+      width,
+      height,
+      sizeBytes: 1000,
+      createdAt: new Date(),
+      isAvatar: false,
+    },
+    degree: 1,
+    val: 0.35,
+    level: 0,
+  };
+}
+
+describe("media card sizing", () => {
+  const squareArea = 22 * 22;
+
+  it("keeps a square photo square", () => {
+    const card = fileCardSize(fileNode(800, 800));
+    expect(card.aspect).toBe(1);
+    expect(card.width).toBeCloseTo(22);
+    expect(card.height).toBeCloseTo(22);
+  });
+
+  it("keeps landscape and portrait photos in their real proportions", () => {
+    const landscape = fileCardSize(fileNode(1200, 800));
+    const portrait = fileCardSize(fileNode(800, 1200));
+    expect(landscape.aspect).toBeCloseTo(1.5);
+    expect(portrait.aspect).toBeCloseTo(2 / 3);
+    expect(landscape.width).toBeGreaterThan(landscape.height);
+    expect(portrait.height).toBeGreaterThan(portrait.width);
+    expect(landscape.width * landscape.height).toBeCloseTo(squareArea);
+    expect(portrait.width * portrait.height).toBeCloseTo(squareArea);
+  });
+
+  it("clamps extreme panoramas so one card cannot dominate the graph", () => {
+    expect(mediaAspect(4000, 400)).toBe(3);
+    expect(mediaAspect(400, 4000)).toBe(1 / 3);
+    const card = fileCardSize(fileNode(4000, 400));
+    expect(card.aspect).toBe(3);
+    expect(card.width).toBeLessThan(44);
+  });
+
+  it("falls back to a square when dimensions are missing", () => {
+    expect(mediaAspect(null, null)).toBe(1);
+    expect(mediaAspect(0, 500)).toBe(1);
+    const card = fileCardSize(fileNode(null, null));
+    expect(card.width).toBeCloseTo(22);
+    expect(card.height).toBeCloseTo(22);
+  });
+
+  it("keeps non-image files as square cards", () => {
+    const card = fileCardSize(fileNode(1200, 800, "document"));
+    expect(card.aspect).toBe(1);
+    expect(card.width).toBeCloseTo(22);
+  });
+
+  it("sizes the collision radius from the longest card side", () => {
+    expect(nodeRadius(fileNode(800, 800))).toBeCloseTo(11);
+    expect(nodeRadius(fileNode(1200, 800))).toBeCloseTo(13.47, 1);
+    expect(nodeRadius(fileNode(1200, 800))).toBeGreaterThan(
+      nodeRadius(fileNode(800, 800)),
+    );
+  });
+
+  it("sizes album cards from their cover photo", () => {
+    const group: GraphNode = {
+      id: "group:album",
+      kind: "group",
+      name: "Summer",
+      group: {
+        id: "album",
+        personId: "a",
+        name: "Summer",
+        count: 3,
+        coverFileId: "one",
+        coverWidth: 1200,
+        coverHeight: 800,
+        createdAt: new Date(),
+      },
+      degree: 1,
+      val: 0.7,
+      level: 0,
+    };
+    const card = fileCardSize(group);
+    expect(card.aspect).toBeCloseTo(1.5);
+    expect(card.width).toBeGreaterThan(card.height);
+    expect(card.width * card.height).toBeCloseTo(32 * 32);
   });
 });
