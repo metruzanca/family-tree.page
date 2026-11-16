@@ -1,4 +1,4 @@
-import { For, Show, createMemo, createSignal, onMount, type JSX } from "solid-js";
+import { For, Show, createMemo, createSignal, type JSX } from "solid-js";
 import { A } from "@solidjs/router";
 import {
   ArrowRight,
@@ -38,24 +38,14 @@ export function LandingHero() {
   const [selectedPersonId, setSelectedPersonId] = createSignal<string | null>(null);
   const [lightbox, setLightbox] = createSignal<LightboxState | null>(null);
   const [peopleOpen, setPeopleOpen] = createSignal(false);
-  const [showMedia, setShowMedia] = createSignal(true);
+  const [showMedia, setShowMedia] = createSignal(false);
   const [handle, setHandle] = createSignal<GraphHandle>();
-  const [hintVisible, setHintVisible] = createSignal(true);
 
   const selectedPerson = createMemo(
     () => demoPeople.find(person => person.id === selectedPersonId()) ?? null,
   );
 
-  onMount(() => {
-    if (window.matchMedia("(max-width: 639px)").matches) setShowMedia(false);
-  });
-
-  function acknowledge() {
-    setHintVisible(false);
-  }
-
   function selectPerson(id: string, focus = false) {
-    acknowledge();
     setPeopleOpen(false);
     setLightbox(null);
     setSelectedPersonId(id);
@@ -74,7 +64,6 @@ export function LandingHero() {
   function openFile(fileId: string) {
     const file = demoMediaById[fileId];
     if (!file) return;
-    acknowledge();
     setPeopleOpen(false);
     setSelectedPersonId(null);
     setLightbox({ title: file.name, files: [file], initialId: file.id });
@@ -82,7 +71,6 @@ export function LandingHero() {
 
   function openGroup(groupId: string) {
     if (groupId !== demoAlbum.id) return;
-    acknowledge();
     setPeopleOpen(false);
     setSelectedPersonId(null);
     setLightbox({
@@ -93,8 +81,9 @@ export function LandingHero() {
   }
 
   function toggleMedia() {
-    acknowledge();
     setShowMedia(value => !value);
+    // The demo places photos in their own row, so refit once the new nodes mount.
+    requestAnimationFrame(() => requestAnimationFrame(() => handle()?.fit()));
   }
 
   return (
@@ -273,14 +262,6 @@ export function LandingHero() {
                   onSelectPerson={id => selectPerson(id, true)}
                 />
               )}
-            </Show>
-
-            <Show when={hintVisible()}>
-              <div class="pointer-events-none absolute inset-x-0 bottom-3 z-20 flex justify-center px-3">
-                <p class="rounded-full border border-white/10 bg-black/40 px-3 py-1.5 text-[0.66rem] text-white/60 backdrop-blur-md">
-                  Click a face or a photo to look closer
-                </p>
-              </div>
             </Show>
           </div>
         </div>

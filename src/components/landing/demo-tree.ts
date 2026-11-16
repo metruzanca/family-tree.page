@@ -377,5 +377,23 @@ const demoPositions: Record<string, { x: number; y: number }> = {
 };
 
 export function demoLayout(node: GraphNode) {
+  if (node.kind === "union") {
+    const parents = (node.parentIds ?? [])
+      .map(id => demoPositions[id])
+      .filter((position): position is { x: number; y: number } => Boolean(position));
+    const children = (node.childIds ?? [])
+      .map(id => demoPositions[id])
+      .filter((position): position is { x: number; y: number } => Boolean(position));
+    if (!parents.length || !children.length) return null;
+    const childXs = children.map(position => position.x);
+    const parentY = parents.reduce((sum, position) => sum + position.y, 0) / parents.length;
+    const childY = children.reduce((sum, position) => sum + position.y, 0) / children.length;
+    return {
+      // Centre the junction over its children so the child lines fan evenly, then
+      // sit it halfway between the two rows so no branch has to overshoot.
+      x: (Math.min(...childXs) + Math.max(...childXs)) / 2,
+      y: (parentY + childY) / 2,
+    };
+  }
   return demoPositions[node.id] ?? null;
 }
