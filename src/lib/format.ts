@@ -14,6 +14,18 @@ export function formatDate(value: Date | string | null | undefined) {
   }).format(date);
 }
 
+export function formatCalendarDate(value: string | null | undefined) {
+  if (!value) return "";
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return formatDate(value);
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  return new Intl.DateTimeFormat(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  }).format(date);
+}
+
 export function formatYears(birthDate?: string | null, deathDate?: string | null) {
   const birth = birthDate ? birthDate.slice(0, 4) : "";
   const death = deathDate ? deathDate.slice(0, 4) : "";

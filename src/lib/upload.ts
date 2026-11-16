@@ -1,4 +1,5 @@
 import { cancelUpload, finalizeUpload, prepareUpload } from "~/api/files-server";
+import { formatExifDate } from "./exif";
 import { makeThumbnail, mimeForFile } from "./image-thumb";
 
 export type UploadOptions = {
@@ -26,6 +27,8 @@ export async function uploadPersonFile(options: UploadOptions): Promise<UploadRe
     }
   }
 
+  const takenAt = mimeType.startsWith("image/") ? await readTakenAt(options.file) : null;
+
   const prepared = await prepareUpload({
     treeId: options.treeId,
     personId: options.personId,
@@ -36,6 +39,7 @@ export async function uploadPersonFile(options: UploadOptions): Promise<UploadRe
     thumbMime: thumb?.mime ?? null,
     width: thumb?.width ?? null,
     height: thumb?.height ?? null,
+    takenAt,
   });
 
   if (!prepared.ok) return { ok: false, error: prepared.error };
@@ -80,6 +84,22 @@ export async function uploadPersonFile(options: UploadOptions): Promise<UploadRe
       ok: false,
       error: error instanceof Error ? error.message : "The upload did not finish. Please try again.",
     };
+  }
+}
+
+async function readTakenAt(file: File) {
+  try {
+    const { default: exifr } = await import("exifr");
+    const data = await exifr.parse(file, {
+      pick: ["DateTimeOriginal", "CreateDate"],
+      reviveValues: false,
+    });
+    if (!data) return null;
+    return (
+      formatExifDate(data.DateTimeOriginal) ?? formatExifDate(data.CreateDate) ?? null
+    );
+  } catch {
+    return null;
   }
 }
 
