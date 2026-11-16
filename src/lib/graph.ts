@@ -5,6 +5,7 @@ import type {
   GraphRelationship,
   TreeGraph,
 } from "~/api/people-server";
+import { analyzeRelationships } from "./relationships";
 
 export type GenerationDirection = "oldest-top" | "oldest-bottom";
 export const GENERATION_SPACING = 190;
@@ -278,49 +279,7 @@ export function computeGenerations(
   people: GraphPerson[],
   relationships: GraphRelationship[],
 ): Map<string, number> {
-  const levels = new Map(people.map(person => [person.id, 0]));
-  const parentEdges = relationships.filter(
-    (relationship): relationship is Extract<GraphRelationship, { type: "parent" }> =>
-      relationship.type === "parent",
-  );
-  const partnerEdges = relationships.filter(
-    (relationship): relationship is Extract<GraphRelationship, { type: "partner" }> =>
-      relationship.type === "partner",
-  );
-
-  const maxRounds = Math.max(4, people.length * 2);
-  for (let round = 0; round < maxRounds; round += 1) {
-    let changed = false;
-    for (const edge of parentEdges) {
-      const parent = levels.get(edge.source) ?? 0;
-      const child = levels.get(edge.target) ?? 0;
-      if (child < parent + 1) {
-        levels.set(edge.target, parent + 1);
-        changed = true;
-      }
-    }
-    for (const edge of partnerEdges) {
-      const a = levels.get(edge.source) ?? 0;
-      const b = levels.get(edge.target) ?? 0;
-      const shared = Math.max(a, b);
-      if (a !== shared) {
-        levels.set(edge.source, shared);
-        changed = true;
-      }
-      if (b !== shared) {
-        levels.set(edge.target, shared);
-        changed = true;
-      }
-    }
-    if (!changed) break;
-  }
-
-  let minimum = 0;
-  for (const value of levels.values()) minimum = Math.min(minimum, value);
-  if (minimum !== 0) {
-    for (const [key, value] of levels) levels.set(key, value - minimum);
-  }
-  return levels;
+  return analyzeRelationships(people, relationships).levels;
 }
 
 export function generationRowY(
