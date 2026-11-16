@@ -28,7 +28,6 @@ import { ConfirmDialog } from "~/components/ui/ConfirmDialog";
 import { Button } from "~/components/ui/button";
 import { useToast } from "~/components/ui/Toast";
 import { uploadPersonFile } from "~/lib/upload";
-import { mimeForFile } from "~/lib/image-thumb";
 import { fileNodeId, groupNodeId, type GenerationDirection } from "~/lib/graph";
 import { track } from "~/lib/analytics";
 import { createTreePresence } from "~/lib/presence";
@@ -251,7 +250,6 @@ function TreePageInner() {
     setUploading(true);
     setUploadProgress(0);
     let uploaded = 0;
-    let needsAvatar = !person.avatarFileId;
     try {
       for (let index = 0; index < files.length; index += 1) {
         const file = files[index];
@@ -269,15 +267,6 @@ function TreePageInner() {
           continue;
         }
         uploaded += 1;
-        if (needsAvatar && mimeForFile(file).startsWith("image/")) {
-          needsAvatar = false;
-          const avatarResult = await setAvatar({
-            treeId: params.treeId,
-            personId: person.id,
-            fileId: result.fileId,
-          });
-          if (!avatarResult.ok) toast.show(avatarResult.error, "error");
-        }
       }
     } finally {
       setUploading(false);
