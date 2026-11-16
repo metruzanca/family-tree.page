@@ -9,7 +9,7 @@ import {
 } from "../../drizzle/schema";
 import { publicOrigin } from "./config";
 import { sendEmail } from "./email";
-import { birthdayMessage, type BirthdayEmailKind } from "./email-templates";
+import { birthdayMessage } from "./email-templates";
 import {
   birthdayMatchesOn,
   birthdayTargetDay,
@@ -31,10 +31,8 @@ type Candidate = {
   displayName: string;
   enabled: Record<BirthdayOffset, boolean>;
   people: {
-    id: string;
     displayName: string;
     birthDate: string;
-    treeId: string;
     treeName: string;
   }[];
 };
@@ -51,10 +49,6 @@ function todayInUtc(now: Date): DateParts {
 
 function dateKey(parts: DateParts) {
   return `${parts.year}-${String(parts.month + 1).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`;
-}
-
-function personName(person: { displayName: string }) {
-  return person.displayName;
 }
 
 /**
@@ -81,12 +75,10 @@ export async function sendBirthdayNotifications(
       weekBefore: users.notifyBirthdayWeekBefore,
       dayBefore: users.notifyBirthdayDayBefore,
       dayOf: users.notifyBirthdayDayOf,
-      personId: people.id,
       firstName: people.firstName,
       lastName: people.lastName,
       nickname: people.nickname,
       birthDate: people.birthDate,
-      treeId: trees.id,
       treeName: trees.name,
     })
     .from(users)
@@ -125,11 +117,9 @@ export async function sendBirthdayNotifications(
       candidates.set(row.userId, candidate);
     }
     candidate.people.push({
-      id: row.personId,
       displayName:
         `${row.firstName} ${row.lastName}`.trim() || row.nickname || "Unnamed person",
       birthDate: row.birthDate,
-      treeId: row.treeId,
       treeName: row.treeName,
     });
   }
@@ -142,14 +132,14 @@ export async function sendBirthdayNotifications(
       const target = birthdayTargetDay(today, kind);
       const matches = candidate.people
         .filter(person => birthdayMatchesOn(person.birthDate, target))
-        .sort((a, b) => personName(a).localeCompare(personName(b)));
+        .sort((a, b) => a.displayName.localeCompare(b.displayName));
       if (!matches.length) continue;
 
       const claimed = await db
         .insert(birthdayEmailLog)
         .values({
           userId: candidate.userId,
-          kind: kind as BirthdayEmailKind,
+          kind,
           sentOn: dateKey(today),
         })
         .onConflictDoNothing()
