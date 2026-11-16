@@ -19,6 +19,8 @@ The graph is the main view. People are nodes, parent and partner relationships a
 
 - Email and password accounts with encrypted session cookies
 - Email verification, password reset by email, and session invalidation on password changes
+- Email address changes with a confirmation link to the new address and a notice to the old one
+- Download a copy of your account, trees, and media as a zip, or delete your account with ownership safeguards
 - Private family trees with owner, editor, and viewer roles
 - Invites by copyable link or by email, with expiry and single use
 - People, parent-child relationships, and partnerships
@@ -276,9 +278,16 @@ The interface uses [shadcn-solid](https://shadcn-solid.com) components on top of
 - Dark mode is the `.dark` class on `<html>`, set by `ThemeProvider`, and is wired into Tailwind through `@custom-variant dark` in `src/app.css`.
 - The graph canvas draws with its own hardcoded colours in `src/components/graph/GraphView.tsx`; theme tokens do not affect it.
 
+## Your data
+
+Account settings has three exits for your own data:
+
+- **Change email.** A confirmation link goes to the new address and a notice goes to the old one. The old address keeps working until the new one confirms. Pending changes can be cancelled from account settings.
+- **Download your data.** `GET /api/account/export` streams a zip with `family-tree-export.json` and a README. The manifest covers your profile, memberships, trees, people, relationships, groups, tags, and file metadata. Add `?media=1` to include every original photo and document, or `?format=json` to download the manifest alone. Exports are rate limited to three per hour per account.
+- **Delete account.** This requires your password and a typed email confirmation. Trees where you are the only member are deleted with their storage objects. If you are the last owner of a shared tree, promote another owner or delete that tree first. Deleting your account clears the session and cascades memberships, calendar feeds, birthday logs, auth tokens, and pending email changes.
+
 ## Known limitations
 
-- Email addresses cannot be changed yet.
 - No realtime co-editing. Presence is live, but the graph still refreshes after changes.
 - Presence is held in the app process. It works as-is on a single Railway replica. Running more than one replica needs a shared presence store, such as Redis or Postgres `LISTEN`/`NOTIFY`.
 - HEIC photos work only when the browser can decode them; otherwise the user is asked to export as JPEG.
