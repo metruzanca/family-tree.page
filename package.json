@@ -19,9 +19,13 @@
     "db:seed": "tsx scripts/assert-local-db.ts && tsx scripts/seed.ts",
     "db:pull": "tsx scripts/db-pull.ts",
     "db:check": "tsx scripts/db-check.ts",
-    "storage:cors": "tsx scripts/storage-cors.ts"
+    "storage:cors": "tsx scripts/storage-cors.ts",
+    "backup": "tsx scripts/backup.ts",
+    "backup:verify": "tsx scripts/backup-verify.ts",
+    "backup:restore": "tsx scripts/backup-restore.ts"
   },
   "devDependencies": {
+    "@sentry/vite-plugin": "^11.12.0",
     "@types/archiver": "^8.0.0",
     "@types/d3-force": "^3.0.10",
     "@types/node": "^24.7.0",
@@ -38,6 +42,8 @@
     "@aws-sdk/s3-presigned-post": "^3.1169.0",
     "@aws-sdk/s3-request-presigner": "^3.1169.0",
     "@kobalte/core": "^0.13.14",
+    "@sentry/browser": "^11.12.0",
+    "@sentry/node": "^11.12.0",
     "@solid-primitives/resize-observer": "^2.2.0",
     "@solid-primitives/websocket": "^1.4.0",
     "@solidjs/router": "^1.0.0",

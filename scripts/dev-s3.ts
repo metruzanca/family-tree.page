@@ -23,13 +23,18 @@ const server = new S3rver({
   port: 9000,
   silent: false,
   directory,
-  configureBuckets: [{ name: "family-tree", configs: [cors] }],
+  configureBuckets: [
+    { name: "family-tree", configs: [cors] },
+    { name: "family-tree-backups", configs: [] },
+  ],
   vhostBuckets: false,
   allowMismatchedSignatures: true,
 });
 
 await server.run();
-console.log("Local S3 listening on http://127.0.0.1:9000 (bucket: family-tree)");
+console.log(
+  "Local S3 listening on http://127.0.0.1:9000 (buckets: family-tree, family-tree-backups)",
+);
 
 const shutdown = async () => {
   await server.close();

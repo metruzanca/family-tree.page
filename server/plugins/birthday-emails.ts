@@ -1,5 +1,6 @@
 import { definePlugin } from "nitro";
 import { sendBirthdayNotifications } from "../../src/server/birthday-notifications";
+import { captureServerError } from "../../src/server/sentry";
 
 const CHECK_INTERVAL_MS = 60 * 60 * 1000;
 const STARTUP_DELAY_MS = 30_000;
@@ -44,6 +45,7 @@ export default definePlugin(nitroApp => {
       }
     } catch (error) {
       console.error("Birthday email run failed", error);
+      captureServerError(error, { source: "birthday-emails" });
     } finally {
       global.__familyTreeBirthdayRunning = false;
     }

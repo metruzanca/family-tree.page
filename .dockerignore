@@ -1,0 +1,8 @@
+.dev
+.github
+.git
+.output
+.nitro
+node_modules
+test-results
+*.log

@@ -1,4 +1,5 @@
 import { ZodError } from "zod";
+import { captureServerError } from "./sentry";
 
 export class AppError extends Error {
   constructor(
@@ -33,6 +34,7 @@ export async function runAction<T>(fn: () => Promise<T>): Promise<ActionResult<T
       return { ok: false, error: "That record already exists." };
     }
     console.error(error);
+    captureServerError(error, { source: "runAction" });
     return { ok: false, error: "Something went wrong. Please try again." };
   }
 }

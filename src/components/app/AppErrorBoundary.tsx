@@ -6,6 +6,7 @@ import {
 } from "~/components/ui/ErrorState";
 import { friendlyMessage } from "~/lib/action-result";
 import { track } from "~/lib/analytics";
+import { captureClientError } from "~/lib/sentry-client";
 
 type AppErrorBoundaryProps = {
   children: JSX.Element;
@@ -32,6 +33,7 @@ export function AppErrorBoundary(props: AppErrorBoundaryProps) {
         track("client_error", {
           name: error instanceof Error ? error.name : typeof error,
         });
+        captureClientError(error, { source: "route" });
 
         async function retry() {
           if (retrying()) return;

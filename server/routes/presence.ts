@@ -1,6 +1,7 @@
 import { defineWebSocketHandler } from "nitro";
 import { authenticatePresence } from "../../src/server/presence-auth";
 import { normalizeNodeId, presenceHub } from "../../src/server/presence";
+import { captureServerError } from "../../src/server/sentry";
 import type {
   PresenceServerMessage,
   PresenceClientMessage,
@@ -83,5 +84,6 @@ export default defineWebSocketHandler({
 
   error(peer, error) {
     console.error("Presence socket error", peer.id, error);
+    captureServerError(error, { source: "presence", peerId: peer.id });
   },
 });
