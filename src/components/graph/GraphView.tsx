@@ -3,7 +3,7 @@ import { forceCollide, forceY } from "d3-force";
 import type { TreeGraph } from "~/api/people-server";
 import type { TreeRole } from "~/server/guards";
 import type { PresencePeer } from "~/lib/presence-protocol";
-import { avatarColors } from "~/lib/avatar-color";
+import { presenceColor } from "~/lib/presence-color";
 import {
   branchColor,
   buildGraphModel,
@@ -163,6 +163,112 @@ export function GraphView(props: GraphViewProps) {
     container.style.cursor = cursor;
     const canvas = container.querySelector("canvas") as HTMLCanvasElement | null;
     if (canvas) canvas.style.cursor = cursor;
+  }
+
+  function shortPresenceName(displayName: string) {
+    const parts = displayName.trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return "?";
+    if (parts.length === 1) {
+      return parts[0].length > 16 ? `${parts[0].slice(0, 15)}…` : parts[0];
+    }
+    return `${parts[0]} ${parts[parts.length - 1][0].toUpperCase()}.`;
+  }
+
+  function drawPresenceTagStack(
+    node: GraphNode,
+    viewers: PresencePeer[],
+    context: CanvasRenderingContext2D,
+    globalScale: number,
+  ) {
+    if (!viewers.length) return;
+    const shown = viewers.slice(0, 3);
+    const remaining = viewers.length - shown.length;
+
+    const card = node.kind === "person" ? null : fileCardSize(node);
+    const radius = nodeRadius(node);
+    const edgeX = (card ? card.width / 2 : radius) + 7 / globalScale;
+    const edgeY = card ? card.height / 2 : radius;
+    const fontSize = 9.5 / globalScale;
+    const dotRadius = 2.6 / globalScale;
+    const padX = 5 / globalScale;
+    const padY = 3 / globalScale;
+    const rowGap = 2.5 / globalScale;
+    const rowHeight = fontSize + padY * 2;
+
+    const rows = shown.map(peer => ({
+      text: shortPresenceName(peer.displayName),
+      color: presenceColor(peer.userId),
+    }));
+    if (remaining > 0) rows.push({ text: `+${remaining}`, color: "#8d846c" });
+
+    const x = (node.x ?? 0) + edgeX;
+    const totalHeight = rows.length * rowHeight + (rows.length - 1) * rowGap;
+    let y = (node.y ?? 0) - edgeY - 6 / globalScale - totalHeight;
+
+    context.save();
+    context.textAlign = "left";
+    context.textBaseline = "middle";
+    context.font = `600 ${fontSize}px ui-sans-serif, system-ui, sans-serif`;
+    for (const row of rows) {
+      const textWidth = context.measureText(row.text).width;
+      const width = padX * 2 + dotRadius * 2 + 3 / globalScale + textWidth;
+      context.beginPath();
+      context.roundRect(x, y, width, rowHeight, rowHeight / 2);
+      context.fillStyle = "rgba(17,20,16,0.86)";
+      context.fill();
+      context.lineWidth = 1 / globalScale;
+      context.strokeStyle = row.color;
+      context.stroke();
+
+      context.beginPath();
+      context.arc(x + padX + dotRadius, y + rowHeight / 2, dotRadius, 0, Math.PI * 2);
+      context.fillStyle = row.color;
+      context.fill();
+
+      context.fillStyle = "#f3eee3";
+      context.fillText(
+        row.text,
+        x + padX + dotRadius * 2 + 3 / globalScale,
+        y + rowHeight / 2 + 0.4 / globalScale,
+      );
+      y += rowHeight + rowGap;
+    }
+    context.restore();
+  }
+
+  /**
+   * Tags render after every node so a nearby node or file card cannot cover
+   * them. Crossws peer ids change on reconnect, so dedupe by user per node.
+   */
+  function drawPresenceTagsLayer(
+    context: CanvasRenderingContext2D,
+    globalScale: number,
+  ) {
+    const peers = props.presence;
+    if (!peers?.length || !graph) return;
+    const nodes = new Map<string, GraphNode>();
+    for (const node of graph.graphData().nodes as GraphNode[]) nodes.set(node.id, node);
+
+    const groups = new Map<string, PresencePeer[]>();
+    const seen = new Map<string, Set<string>>();
+    for (const peer of peers) {
+      if (!peer.nodeId || peer.peerId === props.selfPeerId || !nodes.has(peer.nodeId)) continue;
+      let users = seen.get(peer.nodeId);
+      if (!users) {
+        users = new Set();
+        seen.set(peer.nodeId, users);
+      }
+      if (users.has(peer.userId)) continue;
+      users.add(peer.userId);
+      const viewers = groups.get(peer.nodeId) ?? [];
+      viewers.push(peer);
+      groups.set(peer.nodeId, viewers);
+    }
+
+    for (const [nodeId, viewers] of groups) {
+      const node = nodes.get(nodeId);
+      if (node) drawPresenceTagStack(node, viewers, context, globalScale);
+    }
   }
 
   function drawNode(node: GraphNode, context: CanvasRenderingContext2D, globalScale: number) {
@@ -428,7 +534,7 @@ export function GraphView(props: GraphViewProps) {
           );
         }
         context.lineWidth = 2.2 / globalScale;
-        context.strokeStyle = avatarColors(peer.displayName)[1];
+        context.strokeStyle = presenceColor(peer.userId);
         context.stroke();
       });
     }
@@ -613,6 +719,7 @@ export function GraphView(props: GraphViewProps) {
       .nodeId("id")
       .nodeVal((node: GraphNode) => node.val)
       .nodeCanvasObject(drawNode)
+      .onRenderFramePost(drawPresenceTagsLayer)
       .nodeLabel("")
       .linkColor(linkColor)
       .linkWidth((link: GraphLink) =>
