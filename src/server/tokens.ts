@@ -3,10 +3,11 @@ import { and, eq, isNull } from "drizzle-orm";
 import { db } from "./db";
 import { authTokens } from "../../drizzle/schema";
 
-export type AuthTokenKind = "email_verification" | "password_reset";
+export type AuthTokenKind = "email_verification" | "password_reset" | "email_change";
 
 export const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60_000;
 export const PASSWORD_RESET_TTL_MS = 60 * 60_000;
+export const EMAIL_CHANGE_TTL_MS = 24 * 60 * 60_000;
 
 export function generateToken() {
   return randomBytes(32).toString("base64url");
@@ -24,6 +25,7 @@ export async function issueAuthToken(
   userId: string,
   kind: AuthTokenKind,
   ttlMs: number,
+  options: { pendingEmail?: string | null } = {},
 ): Promise<{ token: string; expiresAt: Date }> {
   const token = generateToken();
   const expiresAt = new Date(Date.now() + ttlMs);
@@ -36,6 +38,7 @@ export async function issueAuthToken(
     await tx.insert(authTokens).values({
       userId,
       kind,
+      pendingEmail: options.pendingEmail ?? null,
       tokenHash: hashToken(token),
       expiresAt,
     });
@@ -45,9 +48,9 @@ export async function issueAuthToken(
 }
 
 export type AuthTokenState =
-  | { status: "ok"; userId: string; tokenId: string }
+  | { status: "ok"; userId: string; tokenId: string; pendingEmail: string | null }
   | { status: "missing" | "expired" }
-  | { status: "used"; userId: string; tokenId: string };
+  | { status: "used"; userId: string; tokenId: string; pendingEmail: string | null };
 
 export async function validateAuthToken(
   token: unknown,
@@ -62,10 +65,20 @@ export async function validateAuthToken(
   const record = rows[0];
   if (!record) return { status: "missing" };
   if (record.usedAt) {
-    return { status: "used", userId: record.userId, tokenId: record.id };
+    return {
+      status: "used",
+      userId: record.userId,
+      tokenId: record.id,
+      pendingEmail: record.pendingEmail,
+    };
   }
   if (record.expiresAt.getTime() <= Date.now()) return { status: "expired" };
-  return { status: "ok", userId: record.userId, tokenId: record.id };
+  return {
+    status: "ok",
+    userId: record.userId,
+    tokenId: record.id,
+    pendingEmail: record.pendingEmail,
+  };
 }
 
 export async function markTokenUsed(tokenId: string): Promise<boolean> {

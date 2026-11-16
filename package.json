@@ -22,6 +22,7 @@
     "storage:cors": "tsx scripts/storage-cors.ts"
   },
   "devDependencies": {
+    "@types/archiver": "^8.0.0",
     "@types/d3-force": "^3.0.10",
     "@types/node": "^24.7.0",
     "@types/pg": "^8.23.1",
@@ -42,6 +43,7 @@
     "@solidjs/router": "^1.0.0",
     "@solidjs/start": "^2.0.0",
     "@tailwindcss/vite": "^4.3.5",
+    "archiver": "^8.0.0",
     "cva": "1.0.0-beta.4",
     "d3-force": "^3.0.1",
     "drizzle-orm": "^0.45.2",

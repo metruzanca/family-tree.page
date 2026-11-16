@@ -158,6 +158,75 @@ export function passwordResetMessage(input: {
   };
 }
 
+export function emailChangeConfirmationMessage(input: {
+  name: string;
+  newEmail: string;
+  url: string;
+  expiresInHours: number;
+}): EmailMessage {
+  const newEmail = escapeHtml(input.newEmail);
+  return {
+    subject: "Confirm your new email for family-tree",
+    html: layout({
+      preheader: `Confirm ${input.newEmail} as the email address on your account.`,
+      heading: "Confirm your new email",
+      paragraphs: [
+        `Hi ${escapeHtml(input.name)},`,
+        `Use the button below to make <strong style="color:${BRAND.ink};">${newEmail}</strong> the email address on your family-tree account.`,
+        "Your current address keeps working until you confirm this link.",
+      ],
+      ctaLabel: "Confirm new email",
+      ctaUrl: input.url,
+      footnote: `This link works once and expires in ${input.expiresInHours} hours. If you did not ask for this change, ignore this email and your address stays the same.`,
+    }),
+    text: [
+      `Hi ${input.name},`,
+      "",
+      `Use this link to make ${input.newEmail} the email address on your family-tree account:`,
+      "",
+      input.url,
+      "",
+      "Your current address keeps working until you confirm this link.",
+      "",
+      `This link works once and expires in ${input.expiresInHours} hours. If you did not ask for this change, ignore this email and your address stays the same.`,
+    ].join("\n"),
+  };
+}
+
+export function emailChangeNoticeMessage(input: {
+  name: string;
+  newEmail: string;
+  url: string;
+}): EmailMessage {
+  const newEmail = escapeHtml(input.newEmail);
+  return {
+    subject: "Your family-tree email address is being changed",
+    html: layout({
+      preheader: "Someone asked to change the email address on your account.",
+      heading: "Email change requested",
+      paragraphs: [
+        `Hi ${escapeHtml(input.name)},`,
+        `Someone asked to change the email address on your family-tree account to <strong style="color:${BRAND.ink};">${newEmail}</strong>.`,
+        "The change only happens after the new address confirms the link we sent there.",
+      ],
+      ctaLabel: "Review account settings",
+      ctaUrl: input.url,
+      footnote:
+        "If this was not you, reset your password and review your account. Nobody at family-tree will ever ask you for your password.",
+    }),
+    text: [
+      `Hi ${input.name},`,
+      "",
+      `Someone asked to change the email address on your family-tree account to ${input.newEmail}.`,
+      "The change only happens after the new address confirms the link we sent there.",
+      "",
+      input.url,
+      "",
+      "If this was not you, reset your password and review your account. Nobody at family-tree will ever ask you for your password.",
+    ].join("\n"),
+  };
+}
+
 export type BirthdayEmailKind = "week_before" | "day_before" | "day_of";
 
 export function birthdayMessage(input: {

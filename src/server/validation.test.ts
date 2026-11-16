@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  deleteAccountSchema,
+  emailChangeSchema,
   emailSchema,
   fileTagsSchema,
   fileTakenAtSchema,
@@ -145,5 +147,34 @@ describe("validation", () => {
     expect(fileTakenAtSchema.safeParse({ ...base, takenAt: "spring 1962" }).success).toBe(
       false,
     );
+  });
+
+  it("normalizes the new email when requesting a change", () => {
+    const parsed = emailChangeSchema.parse({
+      newEmail: " New.Address@Example.COM ",
+      currentPassword: "a-current-password",
+    });
+    expect(parsed.newEmail).toBe("new.address@example.com");
+  });
+
+  it("requires a password to change the email", () => {
+    expect(
+      emailChangeSchema.safeParse({ newEmail: "new@example.com", currentPassword: "" }).success,
+    ).toBe(false);
+  });
+
+  it("requires a password and typed confirmation to delete an account", () => {
+    expect(
+      deleteAccountSchema.safeParse({
+        password: "a-current-password",
+        confirmation: "sam@example.com",
+      }).success,
+    ).toBe(true);
+    expect(
+      deleteAccountSchema.safeParse({ password: "", confirmation: "sam@example.com" }).success,
+    ).toBe(false);
+    expect(
+      deleteAccountSchema.safeParse({ password: "a-current-password", confirmation: "" }).success,
+    ).toBe(false);
   });
 });

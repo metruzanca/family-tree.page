@@ -58,6 +58,16 @@ export const updateProfileSchema = z.object({
   displayName: displayNameSchema,
 });
 
+export const emailChangeSchema = z.object({
+  newEmail: emailSchema,
+  currentPassword: z.string().min(1, "Enter your current password.").max(200),
+});
+
+export const deleteAccountSchema = z.object({
+  password: z.string().min(1, "Enter your password.").max(200),
+  confirmation: z.string().trim().min(1, "Type your email address to confirm.").max(254),
+});
+
 export const updateNotificationSettingsSchema = z.object({
   notifyBirthdayWeekBefore: z.boolean(),
   notifyBirthdayDayBefore: z.boolean(),

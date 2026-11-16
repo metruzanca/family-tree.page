@@ -39,6 +39,7 @@ export const fileTagSource = pgEnum("file_tag_source", ["manual", "face"]);
 export const authTokenKind = pgEnum("auth_token_kind", [
   "email_verification",
   "password_reset",
+  "email_change",
 ]);
 export const birthdayEmailKind = pgEnum("birthday_email_kind", [
   "week_before",
@@ -104,6 +105,8 @@ export const authTokens = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     tokenHash: text("token_hash").notNull().unique(),
     kind: authTokenKind("kind").notNull(),
+    /** The address a pending email change will switch to. */
+    pendingEmail: text("pending_email"),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     usedAt: timestamp("used_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
