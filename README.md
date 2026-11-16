@@ -111,7 +111,7 @@ Copy `.env.example` to `.env`. The important variables:
 |---|---|
 | `DATABASE_URL` | PostgreSQL connection string |
 | `SESSION_SECRET` | 32+ random characters used to encrypt session cookies |
-| `APP_URL` | Public origin fallback for email links and CORS when `RAILWAY_PUBLIC_DOMAIN` is unset |
+| `APP_URL` | Local development origin fallback for email links. Railway sets `RAILWAY_PUBLIC_DOMAIN` in production |
 | `RESEND_API_KEY` | Resend API key used for verification, reset, and invitation emails |
 | `RESEND_FROM_EMAIL` | Sender identity, for example `Roots <hello@your-domain.tld>` |
 | `S3_ENDPOINT` | S3 API endpoint |
@@ -121,11 +121,11 @@ Copy `.env.example` to `.env`. The important variables:
 | `S3_SECRET_ACCESS_KEY` | Bucket secret |
 | `S3_FORCE_PATH_STYLE` | `true` for local s3rver, `false` for Railway buckets |
 
-`CORS_ORIGINS` can hold extra comma-separated origins for `pnpm storage:cors`.
+`CORS_ORIGINS` can hold extra comma-separated origins for `pnpm storage:cors`. Production does not need it: `RAILWAY_PUBLIC_DOMAIN` supplies the public origin.
 
 `RESEND_API_KEY` and `RESEND_FROM_EMAIL` are optional in development. Without a key, verification, reset, and invitation emails are printed to the server console instead of being sent, so the flows still work locally. In production the sender domain must be verified in Resend first.
 
-On Railway, email links and invite links use `RAILWAY_PUBLIC_DOMAIN` (the assigned public domain, custom domains included) before falling back to `APP_URL`. `pnpm storage:cors` also includes that domain automatically when the variable is present.
+On Railway, `RAILWAY_PUBLIC_DOMAIN` is the source of truth for the public origin, so email links, invite links, and bucket CORS all use it (`family-tree.page` in production). `APP_URL` is only a local fallback.
 
 ## How media works
 
@@ -174,13 +174,15 @@ S3_FORCE_PATH_STYLE=false
 
 `railway.json` configures the build, start command, health check, and the `pnpm db:migrate` pre-deploy command.
 
-After the first domain is assigned, apply bucket CORS:
+After a domain is assigned, apply bucket CORS with the production credentials:
 
 ```bash
-APP_URL=https://your-domain.tld pnpm storage:cors
+railway run --service roots-web pnpm storage:cors
 ```
 
-For local development against the same bucket, add localhost origins through `CORS_ORIGINS`.
+The script reads `RAILWAY_PUBLIC_DOMAIN` from the service, so the bucket always allows the live domain. Localhost origins are included by default.
+
+For local development against the same bucket, add extra origins through `CORS_ORIGINS`.
 
 ## Scripts
 
