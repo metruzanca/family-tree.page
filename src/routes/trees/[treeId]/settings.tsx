@@ -25,6 +25,7 @@ import {
   requireUserPage,
 } from "~/api";
 import type { TreeRole } from "~/server/guards";
+import { AppErrorBoundary } from "~/components/app/AppErrorBoundary";
 import { AppHeader } from "~/components/app/AppHeader";
 import { Avatar } from "~/components/ui/Avatar";
 import { Badge } from "~/components/ui/badge";
@@ -33,7 +34,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/com
 import { ConfirmDialog } from "~/components/ui/ConfirmDialog";
 import { Field } from "~/components/ui/Field";
 import { IconButton } from "~/components/ui/icon-button";
-import { LoadingScreen } from "~/components/ui/Loading";
 import {
   Select,
   SelectContent,
@@ -51,6 +51,7 @@ import {
 } from "~/components/ui/tabs";
 import { useToast } from "~/components/ui/Toast";
 import { formatRelative, roleLabel } from "~/lib/format";
+import { attemptAction } from "~/lib/action-result";
 import { track } from "~/lib/analytics";
 
 const roleOptions: { value: TreeRole; label: string }[] = [
@@ -75,9 +76,19 @@ export const route = {
 
 export default function TreeSettingsPage() {
   return (
-    <Show when={true} fallback={<LoadingScreen />}>
+    <AppErrorBoundary
+      title="We could not load tree settings"
+      message="The tree may be temporarily unavailable. Try again in a moment."
+      revalidateKeys={[
+        requireUserPage.key,
+        overviewQuery.key,
+        membersQuery.key,
+        invitesQuery.key,
+      ]}
+      back={{ href: "/trees", label: "Back to your trees" }}
+    >
       <TreeSettingsInner />
-    </Show>
+    </AppErrorBoundary>
   );
 }
 
@@ -162,11 +173,13 @@ function TreeSettingsInner() {
     event.preventDefault();
     if (saving()) return;
     setSaving(true);
-    const result = await updateTree({
-      treeId: params.treeId,
-      name: name(),
-      description: description(),
-    });
+    const result = await attemptAction(() =>
+      updateTree({
+        treeId: params.treeId,
+        name: name(),
+        description: description(),
+      }),
+    );
     setSaving(false);
     if (!result.ok) {
       toast.show(result.error, "error");
@@ -177,7 +190,9 @@ function TreeSettingsInner() {
   }
 
   async function changeRole(userId: string, role: TreeRole) {
-    const result = await updateMemberRole({ treeId: params.treeId, userId, role });
+    const result = await attemptAction(() =>
+      updateMemberRole({ treeId: params.treeId, userId, role }),
+    );
     if (!result.ok) {
       toast.show(result.error, "error");
       return;
@@ -194,12 +209,14 @@ function TreeSettingsInner() {
       return;
     }
     setCreatingInvite(true);
-    const result = await createInvite({
-      treeId: params.treeId,
-      role: inviteRole(),
-      expiresInDays: inviteDays(),
-      email,
-    });
+    const result = await attemptAction(() =>
+      createInvite({
+        treeId: params.treeId,
+        role: inviteRole(),
+        expiresInDays: inviteDays(),
+        email,
+      }),
+    );
     setCreatingInvite(false);
     if (!result.ok) {
       toast.show(result.error, "error");
@@ -233,7 +250,9 @@ function TreeSettingsInner() {
   async function sendInviteAgain(inviteId: string) {
     if (resendingId()) return;
     setResendingId(inviteId);
-    const result = await resendInvite({ treeId: params.treeId, inviteId });
+    const result = await attemptAction(() =>
+      resendInvite({ treeId: params.treeId, inviteId }),
+    );
     setResendingId(null);
     if (!result.ok) {
       toast.show(result.error, "error");
@@ -270,12 +289,14 @@ function TreeSettingsInner() {
     setPending(true);
     try {
       if (action.kind === "remove") {
-        const result = await removeMember({ treeId: params.treeId, userId: action.userId });
+        const result = await attemptAction(() =>
+          removeMember({ treeId: params.treeId, userId: action.userId }),
+        );
         if (!result.ok) return toast.show(result.error, "error");
         await revalidate([membersQuery.key, overviewQuery.key]);
         toast.show("Member removed.", "success");
       } else if (action.kind === "leave") {
-        const result = await leaveTree(params.treeId);
+        const result = await attemptAction(() => leaveTree(params.treeId));
         if (!result.ok) return toast.show(result.error, "error");
         await revalidate(getMyTrees.key);
         track("tree_left");
@@ -283,7 +304,7 @@ function TreeSettingsInner() {
         navigate("/trees");
         return;
       } else if (action.kind === "delete") {
-        const result = await deleteTree(params.treeId);
+        const result = await attemptAction(() => deleteTree(params.treeId));
         if (!result.ok) return toast.show(result.error, "error");
         await revalidate(getMyTrees.key);
         track("tree_deleted");
@@ -291,7 +312,9 @@ function TreeSettingsInner() {
         navigate("/trees");
         return;
       } else if (action.kind === "revoke") {
-        const result = await revokeInvite({ treeId: params.treeId, inviteId: action.inviteId });
+        const result = await attemptAction(() =>
+          revokeInvite({ treeId: params.treeId, inviteId: action.inviteId }),
+        );
         if (!result.ok) return toast.show(result.error, "error");
         setInviteRows(rows =>
           rows?.map(row =>

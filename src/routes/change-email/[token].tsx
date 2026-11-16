@@ -3,11 +3,13 @@ import { Match, Show, Switch, createSignal } from "solid-js";
 import { CircleAlert, Clock, MailCheck, ShieldCheck } from "lucide-solid";
 import { getEmailChangePreview, getUser, getPendingEmailChange, logout } from "~/api";
 import { confirmEmailChange } from "~/api/account-server";
+import { AppErrorBoundary } from "~/components/app/AppErrorBoundary";
 import { BrandMark } from "~/components/app/AppHeader";
 import { Alert, AlertDescription } from "~/components/ui/alert";
 import { Button, buttonVariants } from "~/components/ui/button";
 import { Card } from "~/components/ui/card";
 import { Skeleton } from "~/components/ui/skeleton";
+import { attemptAction } from "~/lib/action-result";
 
 export const route = {
   preload: ({ params }: { params: { token: string } }) =>
@@ -15,6 +17,19 @@ export const route = {
 };
 
 export default function ChangeEmailPage() {
+  return (
+    <AppErrorBoundary
+      title="We could not check this link"
+      message="The link may still be good. Try again, or request a new change from account settings."
+      revalidateKeys={[getEmailChangePreview.key, getUser.key]}
+      back={{ href: "/settings", label: "Account settings" }}
+    >
+      <ChangeEmailInner />
+    </AppErrorBoundary>
+  );
+}
+
+function ChangeEmailInner() {
   const params = useParams<{ token: string }>();
   const preview = createAsync(() => getEmailChangePreview(params.token));
   const user = createAsync(() => getUser());
@@ -30,7 +45,7 @@ export default function ChangeEmailPage() {
     if (pending()) return;
     setPending(true);
     setError("");
-    const result = await confirmEmailChange(params.token);
+    const result = await attemptAction(() => confirmEmailChange(params.token));
     setPending(false);
     if (!result.ok) {
       setError(result.error);

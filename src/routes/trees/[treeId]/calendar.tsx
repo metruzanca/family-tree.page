@@ -2,6 +2,7 @@ import { Show, Suspense } from "solid-js";
 import { A, createAsync, useParams } from "@solidjs/router";
 import { CalendarPlus, Network } from "lucide-solid";
 import { getTreeGraph, requireUserPage } from "~/api";
+import { AppErrorBoundary } from "~/components/app/AppErrorBoundary";
 import { AppHeader } from "~/components/app/AppHeader";
 import { TreeCalendar } from "~/components/calendar/TreeCalendar";
 import { buttonVariants } from "~/components/ui/button";
@@ -17,7 +18,14 @@ export const route = {
 export default function TreeCalendarPage() {
   return (
     <Suspense fallback={<LoadingScreen />}>
-      <TreeCalendarInner />
+      <AppErrorBoundary
+        title="We could not load this calendar"
+        message="The tree may be temporarily unavailable. Try again in a moment."
+        revalidateKeys={[requireUserPage.key, getTreeGraph.key]}
+        back={{ href: "/trees", label: "Back to your trees" }}
+      >
+        <TreeCalendarInner />
+      </AppErrorBoundary>
     </Suspense>
   );
 }

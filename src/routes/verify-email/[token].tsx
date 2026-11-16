@@ -2,6 +2,7 @@ import { A, createAsync, useParams } from "@solidjs/router";
 import { Match, Switch, Show } from "solid-js";
 import { CircleCheck, Clock } from "lucide-solid";
 import { getUser, verifyEmail } from "~/api";
+import { AppErrorBoundary } from "~/components/app/AppErrorBoundary";
 import { BrandMark } from "~/components/app/AppHeader";
 import { buttonVariants } from "~/components/ui/button";
 import { Card } from "~/components/ui/card";
@@ -12,6 +13,19 @@ export const route = {
 };
 
 export default function VerifyEmailPage() {
+  return (
+    <AppErrorBoundary
+      title="We could not check this link"
+      message="The link may still be good. Try again, or request a new one from account settings."
+      revalidateKeys={[verifyEmail.key, getUser.key]}
+      back={{ href: "/login", label: "Back to sign in" }}
+    >
+      <VerifyEmailInner />
+    </AppErrorBoundary>
+  );
+}
+
+function VerifyEmailInner() {
   const params = useParams<{ token: string }>();
   const result = createAsync(() => verifyEmail(params.token));
   const user = createAsync(() => getUser());

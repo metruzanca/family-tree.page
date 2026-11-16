@@ -18,6 +18,7 @@ import {
   updateFileTakenAt,
 } from "~/api/files-server";
 import { getMyTrees, getTreeGraph, getTreeOverview } from "~/api";
+import { AppErrorBoundary } from "~/components/app/AppErrorBoundary";
 import { GraphView, type GraphHandle } from "~/components/graph/GraphView";
 import { GraphToolbar } from "~/components/graph/GraphToolbar";
 import { GraphSearch } from "~/components/graph/GraphSearch";
@@ -31,6 +32,7 @@ import { Alert, AlertDescription, AlertTitle } from "~/components/ui/alert";
 import { Button } from "~/components/ui/button";
 import { useToast } from "~/components/ui/Toast";
 import { uploadPersonFile } from "~/lib/upload";
+import { attemptAction, friendlyMessage } from "~/lib/action-result";
 import { fileNodeId, groupNodeId, type GenerationDirection } from "~/lib/graph";
 import { analyzeRelationships, type RelationshipConflict } from "~/lib/relationships";
 import { track } from "~/lib/analytics";
@@ -43,7 +45,15 @@ export const route = {
 export default function TreePage() {
   return (
     <Suspense fallback={<GraphLoading />}>
-      <TreePageInner />
+      <AppErrorBoundary
+        title="We could not load this tree"
+        message="The tree may be temporarily unavailable. Try again, or head back to your trees."
+        variant="graph"
+        revalidateKeys={[getTreeGraph.key, getTreeOverview.key, getMyTrees.key]}
+        back={{ href: "/trees", label: "Back to your trees" }}
+      >
+        <TreePageInner />
+      </AppErrorBoundary>
     </Suspense>
   );
 }
@@ -272,11 +282,13 @@ function TreePageInner() {
         month: "short",
         day: "numeric",
       }).format(new Date())}`;
-      const groupResult = await createFileGroup({
-        treeId: params.treeId,
-        personId: person.id,
-        name: albumName,
-      });
+      const groupResult = await attemptAction(() =>
+        createFileGroup({
+          treeId: params.treeId,
+          personId: person.id,
+          name: albumName,
+        }),
+      );
       if (!groupResult.ok) {
         toast.show(groupResult.error, "error");
         return;
@@ -304,12 +316,14 @@ function TreePageInner() {
         }
         uploaded += 1;
       }
+    } catch (error) {
+      toast.show(friendlyMessage(error), "error");
     } finally {
       setUploading(false);
       setUploadProgress(0);
     }
     if (!uploaded && groupId) {
-      await deleteFileGroup(groupId);
+      await attemptAction(() => deleteFileGroup(groupId));
     }
     await revalidate([getTreeGraph.key, getTreeOverview.key, getMyTrees.key]);
     if (uploaded) {
@@ -324,7 +338,9 @@ function TreePageInner() {
   }
 
   async function handleSetAvatar(personId: string, fileId: string | null) {
-    const result = await setAvatar({ treeId: params.treeId, personId, fileId });
+    const result = await attemptAction(() =>
+      setAvatar({ treeId: params.treeId, personId, fileId }),
+    );
     if (!result.ok) {
       toast.show(result.error, "error");
       return;
@@ -336,7 +352,9 @@ function TreePageInner() {
 
   async function handleSaveTags(fileId: string, personIds: string[]) {
     setTagPending(true);
-    const result = await updateFileTags({ treeId: params.treeId, fileId, personIds });
+    const result = await attemptAction(() =>
+      updateFileTags({ treeId: params.treeId, fileId, personIds }),
+    );
     setTagPending(false);
     if (!result.ok) {
       toast.show(result.error, "error");
@@ -349,7 +367,9 @@ function TreePageInner() {
 
   async function handleSetTakenAt(fileId: string, value: string | null) {
     setTakenAtPending(true);
-    const result = await updateFileTakenAt({ treeId: params.treeId, fileId, takenAt: value });
+    const result = await attemptAction(() =>
+      updateFileTakenAt({ treeId: params.treeId, fileId, takenAt: value }),
+    );
     setTakenAtPending(false);
     if (!result.ok) {
       toast.show(result.error, "error");
@@ -364,7 +384,7 @@ function TreePageInner() {
     const file = deleteFileTarget();
     if (!file) return;
     setPendingDelete(true);
-    const result = await deleteFile({ treeId: params.treeId, fileId: file.id });
+    const result = await attemptAction(() => deleteFile({ treeId: params.treeId, fileId: file.id }));
     setPendingDelete(false);
     if (!result.ok) {
       toast.show(result.error, "error");
@@ -388,7 +408,7 @@ function TreePageInner() {
     const group = deleteGroupTarget();
     if (!group) return;
     setPendingDelete(true);
-    const result = await deleteFileGroup(group.id);
+    const result = await attemptAction(() => deleteFileGroup(group.id));
     setPendingDelete(false);
     if (!result.ok) {
       toast.show(result.error, "error");
@@ -404,7 +424,7 @@ function TreePageInner() {
   async function handleRenameGroup(name: string) {
     const group = effectiveGroup();
     if (!group) return;
-    const result = await renameFileGroup({ groupId: group.id, name });
+    const result = await attemptAction(() => renameFileGroup({ groupId: group.id, name }));
     if (!result.ok) {
       toast.show(result.error, "error");
       return;
@@ -418,7 +438,9 @@ function TreePageInner() {
     const person = selectedPerson();
     if (!person) return;
     setPendingDelete(true);
-    const result = await deletePerson({ treeId: params.treeId, personId: person.id });
+    const result = await attemptAction(() =>
+      deletePerson({ treeId: params.treeId, personId: person.id }),
+    );
     setPendingDelete(false);
     if (!result.ok) {
       toast.show(result.error, "error");
@@ -432,10 +454,11 @@ function TreePageInner() {
   }
 
   async function handleRemoveRelationship(relationship: GraphRelationship) {
-    const result =
+    const result = await attemptAction(() =>
       relationship.type === "parent"
-        ? await deleteParentChild({ treeId: params.treeId, relationshipId: relationship.id })
-        : await deletePartnership({ treeId: params.treeId, relationshipId: relationship.id });
+        ? deleteParentChild({ treeId: params.treeId, relationshipId: relationship.id })
+        : deletePartnership({ treeId: params.treeId, relationshipId: relationship.id }),
+    );
     if (!result.ok) {
       toast.show(result.error, "error");
       return;

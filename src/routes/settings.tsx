@@ -26,13 +26,13 @@ import {
 } from "~/api/account-server";
 import { createCalendarFeed, disableCalendarFeed } from "~/api/calendar-server";
 import { getCalendarFeed, getPendingEmailChange, getUser, requireUserPage } from "~/api";
+import { AppErrorBoundary } from "~/components/app/AppErrorBoundary";
 import { AppHeader } from "~/components/app/AppHeader";
 import { VerifyEmailNotice } from "~/components/auth/VerifyEmailNotice";
 import { Button, buttonVariants } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { ConfirmDialog } from "~/components/ui/ConfirmDialog";
 import { Field } from "~/components/ui/Field";
-import { LoadingScreen } from "~/components/ui/Loading";
 import { Modal } from "~/components/ui/Modal";
 import { formatRelative } from "~/lib/format";
 import {
@@ -44,6 +44,7 @@ import {
   SwitchThumb,
 } from "~/components/ui/switch";
 import { useToast } from "~/components/ui/Toast";
+import { attemptAction } from "~/lib/action-result";
 import { track } from "~/lib/analytics";
 
 export const route = {
@@ -56,9 +57,19 @@ export const route = {
 
 export default function AccountSettingsPage() {
   return (
-    <Show when={true} fallback={<LoadingScreen />}>
+    <AppErrorBoundary
+      title="We could not load your account settings"
+      message="Your data is safe. Try again in a moment."
+      revalidateKeys={[
+        requireUserPage.key,
+        getUser.key,
+        getCalendarFeed.key,
+        getPendingEmailChange.key,
+      ]}
+      back={{ href: "/trees", label: "Back to your trees" }}
+    >
       <AccountSettingsInner />
-    </Show>
+    </AppErrorBoundary>
   );
 }
 
@@ -108,7 +119,7 @@ function AccountSettingsInner() {
     event.preventDefault();
     if (profilePending()) return;
     setProfilePending(true);
-    const result = await updateProfile({ displayName: displayName() });
+    const result = await attemptAction(() => updateProfile({ displayName: displayName() }));
     setProfilePending(false);
     if (!result.ok) {
       toast.show(result.error, "error");
@@ -122,10 +133,12 @@ function AccountSettingsInner() {
     event.preventDefault();
     if (passwordPending()) return;
     setPasswordPending(true);
-    const result = await changePassword({
-      currentPassword: currentPassword(),
-      newPassword: newPassword(),
-    });
+    const result = await attemptAction(() =>
+      changePassword({
+        currentPassword: currentPassword(),
+        newPassword: newPassword(),
+      }),
+    );
     setPasswordPending(false);
     if (!result.ok) {
       toast.show(result.error, "error");
@@ -145,11 +158,13 @@ function AccountSettingsInner() {
     const next = { ...previous, [key]: value };
     setNotifications(next);
     setNotificationsPending(true);
-    const result = await updateNotificationSettings({
-      notifyBirthdayWeekBefore: next.weekBefore,
-      notifyBirthdayDayBefore: next.dayBefore,
-      notifyBirthdayDayOf: next.dayOf,
-    });
+    const result = await attemptAction(() =>
+      updateNotificationSettings({
+        notifyBirthdayWeekBefore: next.weekBefore,
+        notifyBirthdayDayBefore: next.dayBefore,
+        notifyBirthdayDayOf: next.dayOf,
+      }),
+    );
     setNotificationsPending(false);
     if (!result.ok) {
       setNotifications(previous);
@@ -171,8 +186,9 @@ function AccountSettingsInner() {
   async function applyFeedChange(kind: "create" | "rotate" | "disable") {
     if (feedPending()) return;
     setFeedPending(true);
-    const result =
-      kind === "disable" ? await disableCalendarFeed() : await createCalendarFeed();
+    const result = await attemptAction(() =>
+      kind === "disable" ? disableCalendarFeed() : createCalendarFeed(),
+    );
     setFeedPending(false);
     if (!result.ok) {
       toast.show(result.error, "error");
@@ -195,10 +211,12 @@ function AccountSettingsInner() {
     event.preventDefault();
     if (emailPending()) return;
     setEmailPending(true);
-    const result = await requestEmailChange({
-      newEmail: newEmail(),
-      currentPassword: emailPassword(),
-    });
+    const result = await attemptAction(() =>
+      requestEmailChange({
+        newEmail: newEmail(),
+        currentPassword: emailPassword(),
+      }),
+    );
     setEmailPending(false);
     if (!result.ok) {
       toast.show(result.error, "error");
@@ -221,7 +239,7 @@ function AccountSettingsInner() {
   }
 
   async function cancelPendingEmail() {
-    const result = await cancelEmailChange();
+    const result = await attemptAction(() => cancelEmailChange());
     if (!result.ok) {
       toast.show(result.error, "error");
       return;
@@ -234,10 +252,12 @@ function AccountSettingsInner() {
     event.preventDefault();
     if (deletePending()) return;
     setDeletePending(true);
-    const result = await deleteAccount({
-      password: deletePassword(),
-      confirmation: deleteConfirmation(),
-    });
+    const result = await attemptAction(() =>
+      deleteAccount({
+        password: deletePassword(),
+        confirmation: deleteConfirmation(),
+      }),
+    );
     setDeletePending(false);
     if (!result.ok) {
       toast.show(result.error, "error");

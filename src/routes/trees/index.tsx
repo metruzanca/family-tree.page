@@ -2,6 +2,7 @@ import { A, createAsync } from "@solidjs/router";
 import { For, Show, createSignal } from "solid-js";
 import { ArrowUpRight, CalendarDays, Plus, Sprout, Users } from "lucide-solid";
 import { getMyTrees, requireUserPage } from "~/api";
+import { AppErrorBoundary } from "~/components/app/AppErrorBoundary";
 import { AppHeader } from "~/components/app/AppHeader";
 import { VerifyEmailNotice } from "~/components/auth/VerifyEmailNotice";
 import { CreateTreeDialog } from "~/components/trees/CreateTreeDialog";
@@ -19,6 +20,19 @@ export const route = {
 };
 
 export default function TreesPage() {
+  return (
+    <AppErrorBoundary
+      title="We could not load your trees"
+      message="Your groves are still safe. The connection to the server may have dropped."
+      revalidateKeys={[requireUserPage.key, getMyTrees.key]}
+      back={{ href: "/", label: "Back home" }}
+    >
+      <TreesInner />
+    </AppErrorBoundary>
+  );
+}
+
+function TreesInner() {
   const user = createAsync(() => requireUserPage());
   const trees = createAsync(() => getMyTrees());
   const [creating, setCreating] = createSignal(false);

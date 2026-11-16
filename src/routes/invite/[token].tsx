@@ -3,12 +3,13 @@ import { Match, Show, Switch, createSignal } from "solid-js";
 import { ArrowRight, Clock, Leaf, LockKeyhole } from "lucide-solid";
 import { getInvitePreview, getUser, getMyTrees } from "~/api";
 import { acceptInvite } from "~/api/trees-server";
+import { AppErrorBoundary } from "~/components/app/AppErrorBoundary";
 import { BrandMark } from "~/components/app/AppHeader";
 import { Button, buttonVariants } from "~/components/ui/button";
 import { Card } from "~/components/ui/card";
 import { Skeleton } from "~/components/ui/skeleton";
-import { LoadingScreen } from "~/components/ui/Loading";
 import { useToast } from "~/components/ui/Toast";
+import { attemptAction } from "~/lib/action-result";
 import { formatDate, roleLabel } from "~/lib/format";
 import { track } from "~/lib/analytics";
 
@@ -18,9 +19,14 @@ export const route = {
 
 export default function InvitePage() {
   return (
-    <Show when={true} fallback={<LoadingScreen />}>
+    <AppErrorBoundary
+      title="We could not check this invite"
+      message="The link may still be good. Try again, or ask the tree owner for a new one."
+      revalidateKeys={[getInvitePreview.key, getUser.key]}
+      back={{ href: "/trees", label: "Go to your trees" }}
+    >
       <InviteInner />
-    </Show>
+    </AppErrorBoundary>
   );
 }
 
@@ -36,7 +42,7 @@ function InviteInner() {
   async function join() {
     if (pending()) return;
     setPending(true);
-    const result = await acceptInvite(params.token);
+    const result = await attemptAction(() => acceptInvite(params.token));
     setPending(false);
     if (!result.ok) {
       toast.show(result.error, "error");

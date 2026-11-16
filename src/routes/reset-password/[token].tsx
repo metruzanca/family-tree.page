@@ -2,6 +2,7 @@ import { A, createAsync, useParams, useSubmission } from "@solidjs/router";
 import { Show } from "solid-js";
 import { CircleAlert, Clock, LockKeyhole } from "lucide-solid";
 import { AuthLayout } from "~/components/auth/AuthLayout";
+import { AppErrorBoundary } from "~/components/app/AppErrorBoundary";
 import { Alert, AlertDescription } from "~/components/ui/alert";
 import { Button, buttonVariants } from "~/components/ui/button";
 import { Card } from "~/components/ui/card";
@@ -15,6 +16,19 @@ export const route = {
 };
 
 export default function ResetPasswordPage() {
+  return (
+    <AppErrorBoundary
+      title="We could not check this link"
+      message="The link may still be good. Try again, or request a new one."
+      revalidateKeys={[getPasswordResetPreview.key]}
+      back={{ href: "/forgot-password", label: "Request a new link" }}
+    >
+      <ResetPasswordInner />
+    </AppErrorBoundary>
+  );
+}
+
+function ResetPasswordInner() {
   const params = useParams<{ token: string }>();
   const preview = createAsync(() => getPasswordResetPreview(params.token));
   const submission = useSubmission(resetPassword);
