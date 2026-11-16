@@ -1,5 +1,5 @@
 {
-  "name": "roots",
+  "name": "family-tree",
   "type": "module",
   "private": true,
   "packageManager": "pnpm@11.22.0",

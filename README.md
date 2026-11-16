@@ -1,4 +1,4 @@
-# Roots
+# family-tree
 
 A private, collaborative family tree built around an interactive graph of people, relationships, and the photographs and documents attached to them.
 
@@ -64,8 +64,8 @@ Open <http://localhost:3000>.
 The seed account is:
 
 ```text
-demo@roots.local
-roots-demo-12345
+demo@family-tree.local
+family-tree-demo-12345
 ```
 
 The dev server binds to `0.0.0.0`, so a phone on the same Tailscale network can open `http://<tailnet-host>:3000`.
@@ -117,7 +117,7 @@ Copy `.env.example` to `.env`. The important variables:
 | `SESSION_SECRET` | 32+ random characters used to encrypt session cookies |
 | `APP_URL` | Local development origin fallback for email links. Railway sets `RAILWAY_PUBLIC_DOMAIN` in production |
 | `RESEND_API_KEY` | Resend API key used for verification, reset, invitation, and birthday emails |
-| `RESEND_FROM_EMAIL` | Sender identity, for example `Roots <hello@your-domain.tld>` |
+| `RESEND_FROM_EMAIL` | Sender identity, for example `family-tree <hello@your-domain.tld>` |
 | `BIRTHDAY_EMAILS` | Set to `off` to disable the birthday email scheduler, or `on` to enable it in development |
 | `BIRTHDAY_EMAIL_HOUR_UTC` | UTC hour after which birthday emails are sent each day, default `8` |
 | `S3_ENDPOINT` | S3 API endpoint |
@@ -151,7 +151,7 @@ The bucket stays private. Browsers never receive storage credentials. SVG, HTML,
 ## How presence works
 
 1. The browser opens `wss://<host>/presence?treeId=...` with `@solid-primitives/websocket`, which buffers the first focus message and reconnects with a fixed delay after deploys, sleeps, and network drops.
-2. Nitro's WebSocket route in `server/routes/presence.ts` unseals the same `roots_session` cookie SolidStart uses and checks tree membership before the upgrade completes. Because the session is a sealed cookie with no server-side state, reconnects survive deploys.
+2. Nitro's WebSocket route in `server/routes/presence.ts` unseals the same `family_tree_session` cookie SolidStart uses and checks tree membership before the upgrade completes. Because the session is a sealed cookie with no server-side state, reconnects survive deploys.
 3. Each socket joins a namespace per tree and a presence topic. The client sends `{ type: "focus", nodeId }` when the open person, file, or album changes; the server broadcasts a full snapshot of who is present and what each peer has open.
 4. The avatar stack dedupes by user, and each avatar is outlined in that person's presence color. The graph draws one ring per connected tab plus a name tag in the same color. Colors come from a matte palette keyed by user id, so renaming a person does not change their color.
 
@@ -185,7 +185,7 @@ SESSION_SECRET=<generate with: openssl rand -base64 48>
 APP_URL=https://<your-railway-domain>
 HOST=0.0.0.0
 RESEND_API_KEY=<from the Resend dashboard>
-RESEND_FROM_EMAIL=Roots <hello@your-domain.tld>
+RESEND_FROM_EMAIL=family-tree <hello@your-domain.tld>
 S3_ENDPOINT=${{BucketName.ENDPOINT}}
 S3_REGION=${{BucketName.REGION}}
 S3_BUCKET=${{BucketName.BUCKET}}
@@ -201,7 +201,7 @@ UMAMI_WEBSITE_ID=<optional Umami website ID>
 After a domain is assigned, apply bucket CORS with the production credentials:
 
 ```bash
-railway run --service roots-web pnpm storage:cors
+railway run --service family-tree-web pnpm storage:cors
 ```
 
 The script reads `RAILWAY_PUBLIC_DOMAIN` from the service, so the bucket always allows the live domain. Localhost origins are included by default.

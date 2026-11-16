@@ -17,22 +17,22 @@ describe("email templates", () => {
   it("includes the verification link in html and text", () => {
     const message = verifyEmailMessage({
       name: "Sam",
-      url: "https://roots.test/verify-email/abc",
+      url: "https://family-tree.test/verify-email/abc",
       expiresInHours: 24,
     });
     expect(message.subject).toContain("Verify");
-    expect(message.html).toContain("https://roots.test/verify-email/abc");
-    expect(message.text).toContain("https://roots.test/verify-email/abc");
+    expect(message.html).toContain("https://family-tree.test/verify-email/abc");
+    expect(message.text).toContain("https://family-tree.test/verify-email/abc");
     expect(message.text).toContain("24 hours");
   });
 
   it("includes the reset link and warns about the short lifetime", () => {
     const message = passwordResetMessage({
       name: "Sam",
-      url: "https://roots.test/reset-password/abc",
+      url: "https://family-tree.test/reset-password/abc",
       expiresInMinutes: 60,
     });
-    expect(message.html).toContain("https://roots.test/reset-password/abc");
+    expect(message.html).toContain("https://family-tree.test/reset-password/abc");
     expect(message.text).toContain("60 minutes");
   });
 
@@ -48,14 +48,14 @@ describe("email templates", () => {
           age: 35,
         },
       ],
-      url: "https://roots.test/trees",
+      url: "https://family-tree.test/trees",
     });
     expect(message.subject).toContain("this week");
     expect(message.html).toContain("&lt;Mia&gt; Simpson");
     expect(message.html).toContain("&quot;Simpson&quot;");
     expect(message.html).toContain("turns 35 on April 27");
     expect(message.text).toContain("Mia");
-    expect(message.text).toContain("https://roots.test/trees");
+    expect(message.text).toContain("https://family-tree.test/trees");
   });
 
   it("uses a plural subject for several birthdays", () => {
@@ -66,7 +66,7 @@ describe("email templates", () => {
         { personName: "Mia", treeName: "Family", date: "April 27", age: 35 },
         { personName: "Leo", treeName: "Family", date: "April 27", age: 31 },
       ],
-      url: "https://roots.test/trees",
+      url: "https://family-tree.test/trees",
     });
     expect(message.subject).toContain("2 birthdays today");
     expect(message.html).toContain("Birthdays today");
@@ -77,7 +77,7 @@ describe("email templates", () => {
       treeName: '<b>The "Simpson" family</b>',
       inviterName: "Sam <sam@example.com>",
       role: "editor",
-      url: "https://roots.test/invite/abc",
+      url: "https://family-tree.test/invite/abc",
       expiresAt: new Date("2030-01-01T00:00:00Z"),
     });
     expect(message.subject).toContain("invited you to");
@@ -85,6 +85,6 @@ describe("email templates", () => {
     expect(message.html).not.toContain("<b>The");
     expect(message.html).toContain("&lt;b&gt;The");
     expect(message.text).toContain("editor");
-    expect(message.text).toContain("https://roots.test/invite/abc");
+    expect(message.text).toContain("https://family-tree.test/invite/abc");
   });
 });

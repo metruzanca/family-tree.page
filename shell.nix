@@ -10,7 +10,7 @@ pkgs.mkShell {
   ];
 
   shellHook = ''
-    echo "Roots dev shell: Node $(node --version), pnpm $(pnpm --version), Postgres $(postgres --version | cut -d' ' -f3)"
+    echo "family-tree dev shell: Node $(node --version), pnpm $(pnpm --version), Postgres $(postgres --version | cut -d' ' -f3)"
     echo "Run: pnpm dev:services"
   '';
 }

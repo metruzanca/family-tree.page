@@ -46,7 +46,7 @@ export function VerifyEmailNotice(props: { email: string; class?: string }) {
         <p class="text-sm font-semibold">Confirm your email address</p>
         <p class="mt-0.5 text-xs leading-relaxed text-muted-foreground">
           We sent a link to <span class="font-medium text-foreground">{props.email}</span>. Confirm
-          it to send invitations by email. You can keep using Roots in the meantime.
+          it to send invitations by email. You can keep using family-tree in the meantime.
         </p>
       </div>
       <Button type="button" variant="secondary" size="sm" onClick={resend} disabled={pending()}>

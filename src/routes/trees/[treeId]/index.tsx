@@ -166,10 +166,10 @@ function TreePageInner() {
   }
 
   onMount(() => {
-    const storedLayout = localStorage.getItem("roots-layout");
+    const storedLayout = localStorage.getItem("family-tree-layout");
     if (storedLayout === "freeform") setLayout("freeform");
-    if (localStorage.getItem("roots-media") === "off") setShowMedia(false);
-    if (localStorage.getItem("roots-generation-direction") === "oldest-bottom") {
+    if (localStorage.getItem("family-tree-media") === "off") setShowMedia(false);
+    if (localStorage.getItem("family-tree-generation-direction") === "oldest-bottom") {
       setGenerationDirection("oldest-bottom");
     }
 
@@ -243,20 +243,20 @@ function TreePageInner() {
   function toggleMedia() {
     const next = !showMedia();
     setShowMedia(next);
-    localStorage.setItem("roots-media", next ? "on" : "off");
+    localStorage.setItem("family-tree-media", next ? "on" : "off");
   }
 
   function toggleLayout() {
     const next = layout() === "generations" ? "freeform" : "generations";
     setLayout(next);
-    localStorage.setItem("roots-layout", next);
+    localStorage.setItem("family-tree-layout", next);
   }
 
   function flipGenerationDirection() {
     const next =
       generationDirection() === "oldest-top" ? "oldest-bottom" : "oldest-top";
     setGenerationDirection(next);
-    localStorage.setItem("roots-generation-direction", next);
+    localStorage.setItem("family-tree-generation-direction", next);
   }
 
   async function handleUpload(files: File[]) {

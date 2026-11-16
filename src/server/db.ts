@@ -3,10 +3,10 @@ import { Pool } from "pg";
 import * as schema from "../../drizzle/schema";
 import { env } from "./config";
 
-const globalForDb = globalThis as unknown as { rootsPool?: Pool };
+const globalForDb = globalThis as unknown as { familyTreePool?: Pool };
 
 export const pool =
-  globalForDb.rootsPool ??
+  globalForDb.familyTreePool ??
   new Pool({
     connectionString: env("DATABASE_URL"),
     max: 10,
@@ -14,7 +14,7 @@ export const pool =
   });
 
 if (process.env.NODE_ENV !== "production") {
-  globalForDb.rootsPool = pool;
+  globalForDb.familyTreePool = pool;
 }
 
 pool.on("error", error => {

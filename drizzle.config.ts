@@ -11,7 +11,7 @@ export default defineConfig({
   schema: "./drizzle/schema.ts",
   out: "./drizzle/migrations",
   dbCredentials: {
-    url: process.env.DATABASE_URL ?? "postgresql://roots:roots@localhost:5432/roots",
+    url: process.env.DATABASE_URL ?? "postgresql://family_tree:family_tree@localhost:5432/family_tree",
   },
   strict: true,
   verbose: true,

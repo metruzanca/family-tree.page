@@ -30,7 +30,7 @@ export function AuthLayout(props: {
                 <path d="M32 39c-7 0-12 4-14 10 7 1 12-3 14-10Z" fill="#bf6247" />
               </svg>
             </span>
-            <span class="font-display text-2xl tracking-tight">Roots</span>
+            <span class="font-display text-2xl tracking-tight">family-tree</span>
           </A>
         </div>
         <div class="relative max-w-lg">
@@ -58,7 +58,7 @@ export function AuthLayout(props: {
                 <path d="M32 29c0-8 6-14 14-14 0 8-6 14-14 14Z" fill="#8fa98f" />
               </svg>
             </span>
-            <span class="font-display text-xl">Roots</span>
+            <span class="font-display text-xl">family-tree</span>
           </A>
           <IconButton
             label={theme() === "dark" ? "Switch to light theme" : "Switch to dark theme"}

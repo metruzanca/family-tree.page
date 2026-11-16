@@ -33,7 +33,7 @@ start_postgres() {
 
   if [ ! -f "$PGDATA/PG_VERSION" ]; then
     echo "Initializing local Postgres in $PGDATA"
-    initdb -D "$PGDATA" -U roots --auth=trust --locale=C --encoding=UTF8 > .dev/initdb.log 2>&1
+    initdb -D "$PGDATA" -U family_tree --auth=trust --locale=C --encoding=UTF8 > .dev/initdb.log 2>&1
   fi
 
   if ! pg_ctl -D "$PGDATA" status >/dev/null 2>&1; then
@@ -44,11 +44,11 @@ start_postgres() {
     echo "Postgres already running"
   fi
 
-  createdb -h 127.0.0.1 -p "$PGPORT" -U roots roots 2>/dev/null || true
+  createdb -h 127.0.0.1 -p "$PGPORT" -U family_tree family_tree 2>/dev/null || true
 }
 
 start_storage() {
-  if curl -fsS -o /dev/null "http://127.0.0.1:$S3_PORT/roots/" 2>/dev/null; then
+  if curl -fsS -o /dev/null "http://127.0.0.1:$S3_PORT/family-tree/" 2>/dev/null; then
     echo "Local S3 already running on port $S3_PORT"
     return
   fi
@@ -58,7 +58,7 @@ start_storage() {
   echo $! > "$S3_PID_FILE"
 
   for _ in $(seq 1 30); do
-    if curl -fsS -o /dev/null "http://127.0.0.1:$S3_PORT/roots/" 2>/dev/null; then
+    if curl -fsS -o /dev/null "http://127.0.0.1:$S3_PORT/family-tree/" 2>/dev/null; then
       return
     fi
     sleep 0.2
@@ -99,7 +99,7 @@ status_all() {
     echo "Postgres: stopped"
   fi
 
-  if curl -fsS -o /dev/null "http://127.0.0.1:$S3_PORT/roots/" 2>/dev/null; then
+  if curl -fsS -o /dev/null "http://127.0.0.1:$S3_PORT/family-tree/" 2>/dev/null; then
     echo "Local S3: running on port $S3_PORT"
   else
     echo "Local S3: stopped"

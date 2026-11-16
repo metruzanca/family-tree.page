@@ -63,7 +63,7 @@ function layout(input: LayoutInput) {
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:${BRAND.paper};border:1px solid ${BRAND.line};border-radius:18px;overflow:hidden;">
             <tr>
               <td style="padding:22px 28px;background:${BRAND.ink};color:${BRAND.cream};font-family:Georgia,'Times New Roman',serif;font-size:20px;letter-spacing:0.4px;">
-                Roots
+                family-tree
               </td>
             </tr>
             <tr>
@@ -85,7 +85,7 @@ function layout(input: LayoutInput) {
             <tr>
               <td style="padding:0 28px 28px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
                 <div style="border-top:1px solid ${BRAND.line};padding-top:16px;font-size:12px;line-height:1.6;color:${BRAND.muted};">
-                  ${escapeHtml(input.signOff ?? "Roots is a private place for family trees. Be careful with links from this email.")}
+                  ${escapeHtml(input.signOff ?? "A private place for family trees. Be careful with links from this email.")}
                 </div>
               </td>
             </tr>
@@ -103,9 +103,9 @@ export function verifyEmailMessage(input: {
   expiresInHours: number;
 }): EmailMessage {
   return {
-    subject: "Verify your email for Roots",
+    subject: "Verify your email for family-tree",
     html: layout({
-      preheader: "Confirm your email address to finish setting up Roots.",
+      preheader: "Confirm your email address to finish setting up family-tree.",
       heading: "Confirm your email",
       paragraphs: [
         `Hi ${escapeHtml(input.name)},`,
@@ -113,7 +113,7 @@ export function verifyEmailMessage(input: {
       ],
       ctaLabel: "Verify my email",
       ctaUrl: input.url,
-      footnote: `This link works once and expires in ${input.expiresInHours} hours. If you did not create a Roots account, you can ignore this email.`,
+      footnote: `This link works once and expires in ${input.expiresInHours} hours. If you did not create a family-tree account, you can ignore this email.`,
     }),
     text: [
       `Hi ${input.name},`,
@@ -122,7 +122,7 @@ export function verifyEmailMessage(input: {
       "",
       input.url,
       "",
-      `This link works once and expires in ${input.expiresInHours} hours. If you did not create a Roots account, you can ignore this email.`,
+      `This link works once and expires in ${input.expiresInHours} hours. If you did not create a family-tree account, you can ignore this email.`,
     ].join("\n"),
   };
 }
@@ -133,23 +133,23 @@ export function passwordResetMessage(input: {
   expiresInMinutes: number;
 }): EmailMessage {
   return {
-    subject: "Reset your Roots password",
+    subject: "Reset your family-tree password",
     html: layout({
       preheader: "Use this link to choose a new password.",
       heading: "Choose a new password",
       paragraphs: [
         `Hi ${escapeHtml(input.name)},`,
-        "Someone asked to reset the password for your Roots account. Choose a new one with the button below.",
+        "Someone asked to reset the password for your family-tree account. Choose a new one with the button below.",
       ],
       ctaLabel: "Reset my password",
       ctaUrl: input.url,
       footnote: `This link works once and expires in ${input.expiresInMinutes} minutes. If you did not ask for a reset, ignore this email and your password stays the same.`,
-      signOff: "Reset links are sensitive. Nobody at Roots will ever ask you for a password or a reset link.",
+      signOff: "Reset links are sensitive. Nobody at family-tree will ever ask you for a password or a reset link.",
     }),
     text: [
       `Hi ${input.name},`,
       "",
-      "Someone asked to reset the password for your Roots account. Choose a new one with the link below.",
+      "Someone asked to reset the password for your family-tree account. Choose a new one with the link below.",
       "",
       input.url,
       "",
@@ -185,8 +185,8 @@ export function birthdayMessage(input: {
         : "Birthdays this week";
   const subject =
     input.entries.length === 1
-      ? `A birthday ${when} on Roots`
-      : `${input.entries.length} birthdays ${when} on Roots`;
+      ? `A birthday ${when} on family-tree`
+      : `${input.entries.length} birthdays ${when} on family-tree`;
 
   const listItems = input.entries.map(entry => {
     const name = escapeHtml(entry.personName);
@@ -226,7 +226,7 @@ export function birthdayMessage(input: {
       ctaLabel: "Open your trees",
       ctaUrl: input.url,
       footnote:
-        "You are receiving this because birthday reminders are on in your Roots account. You can change them any time in Account settings.",
+        "You are receiving this because birthday reminders are on in your family-tree account. You can change them any time in Account settings.",
     }),
     text: [
       `Hi ${input.name},`,
@@ -237,7 +237,7 @@ export function birthdayMessage(input: {
       "",
       input.url,
       "",
-      "You are receiving this because birthday reminders are on in your Roots account. You can change them any time in Account settings.",
+      "You are receiving this because birthday reminders are on in your family-tree account. You can change them any time in Account settings.",
     ].join("\n"),
   };
 }
@@ -259,13 +259,13 @@ export function inviteMessage(input: {
   const inviterName = escapeHtml(input.inviterName);
 
   return {
-    subject: subjectLine(`${input.inviterName} invited you to ${input.treeName} on Roots`),
+    subject: subjectLine(`${input.inviterName} invited you to ${input.treeName} on family-tree`),
     html: layout({
       preheader: `${input.inviterName} invited you to join ${input.treeName} as ${role}.`,
       heading: `Join ${treeName}`,
       paragraphs: [
         `${inviterName} invited you to help grow the family tree <strong style="color:${BRAND.ink};">${treeName}</strong> as ${role}.`,
-        "Roots keeps your family's people, photographs, and documents in one private graph. You can sign in or create an account when you open the link.",
+        "Your family's people, photographs, and documents stay in one private graph. You can sign in or create an account when you open the link.",
       ],
       ctaLabel: "Open the invitation",
       ctaUrl: input.url,
@@ -274,7 +274,7 @@ export function inviteMessage(input: {
     text: [
       `${input.inviterName} invited you to help grow the family tree "${input.treeName}" as ${role}.`,
       "",
-      "Roots keeps your family's people, photographs, and documents in one private graph. You can sign in or create an account when you open the link.",
+      "Your family's people, photographs, and documents stay in one private graph. You can sign in or create an account when you open the link.",
       "",
       input.url,
       "",

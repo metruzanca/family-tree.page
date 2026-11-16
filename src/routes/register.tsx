@@ -20,7 +20,7 @@ export default function RegisterPage() {
 
   return (
     <AuthLayout
-      title="Plant your roots"
+      title="Start your family tree"
       subtitle="Create an account to start a family tree or accept an invitation to one."
       notice={invited() ? "Create an account, then you can accept the invitation." : undefined}
       footer={

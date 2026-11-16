@@ -10,10 +10,10 @@ import { createPresignedPost } from "@aws-sdk/s3-presigned-post";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { env, optionalEnv } from "./config";
 
-const globalForS3 = globalThis as unknown as { rootsS3?: S3Client };
+const globalForS3 = globalThis as unknown as { familyTreeS3?: S3Client };
 
 export const s3 =
-  globalForS3.rootsS3 ??
+  globalForS3.familyTreeS3 ??
   new S3Client({
     endpoint: env("S3_ENDPOINT"),
     region: optionalEnv("S3_REGION", "auto"),
@@ -25,7 +25,7 @@ export const s3 =
   });
 
 if (process.env.NODE_ENV !== "production") {
-  globalForS3.rootsS3 = s3;
+  globalForS3.familyTreeS3 = s3;
 }
 
 export const bucket = () => env("S3_BUCKET");

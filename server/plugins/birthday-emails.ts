@@ -5,8 +5,8 @@ const CHECK_INTERVAL_MS = 60 * 60 * 1000;
 const STARTUP_DELAY_MS = 30_000;
 
 type BirthdaySchedulerGlobal = typeof globalThis & {
-  __rootsBirthdayTimer?: ReturnType<typeof setInterval>;
-  __rootsBirthdayRunning?: boolean;
+  __familyTreeBirthdayTimer?: ReturnType<typeof setInterval>;
+  __familyTreeBirthdayRunning?: boolean;
 };
 
 /**
@@ -23,7 +23,7 @@ export default definePlugin(nitroApp => {
   }
 
   const global = globalThis as BirthdaySchedulerGlobal;
-  if (global.__rootsBirthdayTimer) return;
+  if (global.__familyTreeBirthdayTimer) return;
 
   const configuredHour = Number(process.env.BIRTHDAY_EMAIL_HOUR_UTC ?? "8");
   const targetHour =
@@ -32,9 +32,9 @@ export default definePlugin(nitroApp => {
       : 8;
 
   async function tick() {
-    if (global.__rootsBirthdayRunning) return;
+    if (global.__familyTreeBirthdayRunning) return;
     if (new Date().getUTCHours() < targetHour) return;
-    global.__rootsBirthdayRunning = true;
+    global.__familyTreeBirthdayRunning = true;
     try {
       const summary = await sendBirthdayNotifications();
       if (summary.emailsSent || summary.emailsFailed) {
@@ -45,7 +45,7 @@ export default definePlugin(nitroApp => {
     } catch (error) {
       console.error("Birthday email run failed", error);
     } finally {
-      global.__rootsBirthdayRunning = false;
+      global.__familyTreeBirthdayRunning = false;
     }
   }
 
@@ -58,12 +58,12 @@ export default definePlugin(nitroApp => {
 
   startup.unref?.();
   timer.unref?.();
-  global.__rootsBirthdayTimer = timer;
+  global.__familyTreeBirthdayTimer = timer;
 
   nitroApp.hooks.hook("close", () => {
     clearTimeout(startup);
     clearInterval(timer);
-    delete global.__rootsBirthdayTimer;
-    delete global.__rootsBirthdayRunning;
+    delete global.__familyTreeBirthdayTimer;
+    delete global.__familyTreeBirthdayRunning;
   });
 });

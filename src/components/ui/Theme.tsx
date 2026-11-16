@@ -17,7 +17,7 @@ export function ThemeProvider(props: { children: JSX.Element }) {
   const [theme, setThemeSignal] = createSignal<Theme>("light");
 
   onMount(() => {
-    const stored = localStorage.getItem("roots-theme");
+    const stored = localStorage.getItem("family-tree-theme");
     const initial: Theme =
       stored === "dark" || stored === "light"
         ? stored
@@ -30,7 +30,7 @@ export function ThemeProvider(props: { children: JSX.Element }) {
 
   function setTheme(next: Theme) {
     setThemeSignal(next);
-    localStorage.setItem("roots-theme", next);
+    localStorage.setItem("family-tree-theme", next);
     apply(next);
   }
 

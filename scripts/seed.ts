@@ -36,7 +36,7 @@ function hashPassword(password: string) {
 }
 
 try {
-  const email = "demo@roots.local";
+  const email = "demo@family-tree.local";
   let user = (await db.select().from(users).where(eq(users.email, email)).limit(1))[0];
   if (!user) {
     [user] = await db
@@ -44,7 +44,7 @@ try {
       .values({
         email,
         displayName: "Demo Simpson",
-        passwordHash: await hashPassword("roots-demo-12345"),
+        passwordHash: await hashPassword("family-tree-demo-12345"),
         emailVerifiedAt: new Date(),
       })
       .returning();
@@ -200,7 +200,7 @@ try {
     { treeId: tree.id, parentId: marge.id, childId: maggie.id },
   ]);
 
-  console.log(`Seeded tree ${tree.id} for demo@roots.local (password: roots-demo-12345)`);
+  console.log(`Seeded tree ${tree.id} for demo@family-tree.local (password: family-tree-demo-12345)`);
 } finally {
   await pool.end();
 }

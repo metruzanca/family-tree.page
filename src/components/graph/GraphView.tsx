@@ -768,7 +768,7 @@ export function GraphView(props: GraphViewProps) {
         link.kind === "parent" ? colors.parentStep : "rgba(0,0,0,0)",
       )
       .onEngineStop(() => {
-        if (import.meta.env.DEV) (window as any).__rootsStoppedAt = Date.now();
+        if (import.meta.env.DEV) (window as any).__familyTreeStoppedAt = Date.now();
         packComponentBands();
         snapPartnerRows();
         updateHoverAt(pointer.x, pointer.y);
@@ -790,8 +790,8 @@ export function GraphView(props: GraphViewProps) {
     graph.graphData({ nodes: model.nodes, links: model.links });
     snapPartnerRows();
     if (import.meta.env.DEV) {
-      (window as any).__rootsGraph = graph;
-      (window as any).__rootsNodes = () =>
+      (window as any).__familyTreeGraph = graph;
+      (window as any).__familyTreeNodes = () =>
         graph.graphData().nodes.map((node: GraphNode) => ({
           id: node.id,
           kind: node.kind,

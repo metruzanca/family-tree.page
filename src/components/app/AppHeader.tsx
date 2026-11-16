@@ -27,7 +27,7 @@ export function BrandMark(props: { compact?: boolean }) {
         </svg>
       </span>
       <span class={`font-display text-xl tracking-tight ${props.compact ? "hidden sm:inline" : ""}`}>
-        Roots
+        family-tree
       </span>
     </A>
   );
