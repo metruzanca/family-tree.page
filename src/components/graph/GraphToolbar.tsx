@@ -3,6 +3,7 @@ import { Show, type JSX } from "solid-js";
 import {
   ArrowDownUp,
   ArrowLeft,
+  CalendarDays,
   Image as ImageIcon,
   ImageOff,
   Maximize2,
@@ -21,6 +22,7 @@ import type { PresencePeer, PresenceStatus } from "~/lib/presence-protocol";
 import type { TreeRole } from "~/server/guards";
 import { roleLabel } from "~/lib/format";
 import { PresenceBar } from "../presence/PresenceBar";
+import { TreeViewTabs } from "../trees/TreeViewTabs";
 import { Badge } from "./../ui/badge";
 import { Kbd } from "./../ui/kbd";
 import {
@@ -82,6 +84,10 @@ export function GraphToolbar(props: ToolbarProps) {
           >
             {roleLabel(props.role)}
           </Badge>
+        </div>
+
+        <div class="hidden sm:block">
+          <TreeViewTabs treeId={props.treeId} active="graph" />
         </div>
 
         <PresenceBar
@@ -194,6 +200,14 @@ export function GraphToolbar(props: ToolbarProps) {
                 <RotateCcw />
               </GlassItem>
               <DropdownMenuSeparator class="my-1 bg-white/10" />
+              <DropdownMenuItem
+                as={A}
+                href={`/trees/${props.treeId}/calendar`}
+                class="gap-2 rounded-xl px-3 py-2 text-white/80 data-[highlighted]:bg-white/10 data-[highlighted]:text-white"
+              >
+                <CalendarDays />
+                Calendar
+              </DropdownMenuItem>
               <DropdownMenuItem
                 as={A}
                 href={`/trees/${props.treeId}/settings`}
