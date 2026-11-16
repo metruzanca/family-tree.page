@@ -43,7 +43,7 @@ export default function RegisterPage() {
               id="displayName"
               name="displayName"
               class="input"
-              placeholder="Sam Zanca"
+              placeholder="Bart Simpson"
               autocomplete="name"
               required
               autofocus

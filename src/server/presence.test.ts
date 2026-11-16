@@ -8,7 +8,7 @@ const PERSON = "33333333-3333-4333-8333-333333333333";
 const demo = {
   peerId: "peer-demo",
   userId: "user-demo",
-  displayName: "Demo Zanca",
+  displayName: "Demo Simpson",
   nodeId: null,
 };
 

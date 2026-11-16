@@ -16,8 +16,8 @@ function person(overrides: Partial<GraphPerson> & { id: string }): GraphPerson {
   return {
     id: overrides.id,
     firstName: overrides.firstName ?? overrides.id,
-    lastName: overrides.lastName ?? "Zanca",
-    displayName: overrides.displayName ?? `${overrides.firstName ?? overrides.id} Zanca`,
+    lastName: overrides.lastName ?? "Simpson",
+    displayName: overrides.displayName ?? `${overrides.firstName ?? overrides.id} Simpson`,
     maidenName: null,
     nickname: null,
     birthDate: overrides.birthDate ?? null,
@@ -67,8 +67,8 @@ describe("calendar helpers", () => {
 
   it("lists only living people with known birthdays, soonest first", () => {
     const people = [
-      person({ id: "mia", displayName: "Mia Zanca", birthDate: "1991-04-27" }),
-      person({ id: "sam", displayName: "Sam Zanca", birthDate: "1988-04-20" }),
+      person({ id: "mia", displayName: "Mia Simpson", birthDate: "1991-04-27" }),
+      person({ id: "sam", displayName: "Sam Simpson", birthDate: "1988-04-20" }),
       person({ id: "giuseppe", birthDate: "1928-04-21", deathDate: "2004-11-02" }),
       person({ id: "unknown" }),
     ];

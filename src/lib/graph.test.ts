@@ -16,7 +16,7 @@ import {
 } from "./graph";
 import type { GraphPerson, GraphRelationship, TreeGraph } from "../api/people-server";
 
-function person(id: string, firstName = id, lastName = "Zanca"): GraphPerson {
+function person(id: string, firstName = id, lastName = "Simpson"): GraphPerson {
   return {
     id,
     firstName,

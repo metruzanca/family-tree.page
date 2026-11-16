@@ -42,8 +42,8 @@ describe("email templates", () => {
       kind: "week_before",
       entries: [
         {
-          personName: "<Mia> Zanca",
-          treeName: 'The "Zanca" family',
+          personName: "<Mia> Simpson",
+          treeName: 'The "Simpson" family',
           date: "April 27",
           age: 35,
         },
@@ -51,8 +51,8 @@ describe("email templates", () => {
       url: "https://roots.test/trees",
     });
     expect(message.subject).toContain("this week");
-    expect(message.html).toContain("&lt;Mia&gt; Zanca");
-    expect(message.html).toContain("&quot;Zanca&quot;");
+    expect(message.html).toContain("&lt;Mia&gt; Simpson");
+    expect(message.html).toContain("&quot;Simpson&quot;");
     expect(message.html).toContain("turns 35 on April 27");
     expect(message.text).toContain("Mia");
     expect(message.text).toContain("https://roots.test/trees");
@@ -74,7 +74,7 @@ describe("email templates", () => {
 
   it("escapes tree names and inviter names in invitations", () => {
     const message = inviteMessage({
-      treeName: '<b>The "Zanca" family</b>',
+      treeName: '<b>The "Simpson" family</b>',
       inviterName: "Sam <sam@example.com>",
       role: "editor",
       url: "https://roots.test/invite/abc",
