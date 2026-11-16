@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { emailSchema, parentChildSchema, personSchema, registerSchema } from "./validation";
+import {
+  emailSchema,
+  forgotPasswordSchema,
+  inviteEmailSchema,
+  parentChildSchema,
+  personSchema,
+  registerSchema,
+  resetPasswordSchema,
+} from "./validation";
 
 describe("validation", () => {
   it("normalizes email addresses", () => {
@@ -43,5 +51,31 @@ describe("validation", () => {
       childId: "00000000-0000-4000-8000-000000000002",
     });
     expect(parsed.parentType).toBe("biological");
+  });
+
+  it("normalizes invite email addresses", () => {
+    expect(inviteEmailSchema.parse(" Cousin@Example.COM ")).toBe("cousin@example.com");
+    expect(inviteEmailSchema.safeParse("not-an-email").success).toBe(false);
+  });
+
+  it("requires a valid email for a password reset request", () => {
+    expect(forgotPasswordSchema.safeParse({ email: "sam@example.com" }).success).toBe(true);
+    expect(forgotPasswordSchema.safeParse({ email: "nope" }).success).toBe(false);
+  });
+
+  it("requires matching passwords when resetting", () => {
+    const base = {
+      token: "abc123",
+      password: "a-long-new-password",
+      confirmPassword: "a-long-new-password",
+    };
+    expect(resetPasswordSchema.safeParse(base).success).toBe(true);
+    expect(
+      resetPasswordSchema.safeParse({ ...base, confirmPassword: "something-else" }).success,
+    ).toBe(false);
+    expect(
+      resetPasswordSchema.safeParse({ ...base, password: "short", confirmPassword: "short" })
+        .success,
+    ).toBe(false);
   });
 });

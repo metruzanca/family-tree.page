@@ -5,6 +5,7 @@ import { redirect } from "@solidjs/router";
 import { db } from "../server/db";
 import { users } from "../../drizzle/schema";
 import {
+  bumpSessionVersion,
   checkRateLimit,
   clearRateLimit,
   endSession,
@@ -14,17 +15,23 @@ import {
   hashPassword,
   requireUser,
   sanitizeRedirect,
+  sendPasswordResetEmail,
+  sendVerificationEmail,
   startSession,
   toPublicUser,
+  verifyEmailToken,
   verifyPassword,
 } from "../server/auth-service";
-import { runAction, type ActionResult } from "../server/errors";
+import { AppError, runAction, type ActionResult } from "../server/errors";
 import {
   changePasswordSchema,
+  forgotPasswordSchema,
   loginSchema,
   registerSchema,
+  resetPasswordSchema,
   updateProfileSchema,
 } from "../server/validation";
+import { markTokenUsed, validateAuthToken } from "../server/tokens";
 import type { PublicUser } from "../server/auth-service";
 
 export async function getUser(): Promise<PublicUser | null> {
@@ -84,8 +91,105 @@ export async function register(formData: FormData) {
     return new Error("Could not create your account. Please try again.");
   }
 
+  try {
+    const sent = await sendVerificationEmail(user);
+    if (!sent.delivered && !sent.simulated) {
+      console.warn(`Verification email for ${email} was not delivered; the user can resend it later.`);
+    }
+  } catch (error) {
+    console.error("Could not send the verification email", error);
+  }
+
   await startSession(user.id);
   throw redirect(sanitizeRedirect(redirectTo, "/trees"));
+}
+
+export async function requestPasswordReset(formData: FormData) {
+  const parsed = forgotPasswordSchema.safeParse({ email: formData.get("email") });
+  if (!parsed.success) return new Error(parsed.error.issues[0]?.message ?? "Enter your email.");
+  const { email } = parsed.data;
+
+  if (!checkRateLimit("forgot-password", email, 5, 60 * 60_000)) {
+    return new Error("Too many reset emails requested. Try again in an hour.");
+  }
+
+  const user = await findUserByEmail(email);
+  if (user) {
+    try {
+      const sent = await sendPasswordResetEmail(user);
+      if (!sent.delivered && !sent.simulated) {
+        console.warn(`Password reset email for ${email} was not delivered.`);
+      }
+    } catch (error) {
+      console.error("Could not send the password reset email", error);
+    }
+  }
+
+  // Always the same response, whether or not the address has an account.
+  return { sent: true };
+}
+
+export async function resetPassword(formData: FormData) {
+  const parsed = resetPasswordSchema.safeParse({
+    token: formData.get("token"),
+    password: formData.get("password"),
+    confirmPassword: formData.get("confirmPassword"),
+  });
+  if (!parsed.success) return new Error(parsed.error.issues[0]?.message ?? "Check your details.");
+  const { token, password } = parsed.data;
+
+  if (!checkRateLimit("reset-password", "reset", 15, 15 * 60_000)) {
+    return new Error("Too many attempts. Wait a few minutes and try again.");
+  }
+
+  const state = await validateAuthToken(token, "password_reset");
+  if (state.status !== "ok") {
+    if (state.status === "expired") {
+      return new Error("This reset link has expired. Request a new one.");
+    }
+    if (state.status === "used") return new Error("This reset link has already been used.");
+    return new Error("That reset link is not valid.");
+  }
+
+  const user = await findUserById(state.userId);
+  if (!user) return new Error("That reset link is not valid.");
+
+  const passwordHash = await hashPassword(password);
+  const claimed = await markTokenUsed(state.tokenId);
+  if (!claimed) return new Error("This reset link has already been used.");
+  await db
+    .update(users)
+    .set({ passwordHash, updatedAt: new Date() })
+    .where(eq(users.id, user.id));
+  await bumpSessionVersion(user.id);
+  clearRateLimit("forgot-password", user.email);
+  await startSession(user.id);
+  throw redirect("/trees");
+}
+
+export async function resendVerificationEmail(): Promise<
+  ActionResult<{ delivered: boolean; simulated: boolean }>
+> {
+  return runAction(async () => {
+    const current = await requireUser();
+    if (current.emailVerified) throw new AppError("Your email is already verified.");
+    if (!checkRateLimit("verification-email", current.email, 3, 60 * 60_000)) {
+      throw new AppError("We just sent a few links. Try again in an hour.");
+    }
+    const user = await findUserById(current.id);
+    if (!user) throw new AppError("Account not found.");
+    const result = await sendVerificationEmail(user);
+    return { delivered: result.delivered, simulated: Boolean(result.simulated) };
+  });
+}
+
+export async function verifyEmail(token: string) {
+  return verifyEmailToken(token);
+}
+
+export async function getPasswordResetPreview(token: string) {
+  const state = await validateAuthToken(token, "password_reset");
+  return { status: state.status };
 }
 
 export async function logout() {
@@ -126,6 +230,9 @@ export async function changePassword(input: {
       .update(users)
       .set({ passwordHash, updatedAt: new Date() })
       .where(eq(users.id, user.id));
+    // Changing a password signs out every other device.
+    await bumpSessionVersion(user.id);
+    await startSession(user.id);
     return undefined;
   });
 }

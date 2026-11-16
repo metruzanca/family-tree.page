@@ -65,6 +65,14 @@ export default function LoginPage() {
               required
             />
           </Field>
+          <div class="-mt-2 text-right">
+            <A
+              href="/forgot-password"
+              class="text-xs font-semibold text-primary underline decoration-primary/30 underline-offset-4"
+            >
+              Forgot your password?
+            </A>
+          </div>
           <Show when={error()}>
             <Alert variant="destructive" class="rounded-xl py-2.5">
               <CircleAlert />

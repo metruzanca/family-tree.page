@@ -3,6 +3,7 @@ import { For, Show, createSignal } from "solid-js";
 import { ArrowUpRight, Plus, Sprout, Users } from "lucide-solid";
 import { getMyTrees, requireUserPage } from "~/api";
 import { AppHeader } from "~/components/app/AppHeader";
+import { VerifyEmailNotice } from "~/components/auth/VerifyEmailNotice";
 import { CreateTreeDialog } from "~/components/trees/CreateTreeDialog";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -37,6 +38,9 @@ export default function TreesPage() {
               }
             />
             <main class="mx-auto max-w-7xl px-4 pb-20 pt-10 sm:px-6">
+              <Show when={!currentUser().emailVerified}>
+                <VerifyEmailNotice email={currentUser().email} class="mb-8" />
+              </Show>
               <section class="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
                 <div>
                   <p class="eyebrow mb-2">Your groves</p>

@@ -15,6 +15,13 @@
       "when": 1794772744305,
       "tag": "0001_odd_lockheed",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794786722266,
+      "tag": "0002_brainy_gauntlet",
+      "breakpoints": true
     }
   ]
 }

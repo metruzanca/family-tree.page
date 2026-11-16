@@ -1,9 +1,10 @@
 import { Show, createEffect, createSignal } from "solid-js";
 import { createAsync, revalidate } from "@solidjs/router";
-import { KeyRound, UserRound } from "lucide-solid";
+import { CircleCheck, KeyRound, UserRound } from "lucide-solid";
 import { changePassword, updateProfile } from "~/api/auth-server";
 import { getUser, requireUserPage } from "~/api";
 import { AppHeader } from "~/components/app/AppHeader";
+import { VerifyEmailNotice } from "~/components/auth/VerifyEmailNotice";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Field } from "~/components/ui/Field";
@@ -113,6 +114,17 @@ function AccountSettingsInner() {
                   >
                     <input id="account-email" class="input" value={current().email} disabled />
                   </Field>
+                  <Show
+                    when={!current().emailVerified}
+                    fallback={
+                      <p class="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <CircleCheck size={14} class="text-primary" />
+                        Your email address is confirmed.
+                      </p>
+                    }
+                  >
+                    <VerifyEmailNotice email={current().email} />
+                  </Show>
                   <Button type="submit" disabled={profilePending()}>
                     {profilePending() ? "Saving…" : "Save profile"}
                   </Button>
@@ -160,13 +172,16 @@ function AccountSettingsInner() {
                   <Button type="submit" disabled={passwordPending()}>
                     {passwordPending() ? "Changing…" : "Change password"}
                   </Button>
+                  <p class="text-xs leading-relaxed text-muted-foreground">
+                    Changing your password signs out every other device.
+                  </p>
                 </form>
               </CardContent>
             </Card>
 
             <p class="mt-6 text-center text-xs leading-relaxed text-muted-foreground">
-              Password reset by email is not available yet. If you forget your password, there is no
-              self-service recovery in this version.
+              Forgot your password? Sign out and choose “Forgot your password?” on the sign-in page
+              to get a reset link by email.
             </p>
           </main>
         </div>

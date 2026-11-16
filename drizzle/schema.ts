@@ -34,15 +34,37 @@ export const partnershipStatus = pgEnum("partnership_status", [
 ]);
 export const fileKind = pgEnum("file_kind", ["image", "document", "other"]);
 export const fileStatus = pgEnum("file_status", ["uploading", "ready", "failed"]);
+export const authTokenKind = pgEnum("auth_token_kind", [
+  "email_verification",
+  "password_reset",
+]);
 
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
   email: text("email").notNull().unique(),
   displayName: text("display_name").notNull(),
   passwordHash: text("password_hash").notNull(),
+  emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
+  sessionVersion: integer("session_version").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+export const authTokens = pgTable(
+  "auth_tokens",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    tokenHash: text("token_hash").notNull().unique(),
+    kind: authTokenKind("kind").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  t => [index("auth_tokens_user_kind_idx").on(t.userId, t.kind)],
+);
 
 export const trees = pgTable("trees", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -81,14 +103,16 @@ export const treeInvites = pgTable(
       .references(() => trees.id, { onDelete: "cascade" }),
     tokenHash: text("token_hash").notNull().unique(),
     role: treeRole("role").notNull().default("editor"),
+    email: text("email"),
     createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
     acceptedBy: uuid("accepted_by").references(() => users.id, { onDelete: "set null" }),
     acceptedAt: timestamp("accepted_at", { withTimezone: true }),
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  t => [index("tree_invites_tree_idx").on(t.treeId)],
+  t => [index("tree_invites_tree_idx").on(t.treeId), index("tree_invites_email_idx").on(t.treeId, t.email)],
 );
 
 export const people = pgTable(
@@ -246,8 +270,10 @@ export const files = pgTable(
 );
 
 export type User = typeof users.$inferSelect;
+export type AuthToken = typeof authTokens.$inferSelect;
 export type Tree = typeof trees.$inferSelect;
 export type TreeMember = typeof treeMembers.$inferSelect;
+export type TreeInvite = typeof treeInvites.$inferSelect;
 export type Person = typeof people.$inferSelect;
 export type ParentChild = typeof parentChild.$inferSelect;
 export type Partnership = typeof partnerships.$inferSelect;

@@ -18,8 +18,9 @@ The graph is the main view. People are nodes, parent and partner relationships a
 ## Features in this version
 
 - Email and password accounts with encrypted session cookies
+- Email verification, password reset by email, and session invalidation on password changes
 - Private family trees with owner, editor, and viewer roles
-- Link-based invites with expiry and single use
+- Invites by copyable link or by email, with expiry and single use
 - People, parent-child relationships, and partnerships
 - Generation-aware force graph with a freeform layout toggle
 - Static generation bands: parents and children stay in ordered rows, with no node dragging
@@ -84,7 +85,9 @@ Copy `.env.example` to `.env`. The important variables:
 |---|---|
 | `DATABASE_URL` | PostgreSQL connection string |
 | `SESSION_SECRET` | 32+ random characters used to encrypt session cookies |
-| `APP_URL` | Public origin fallback for invite links and CORS when `RAILWAY_PUBLIC_DOMAIN` is unset |
+| `APP_URL` | Public origin fallback for email links and CORS when `RAILWAY_PUBLIC_DOMAIN` is unset |
+| `RESEND_API_KEY` | Resend API key used for verification, reset, and invitation emails |
+| `RESEND_FROM_EMAIL` | Sender identity, for example `Roots <hello@your-domain.tld>` |
 | `S3_ENDPOINT` | S3 API endpoint |
 | `S3_REGION` | Bucket region |
 | `S3_BUCKET` | Bucket name |
@@ -94,7 +97,9 @@ Copy `.env.example` to `.env`. The important variables:
 
 `CORS_ORIGINS` can hold extra comma-separated origins for `pnpm storage:cors`.
 
-On Railway, invite links use `RAILWAY_PUBLIC_DOMAIN` (the assigned public domain, custom domains included) before falling back to `APP_URL`. `pnpm storage:cors` also includes that domain automatically when the variable is present.
+`RESEND_API_KEY` and `RESEND_FROM_EMAIL` are optional in development. Without a key, verification, reset, and invitation emails are printed to the server console instead of being sent, so the flows still work locally. In production the sender domain must be verified in Resend first.
+
+On Railway, email links and invite links use `RAILWAY_PUBLIC_DOMAIN` (the assigned public domain, custom domains included) before falling back to `APP_URL`. `pnpm storage:cors` also includes that domain automatically when the variable is present.
 
 ## How media works
 
@@ -131,6 +136,8 @@ DATABASE_URL=${{Postgres.DATABASE_URL}}
 SESSION_SECRET=<generate with: openssl rand -base64 48>
 APP_URL=https://<your-railway-domain>
 HOST=0.0.0.0
+RESEND_API_KEY=<from the Resend dashboard>
+RESEND_FROM_EMAIL=Roots <hello@your-domain.tld>
 S3_ENDPOINT=${{BucketName.ENDPOINT}}
 S3_REGION=${{BucketName.REGION}}
 S3_BUCKET=${{BucketName.BUCKET}}
@@ -193,7 +200,7 @@ The interface uses [shadcn-solid](https://shadcn-solid.com) components on top of
 
 ## Known limitations
 
-- No email verification, password reset, or email invites yet. Invite links are shared manually.
+- Email addresses cannot be changed yet.
 - No realtime co-editing. Presence is live, but the graph still refreshes after changes.
 - Presence is held in the app process. It works as-is on a single Railway replica. Running more than one replica needs a shared presence store, such as Redis or Postgres `LISTEN`/`NOTIFY`.
 - HEIC photos work only when the browser can decode them; otherwise the user is asked to export as JPEG.

@@ -18,9 +18,11 @@ import {
   type TreeRole,
 } from "../server/guards";
 import { AppError, runAction, type ActionResult } from "../server/errors";
-import { inviteSchema, treeRoleSchema, treeSchema } from "../server/validation";
+import { inviteEmailSchema, inviteSchema, treeRoleSchema, treeSchema } from "../server/validation";
 import { deletePrefix, TREE_PREFIX } from "../server/storage";
 import { publicOrigin } from "../server/config";
+import { sendEmail } from "../server/email";
+import { inviteMessage } from "../server/email-templates";
 
 export type TreeSummary = {
   id: string;
@@ -239,6 +241,8 @@ export async function leaveTree(treeId: string): Promise<ActionResult<undefined>
 export type InviteView = {
   id: string;
   role: TreeRole;
+  email: string | null;
+  sentAt: Date | null;
   createdAt: Date;
   expiresAt: Date;
   revokedAt: Date | null;
@@ -252,6 +256,8 @@ export async function getTreeInvites(treeId: string): Promise<InviteView[]> {
     .select({
       id: treeInvites.id,
       role: treeInvites.role,
+      email: treeInvites.email,
+      sentAt: treeInvites.sentAt,
       createdAt: treeInvites.createdAt,
       expiresAt: treeInvites.expiresAt,
       revokedAt: treeInvites.revokedAt,
@@ -263,33 +269,194 @@ export async function getTreeInvites(treeId: string): Promise<InviteView[]> {
     .orderBy(desc(treeInvites.createdAt));
 }
 
+export type CreatedInvite = {
+  id: string;
+  url: string;
+  expiresAt: Date;
+  role: TreeRole;
+  email: string | null;
+  emailSent: boolean;
+  emailSimulated: boolean;
+  emailError?: string;
+};
+
+async function issueInvite(input: {
+  treeId: string;
+  role: TreeRole;
+  email: string | null;
+  expiresInDays: number;
+  createdBy: string;
+  inviterName: string;
+  treeName: string;
+}) {
+  const token = randomBytes(32).toString("base64url");
+  const tokenHash = hashInviteToken(token);
+  const expiresAt = new Date(Date.now() + input.expiresInDays * 24 * 60 * 60_000);
+
+  const invite = await db.transaction(async tx => {
+    if (input.email) {
+      // Only the newest pending invite for an address stays usable.
+      await tx
+        .update(treeInvites)
+        .set({ revokedAt: new Date() })
+        .where(
+          and(
+            eq(treeInvites.treeId, input.treeId),
+            eq(treeInvites.email, input.email),
+            isNull(treeInvites.acceptedAt),
+            isNull(treeInvites.revokedAt),
+            gt(treeInvites.expiresAt, new Date()),
+          ),
+        );
+    }
+
+    const [created] = await tx
+      .insert(treeInvites)
+      .values({
+        treeId: input.treeId,
+        tokenHash,
+        role: input.role,
+        email: input.email,
+        createdBy: input.createdBy,
+        expiresAt,
+      })
+      .returning();
+    return created;
+  });
+
+  const url = `${publicOrigin()}/invite/${token}`;
+  let emailSent = false;
+  let emailSimulated = false;
+  let emailError: string | undefined;
+
+  if (input.email) {
+    const result = await sendEmail(
+      input.email,
+      inviteMessage({
+        treeName: input.treeName,
+        inviterName: input.inviterName,
+        role: invite.role,
+        url,
+        expiresAt: invite.expiresAt,
+      }),
+    );
+    if (result.delivered) {
+      await db
+        .update(treeInvites)
+        .set({ sentAt: new Date() })
+        .where(eq(treeInvites.id, invite.id));
+      emailSent = true;
+    } else if (result.simulated) {
+      emailSimulated = true;
+    } else {
+      emailError =
+        result.reason === "not_configured"
+          ? "Email is not configured on this server. Copy the link and send it yourself."
+          : "The email could not be sent. Copy the link and send it yourself.";
+    }
+  }
+
+  return {
+    id: invite.id,
+    url,
+    expiresAt: invite.expiresAt,
+    role: invite.role,
+    email: invite.email,
+    emailSent,
+    emailSimulated,
+    emailError,
+  } satisfies CreatedInvite;
+}
+
 export async function createInvite(input: {
   treeId: string;
   role: TreeRole;
   expiresInDays: number;
-}): Promise<ActionResult<{ id: string; url: string; expiresAt: Date; role: TreeRole }>> {
+  email?: string | null;
+}): Promise<ActionResult<CreatedInvite>> {
   return runAction(async () => {
     const access = await requireTreeMember(input.treeId, "owner");
     const parsed = inviteSchema.parse(input);
-    const token = randomBytes(32).toString("base64url");
-    const tokenHash = hashInviteToken(token);
-    const expiresAt = new Date(Date.now() + parsed.expiresInDays * 24 * 60 * 60_000);
-    const [invite] = await db
-      .insert(treeInvites)
-      .values({
-        treeId: access.tree.id,
-        tokenHash,
-        role: parsed.role,
-        createdBy: access.user.id,
-        expiresAt,
-      })
-      .returning();
-    return {
-      id: invite.id,
-      url: `${publicOrigin()}/invite/${token}`,
-      expiresAt: invite.expiresAt,
+    const email = input.email ? inviteEmailSchema.parse(input.email) : null;
+
+    if (email) {
+      if (!access.user.emailVerified) {
+        throw new AppError("Verify your email address before sending invitations.");
+      }
+      if (email === access.user.email.toLowerCase()) {
+        throw new AppError("That is your own email address.");
+      }
+      const existing = await db
+        .select({ userId: treeMembers.userId })
+        .from(treeMembers)
+        .innerJoin(users, eq(users.id, treeMembers.userId))
+        .where(and(eq(treeMembers.treeId, input.treeId), eq(users.email, email)))
+        .limit(1);
+      if (existing.length) throw new AppError("That person is already a member of this tree.");
+    }
+
+    return issueInvite({
+      treeId: access.tree.id,
+      role: parsed.role,
+      email,
+      expiresInDays: parsed.expiresInDays,
+      createdBy: access.user.id,
+      inviterName: access.user.displayName,
+      treeName: access.tree.name,
+    });
+  });
+}
+
+export async function resendInvite(input: {
+  treeId: string;
+  inviteId: string;
+}): Promise<ActionResult<CreatedInvite>> {
+  return runAction(async () => {
+    const access = await requireTreeMember(input.treeId, "owner");
+    if (!access.user.emailVerified) {
+      throw new AppError("Verify your email address before sending invitations.");
+    }
+    const rows = await db
+      .select()
+      .from(treeInvites)
+      .where(
+        and(
+          eq(treeInvites.id, input.inviteId),
+          eq(treeInvites.treeId, input.treeId),
+          isNull(treeInvites.acceptedAt),
+          isNull(treeInvites.revokedAt),
+          gt(treeInvites.expiresAt, new Date()),
+        ),
+      )
+      .limit(1);
+    const invite = rows[0];
+    if (!invite) throw new AppError("That invite is no longer active.");
+    if (!invite.email) throw new AppError("That invite does not have an email address.");
+
+    const days = Math.min(
+      30,
+      Math.max(
+        1,
+        Math.round(
+          (invite.expiresAt.getTime() - invite.createdAt.getTime()) / (24 * 60 * 60_000),
+        ),
+      ),
+    );
+
+    await db
+      .update(treeInvites)
+      .set({ revokedAt: new Date() })
+      .where(eq(treeInvites.id, invite.id));
+
+    return issueInvite({
+      treeId: access.tree.id,
       role: invite.role,
-    };
+      email: invite.email,
+      expiresInDays: days,
+      createdBy: access.user.id,
+      inviterName: access.user.displayName,
+      treeName: access.tree.name,
+    });
   });
 }
 
@@ -317,7 +484,14 @@ export async function revokeInvite(input: {
 }
 
 export type InvitePreview =
-  | { status: "valid"; treeName: string; inviterName: string; role: TreeRole; expiresAt: Date }
+  | {
+      status: "valid";
+      treeName: string;
+      inviterName: string;
+      role: TreeRole;
+      email: string | null;
+      expiresAt: Date;
+    }
   | { status: "expired" | "revoked" | "used" | "invalid" };
 
 export async function getInvitePreview(token: string): Promise<InvitePreview> {
@@ -325,6 +499,7 @@ export async function getInvitePreview(token: string): Promise<InvitePreview> {
   const rows = await db
     .select({
       role: treeInvites.role,
+      email: treeInvites.email,
       expiresAt: treeInvites.expiresAt,
       revokedAt: treeInvites.revokedAt,
       acceptedAt: treeInvites.acceptedAt,
@@ -346,6 +521,7 @@ export async function getInvitePreview(token: string): Promise<InvitePreview> {
     treeName: invite.treeName,
     inviterName: invite.inviterName ?? "Someone",
     role: invite.role,
+    email: invite.email,
     expiresAt: invite.expiresAt,
   };
 }

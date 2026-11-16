@@ -82,7 +82,8 @@ export default function RegisterPage() {
             {submission.pending ? "Creating account…" : "Create account"}
           </Button>
           <p class="text-center text-xs leading-relaxed text-muted-foreground">
-            There is no email verification in this version. Use an email address you can remember.
+            We will send a link to confirm your email address. Your family data stays private in the
+            meantime.
           </p>
         </form>
       </Card>

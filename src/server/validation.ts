@@ -77,6 +77,23 @@ export const inviteSchema = z.object({
   expiresInDays: z.coerce.number().int().min(1).max(30).default(7),
 });
 
+export const inviteEmailSchema = emailSchema;
+
+export const forgotPasswordSchema = z.object({
+  email: emailSchema,
+});
+
+export const resetPasswordSchema = z
+  .object({
+    token: z.string().min(1, "That reset link is not valid.").max(200),
+    password: passwordSchema,
+    confirmPassword: z.string(),
+  })
+  .refine(values => values.password === values.confirmPassword, {
+    message: "Those passwords do not match.",
+    path: ["confirmPassword"],
+  });
+
 export const personSchema = z.object({
   treeId: z.string().uuid(),
   firstName: z.string().trim().min(1, "Enter a first name.").max(80),

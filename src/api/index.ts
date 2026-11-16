@@ -1,5 +1,14 @@
 import { action, query } from "@solidjs/router";
-import { getUser as getUserFn, login as loginFn, logout as logoutFn, register as registerFn } from "./auth-server";
+import {
+  getPasswordResetPreview as getPasswordResetPreviewFn,
+  getUser as getUserFn,
+  login as loginFn,
+  logout as logoutFn,
+  register as registerFn,
+  requestPasswordReset as requestPasswordResetFn,
+  resetPassword as resetPasswordFn,
+  verifyEmail as verifyEmailFn,
+} from "./auth-server";
 import { requireUserPage as requireUserPageFn } from "./require-user-server";
 import {
   getInvitePreview as getInvitePreviewFn,
@@ -18,7 +27,11 @@ export const getTreeMembers = query(getTreeMembersFn, "tree-members");
 export const getTreeInvites = query(getTreeInvitesFn, "tree-invites");
 export const getInvitePreview = query(getInvitePreviewFn, "invite-preview");
 export const getTreeGraph = query(getTreeGraphFn, "tree-graph");
+export const verifyEmail = query(verifyEmailFn, "verify-email");
+export const getPasswordResetPreview = query(getPasswordResetPreviewFn, "password-reset-preview");
 
 export const login = action(loginFn, "login");
 export const register = action(registerFn, "register");
 export const logout = action(logoutFn, "logout");
+export const requestPasswordReset = action(requestPasswordResetFn, "request-password-reset");
+export const resetPassword = action(resetPasswordFn, "reset-password");

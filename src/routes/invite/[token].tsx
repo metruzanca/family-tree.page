@@ -79,6 +79,12 @@ function InviteInner() {
                         {(valid() as any).inviterName} invited you to join as{" "}
                         <span class="font-semibold text-foreground">{roleLabel((valid() as any).role)}</span>.
                       </p>
+                      <Show when={(valid() as any).email}>
+                        <p class="mt-2 text-xs text-muted-foreground">
+                          Sent to{" "}
+                          <span class="font-medium text-foreground">{(valid() as any).email}</span>
+                        </p>
+                      </Show>
                       <div class="mt-6 flex items-center justify-center gap-2 text-xs text-muted-foreground">
                         <Clock size={13} />
                         Expires {formatDate((valid() as any).expiresAt)}

@@ -1,6 +1,6 @@
-import { For, Show, createEffect, createMemo, createSignal } from "solid-js";
-import { createAsync, useNavigate, useParams, revalidate } from "@solidjs/router";
-import { Copy, Link2, LogOut, Plus, Settings, Shield, Trash2, Users } from "lucide-solid";
+import { For, Show, createEffect, createSignal } from "solid-js";
+import { A, createAsync, useNavigate, useParams, revalidate } from "@solidjs/router";
+import { Copy, Link2, LogOut, Mail, Plus, RotateCw, Settings, Shield, Trash2, Users } from "lucide-solid";
 import {
   createInvite,
   deleteTree,
@@ -9,9 +9,12 @@ import {
   getTreeOverview,
   leaveTree,
   removeMember,
+  resendInvite,
   revokeInvite,
   updateMemberRole,
   updateTree,
+  type CreatedInvite,
+  type InviteView,
 } from "~/api/trees-server";
 import {
   getMyTrees,
@@ -94,8 +97,45 @@ function TreeSettingsInner() {
   const [saving, setSaving] = createSignal(false);
   const [inviteRole, setInviteRole] = createSignal<TreeRole>("editor");
   const [inviteDays, setInviteDays] = createSignal(7);
+  const [inviteMode, setInviteMode] = createSignal<"link" | "email">("link");
+  const [inviteEmail, setInviteEmail] = createSignal("");
   const [creatingInvite, setCreatingInvite] = createSignal(false);
-  const [createdInvite, setCreatedInvite] = createSignal<string | null>(null);
+  const [createdInvite, setCreatedInvite] = createSignal<CreatedInvite | null>(null);
+  const [resendingId, setResendingId] = createSignal<string | null>(null);
+  const [inviteRows, setInviteRows] = createSignal<InviteView[] | null>(null);
+
+  createEffect(() => {
+    const rows = invites();
+    if (rows) setInviteRows(rows);
+  });
+
+  function applyCreatedInvite(created: CreatedInvite) {
+    const now = new Date();
+    setInviteRows(rows => {
+      const base = rows ?? [];
+      const kept = created.email
+        ? base.map(row =>
+            row.email === created.email && !row.revokedAt && !row.acceptedAt
+              ? { ...row, revokedAt: now }
+              : row,
+          )
+        : base;
+      return [
+        {
+          id: created.id,
+          role: created.role,
+          email: created.email,
+          sentAt: created.emailSent ? now : null,
+          createdAt: now,
+          expiresAt: new Date(created.expiresAt),
+          revokedAt: null,
+          acceptedAt: null,
+          acceptedBy: null,
+        },
+        ...kept,
+      ];
+    });
+  }
   const [confirm, setConfirm] = createSignal<
     | { kind: "remove"; userId: string; name: string }
     | { kind: "leave" }
@@ -116,7 +156,7 @@ function TreeSettingsInner() {
   });
 
   const isOwner = () => overview()?.role === "owner";
-  const randomInvite = createMemo(() => createdInvite());
+  const canEmailInvites = () => Boolean(user()?.emailVerified);
 
   async function saveTree(event: SubmitEvent) {
     event.preventDefault();
@@ -148,21 +188,71 @@ function TreeSettingsInner() {
 
   async function createNewInvite() {
     if (creatingInvite()) return;
+    const email = inviteMode() === "email" ? inviteEmail().trim() : null;
+    if (inviteMode() === "email" && !email) {
+      toast.show("Enter an email address for the invitation.", "error");
+      return;
+    }
     setCreatingInvite(true);
     const result = await createInvite({
       treeId: params.treeId,
       role: inviteRole(),
       expiresInDays: inviteDays(),
+      email,
     });
     setCreatingInvite(false);
     if (!result.ok) {
       toast.show(result.error, "error");
       return;
     }
-    setCreatedInvite(result.data.url);
+    setCreatedInvite(result.data);
+    applyCreatedInvite(result.data);
+    if (result.data.email) setInviteEmail("");
     await revalidate(invitesQuery.key);
-    track("invite_created", { role: inviteRole() });
-    toast.show("Invite link created. Copy it now.", "success");
+    track("invite_created", {
+      role: inviteRole(),
+      delivery: result.data.email ? "email" : "link",
+    });
+    if (result.data.email && !result.data.emailSent && !result.data.emailSimulated) {
+      toast.show(result.data.emailError ?? "The email could not be sent. Copy the link instead.", "error");
+      return;
+    }
+    if (result.data.emailSimulated) {
+      toast.show(
+        "Invitation created. The email was printed to the server console instead of being sent.",
+        "success",
+      );
+      return;
+    }
+    toast.show(
+      result.data.email ? "Invitation sent." : "Invite link created. Copy it now.",
+      "success",
+    );
+  }
+
+  async function sendInviteAgain(inviteId: string) {
+    if (resendingId()) return;
+    setResendingId(inviteId);
+    const result = await resendInvite({ treeId: params.treeId, inviteId });
+    setResendingId(null);
+    if (!result.ok) {
+      toast.show(result.error, "error");
+      return;
+    }
+    setCreatedInvite(result.data);
+    applyCreatedInvite(result.data);
+    await revalidate(invitesQuery.key);
+    track("invite_created", { role: result.data.role, delivery: "email" });
+    if (!result.data.emailSent && !result.data.emailSimulated) {
+      toast.show(result.data.emailError ?? "The email could not be sent. Copy the link instead.", "error");
+      return;
+    }
+    toast.show(
+      result.data.emailSimulated
+        ? "Invitation created. The email was printed to the server console."
+        : "Invitation sent again.",
+      "success",
+    );
   }
 
   async function copyInvite(url: string) {
@@ -203,6 +293,11 @@ function TreeSettingsInner() {
       } else if (action.kind === "revoke") {
         const result = await revokeInvite({ treeId: params.treeId, inviteId: action.inviteId });
         if (!result.ok) return toast.show(result.error, "error");
+        setInviteRows(rows =>
+          rows?.map(row =>
+            row.id === action.inviteId ? { ...row, revokedAt: new Date() } : row,
+          ) ?? rows,
+        );
         await revalidate(invitesQuery.key);
         toast.show("Invite revoked.", "success");
       }
@@ -369,9 +464,36 @@ function TreeSettingsInner() {
                 <TabsContent value="invites">
                   <SectionCard
                     title="Invites"
-                    description="Share a link with someone you trust. Links are single-use and expire."
+                    description="Share a single-use link, or send the invitation straight to someone's inbox."
                   >
-                    <div class="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+                    <div class="inline-flex rounded-xl border border-border bg-background p-1">
+                      <button
+                        type="button"
+                        aria-pressed={inviteMode() === "link"}
+                        class={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                          inviteMode() === "link"
+                            ? "bg-accent text-foreground shadow-xs"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                        onClick={() => setInviteMode("link")}
+                      >
+                        Share a link
+                      </button>
+                      <button
+                        type="button"
+                        aria-pressed={inviteMode() === "email"}
+                        class={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                          inviteMode() === "email"
+                            ? "bg-accent text-foreground shadow-xs"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                        onClick={() => setInviteMode("email")}
+                      >
+                        Send by email
+                      </button>
+                    </div>
+
+                    <div class="mt-4 grid gap-3 sm:grid-cols-2 sm:items-end">
                       <Field label="Role" for="invite-role">
                         <Select
                           options={roleOptions}
@@ -420,30 +542,88 @@ function TreeSettingsInner() {
                           </SelectPortal>
                         </Select>
                       </Field>
-                      <Button type="button" onClick={createNewInvite} disabled={creatingInvite()}>
-                        <Plus />
-                        {creatingInvite() ? "Creating…" : "Create link"}
-                      </Button>
+
+                      <Show when={inviteMode() === "email"}>
+                        <Field
+                          label="Email address"
+                          for="invite-email"
+                          class="sm:col-span-2"
+                          hint={
+                            canEmailInvites()
+                              ? "The invitation link is emailed to this address. You can still copy it below."
+                              : undefined
+                          }
+                        >
+                          <input
+                            id="invite-email"
+                            type="email"
+                            class="input"
+                            placeholder="relative@example.com"
+                            autocomplete="email"
+                            value={inviteEmail()}
+                            onInput={event => setInviteEmail(event.currentTarget.value)}
+                            disabled={!canEmailInvites()}
+                          />
+                        </Field>
+                        <Show when={!canEmailInvites()}>
+                          <p class="rounded-xl border border-dashed border-border px-3 py-2 text-xs leading-relaxed text-muted-foreground sm:col-span-2">
+                            Confirm your own email address before sending invitations.{" "}
+                            <A href="/settings" class="font-semibold text-primary underline decoration-primary/30 underline-offset-4">
+                              Resend the verification link
+                            </A>
+                            .
+                          </p>
+                        </Show>
+                      </Show>
+
+                      <div class="sm:col-span-2">
+                        <Button
+                          type="button"
+                          onClick={createNewInvite}
+                          disabled={
+                            creatingInvite() ||
+                            (inviteMode() === "email" && !canEmailInvites())
+                          }
+                        >
+                          <Show
+                            when={inviteMode() === "email"}
+                            fallback={<Plus />}
+                          >
+                            <Mail />
+                          </Show>
+                          {creatingInvite()
+                            ? "Working…"
+                            : inviteMode() === "email"
+                              ? "Send invite"
+                              : "Create link"}
+                        </Button>
+                      </div>
                     </div>
 
-                    <Show when={randomInvite()}>
-                      {url => (
+                    <Show when={createdInvite()}>
+                      {invite => (
                         <div class="mt-4 rounded-2xl border border-primary/25 bg-accent p-3">
                           <p class="mb-2 text-xs font-semibold text-primary">
-                            Copy this link now. It will not be shown again.
+                            {invite().email
+                              ? invite().emailSimulated
+                                ? `Development mode: the email to ${invite().email} was printed to the server console. You can also share this link.`
+                                : invite().emailSent
+                                  ? `Emailed to ${invite().email}. You can also share this link directly.`
+                                  : `We could not email ${invite().email}. Copy this link and send it yourself.`
+                              : "Copy this link now. It will not be shown again."}
                           </p>
                           <div class="flex gap-2">
                             <input
                               class="input text-xs"
                               readonly
-                              value={url()}
+                              value={invite().url}
                               onFocus={event => event.currentTarget.select()}
                             />
                             <Button
                               type="button"
                               size="sm"
                               variant="secondary"
-                              onClick={() => copyInvite(url())}
+                              onClick={() => copyInvite(invite().url)}
                             >
                               <Copy />
                               Copy
@@ -456,7 +636,7 @@ function TreeSettingsInner() {
                     <div class="mt-5">
                       <h3 class="field-label mb-2">Recent invites</h3>
                       <Show
-                        when={invites()?.length}
+                        when={inviteRows()?.length}
                         fallback={
                           <p class="rounded-xl border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
                             No invites created yet.
@@ -464,16 +644,40 @@ function TreeSettingsInner() {
                         }
                       >
                         <div class="space-y-1">
-                          <For each={invites()}>
+                          <For each={inviteRows()}>
                             {invite => (
-                              <div class="flex items-center gap-3 rounded-xl px-2 py-2 text-sm transition hover:bg-accent/50">
-                                <Shield size={15} class="text-muted-foreground" />
+                              <div class="flex flex-wrap items-center gap-3 rounded-xl px-2 py-2 text-sm transition hover:bg-accent/50">
+                                <Show
+                                  when={invite.email}
+                                  fallback={<Shield size={15} class="text-muted-foreground" />}
+                                >
+                                  <Mail size={15} class="text-muted-foreground" />
+                                </Show>
                                 <div class="min-w-0 flex-1">
                                   <p class="font-medium">{roleLabel(invite.role)} invite</p>
+                                  <Show when={invite.email}>
+                                    <p class="truncate text-xs text-foreground">{invite.email}</p>
+                                  </Show>
                                   <p class="text-xs text-muted-foreground">
                                     {inviteStatus(invite)} · {formatRelative(invite.createdAt)}
+                                    <Show when={invite.email && invite.sentAt}>
+                                      {" "}
+                                      · emailed
+                                    </Show>
                                   </p>
                                 </div>
+                                <Show when={inviteStatus(invite) === "Pending" && invite.email}>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    disabled={resendingId() === invite.id}
+                                    onClick={() => sendInviteAgain(invite.id)}
+                                  >
+                                    <RotateCw />
+                                    {resendingId() === invite.id ? "Sending…" : "Send again"}
+                                  </Button>
+                                </Show>
                                 <Show when={inviteStatus(invite) === "Pending"}>
                                   <Button
                                     type="button"

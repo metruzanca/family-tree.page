@@ -45,6 +45,7 @@ try {
         email,
         displayName: "Demo Zanca",
         passwordHash: await hashPassword("roots-demo-12345"),
+        emailVerifiedAt: new Date(),
       })
       .returning();
   }
