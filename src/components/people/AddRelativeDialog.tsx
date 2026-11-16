@@ -154,9 +154,8 @@ export function AddRelativeDialog(props: {
       anchorPersonId: props.anchor.id,
       relation: relation(),
       personId: selectedId() ?? undefined,
-      otherParentId: relation() === "child" && otherParentId() !== "none"
-        ? otherParentId()
-        : undefined,
+      otherParentId:
+        relation() === "child" && otherParentId() !== "none" ? otherParentId() : undefined,
       person:
         mode() === "new"
           ? {

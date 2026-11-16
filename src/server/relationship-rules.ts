@@ -4,7 +4,7 @@ import {
   createChildrenMap,
   isAncestorInMap,
   type PlainParentEdge,
-} from "~/lib/relationships";
+} from "../lib/relationships";
 
 export type ParentEdgeRecord = PlainParentEdge & { id: string };
 
