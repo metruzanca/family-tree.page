@@ -44,10 +44,12 @@ The graph is the main view. People are nodes, parent and partner relationships a
 - Optional Umami analytics with page views and product events, enabled by environment variables
 - Full-screen image lightbox with a details sidebar
 - Tag other people in a photo, with an "Also in photos" section on each tagged person's profile
-- Optional date taken on photos, prefilled from EXIF when the camera recorded it
+- Optional date taken on photos, prefilled from EXIF and editable as a partial or approximate date
 - Multi-file uploads become albums rendered as stacked nodes on the graph
 - Portraits stay on the person node and are not duplicated as file nodes
 - Person profiles with parents, partners, children, and life notes
+- Partial and approximate dates for people, partnerships, and photos, including unknown-year birthdays
+- A life events timeline for each person: residence, occupation, education, military service, migration, burial, and custom events
 - Image, PDF, and document uploads attached to people
 - Client-generated thumbnails, server-side content validation, and private file access
 - Mobile layout with a person sheet, touch gestures, and a list-free graph fallback through search
@@ -171,9 +173,28 @@ The bucket stays private. Browsers never receive storage credentials. SVG, HTML,
 
 Every file is still filed under one person, which is where its graph node lives. Editors can additionally tag any other people who appear in an image. Tags live in `file_tags` with tree-scoped foreign keys, so removing a person or a file removes the tags automatically. A tagged person sees the picture under "Also in photos" on their profile without becoming the owner.
 
-Images also carry an optional `taken_at` date. The browser reads EXIF `DateTimeOriginal` with `exifr` during upload and uses it as the initial value; editors can change or clear it in the file panel or lightbox. This is separate from the upload date, so scanned photos can be dated to when they were actually taken.
+Images also carry an optional `taken_at` date. The browser reads EXIF `DateTimeOriginal` with `exifr` during upload and uses it as the initial value; editors can change or clear it in the file panel or lightbox. This is separate from the upload date, so scanned photos can be dated to when they were actually taken, and the date can be partial or approximate.
 
 `file_tags` also has nullable `face_box` and a `source` of `manual` or `face`. Nothing writes `face` yet: the columns and the tag picker are the groundwork for face detection and a "who is this?" pass after upload.
+
+## How dates work
+
+Date fields are stored as a small JSON value rather than a SQL `date`, so partial and approximate dates survive:
+
+- A qualifier: `exact`, `about`, `before`, `after`, `between`, or `unknown`.
+- A start date with an optional year, month, and day.
+- An optional end date for a range.
+- A birthday with a known month and day but no known year.
+
+`src/lib/fuzzy-date.ts` parses, formats, validates, and sorts these values. The editor has a type selector plus optional year, month, and day inputs; choosing "between" adds the end date. The graph, profile header, search results, and file panel show labels such as `c. 1920`, `before 1900`, `1890-1900`, and `Born 1920 - 1987`.
+
+Birthday emails and iCal subscriptions only include dates with a known month and day. An unknown year still produces a birthday, but the age is omitted. Approximate dates with a day are treated as birthdays; open-ended ranges are not.
+
+The same model is used for `people.birth_date`, `people.death_date`, `partnerships.start_date`, `partnerships.end_date`, `files.taken_at`, and `person_events.date`. Existing `date` columns were converted in migration `0007_gray_sumo.sql`, which backfills every value as an exact date.
+
+## Life events
+
+Each person has a timeline of life events. An event has a kind (residence, occupation, education, military service, immigration, emigration, burial, or other), an optional title, a place, a fuzzy date, and notes. Editors can add, edit, and delete events from the person panel. Events are included in account exports and are removed with the person or tree.
 
 ## How presence works
 
@@ -365,7 +386,7 @@ The interface uses [shadcn-solid](https://shadcn-solid.com) components on top of
 Account settings has three exits for your own data:
 
 - **Change email.** A confirmation link goes to the new address and a notice goes to the old one. The old address keeps working until the new one confirms. Pending changes can be cancelled from account settings.
-- **Download your data.** `GET /api/account/export` streams a zip with `family-tree-export.json` and a README. The manifest covers your profile, memberships, trees, people, relationships, groups, tags, and file metadata. Add `?media=1` to include every original photo and document, or `?format=json` to download the manifest alone. Exports are rate limited to three per hour per account.
+- **Download your data.** `GET /api/account/export` streams a zip with `family-tree-export.json` and a README. The manifest covers your profile, memberships, trees, people, relationships, groups, tags, life events, and file metadata. Add `?media=1` to include every original photo and document, or `?format=json` to download the manifest alone. Exports are rate limited to three per hour per account.
 - **Delete account.** This requires your password and a typed email confirmation. Trees where you are the only member are deleted with their storage objects. If you are the last owner of a shared tree, promote another owner or delete that tree first. Deleting your account clears the session and cascades memberships, calendar feeds, birthday logs, auth tokens, and pending email changes.
 
 ## Known limitations
@@ -374,6 +395,7 @@ Account settings has three exits for your own data:
 - Presence is held in the app process. It works as-is on a single Railway replica. Running more than one replica needs a shared presence store, such as Redis or Postgres `LISTEN`/`NOTIFY`.
 - HEIC photos work only when the browser can decode them; otherwise the user is asked to export as JPEG.
 - Backups live in a second Railway bucket in the same region and are not encrypted by the app. Backups run daily, so enable PostgreSQL point-in-time recovery for the gap between dumps.
+- Dates are Gregorian and structured. Seasons and free-text dates such as "spring 1918" are not represented; use an event note for those.
 - No GEDCOM import/export, public share links, OCR, or face detection yet.
 
 ## License
