@@ -135,6 +135,13 @@ export function AddRelativeDialog(props: {
     setSelectedId(null);
     setError("");
     setForm({ firstName: "", lastName: "", nickname: "", birthDate: "", deathDate: "" });
+    requestAnimationFrame(() => {
+      const target =
+        mode() === "new"
+          ? document.getElementById("relative-first")
+          : document.getElementById("relative-search");
+      target?.focus();
+    });
   }
 
   async function submit(event: SubmitEvent) {
@@ -344,6 +351,7 @@ export function AddRelativeDialog(props: {
             <label class="relative block">
               <Search size={15} class="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <input
+                id="relative-search"
                 class="input pl-9"
                 placeholder="Search people already in this tree"
                 value={search()}
