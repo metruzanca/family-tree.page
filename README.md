@@ -30,6 +30,8 @@ The graph is the main view. People are nodes, parent and partner relationships a
 - Parent pairs join at one small junction before branching to their children, so each child gets one parent-line arrow
 - Direction flip for oldest-at-top or oldest-at-bottom layouts
 - Search, neighbor highlighting, zoom and pan
+- Calendar tab with birth and death anniversaries, plus upcoming birthdays for living relatives
+- Email birthday reminders, with one-week, day-before, and day-of toggles in account settings
 - Live presence: see who else has the tree open, which person, file, or album they are looking at, and a colored ring and name tag around that node
 - Pointer cursor only over nodes, not links or empty canvas
 - Person and document info panels on desktop and mobile
@@ -113,8 +115,10 @@ Copy `.env.example` to `.env`. The important variables:
 | `DATABASE_URL` | PostgreSQL connection string |
 | `SESSION_SECRET` | 32+ random characters used to encrypt session cookies |
 | `APP_URL` | Local development origin fallback for email links. Railway sets `RAILWAY_PUBLIC_DOMAIN` in production |
-| `RESEND_API_KEY` | Resend API key used for verification, reset, and invitation emails |
+| `RESEND_API_KEY` | Resend API key used for verification, reset, invitation, and birthday emails |
 | `RESEND_FROM_EMAIL` | Sender identity, for example `Roots <hello@your-domain.tld>` |
+| `BIRTHDAY_EMAILS` | Set to `off` to disable the birthday email scheduler, or `on` to enable it in development |
+| `BIRTHDAY_EMAIL_HOUR_UTC` | UTC hour after which birthday emails are sent each day, default `8` |
 | `S3_ENDPOINT` | S3 API endpoint |
 | `S3_REGION` | Bucket region |
 | `S3_BUCKET` | Bucket name |
@@ -147,6 +151,18 @@ The bucket stays private. Browsers never receive storage credentials. SVG, HTML,
 4. The avatar stack dedupes by user, and each avatar is outlined in that person's presence color. The graph draws one ring per connected tab plus a name tag in the same color. Colors come from a matte palette keyed by user id, so renaming a person does not change their color.
 
 Presence is ephemeral. Nothing is written to Postgres, and a closed tab removes the peer immediately. State lives in the app process, which matches a single Railway replica.
+
+## How birthday emails work
+
+Account settings has three independent reminders: one week before, the day before, and on the morning of a birthday. They are off, off, and on by default. Preferences are per user and cover every tree that user belongs to.
+
+1. A Nitro plugin checks once an hour and runs the job after `BIRTHDAY_EMAIL_HOUR_UTC` (08:00 by default) on the UTC calendar date.
+2. The job collects verified users with at least one reminder enabled and living people with birth dates from all their trees.
+3. Each enabled reminder becomes one digest email per user, so a person with several birthdays on the same day receives a single message.
+4. `birthday_email_log` claims each user, reminder kind, and date before sending. Restarts, repeated hourly checks, and duplicate replicas cannot send the same reminder twice.
+5. February 29 birthdays are treated as February 28 in common years.
+
+Set `BIRTHDAY_EMAILS=off` to disable the scheduler, or `BIRTHDAY_EMAILS=on` to run it in development and print emails to the server console when Resend is not configured. `BIRTHDAY_EMAIL_HOUR_UTC` changes the daily send hour.
 
 ## Railway deployment
 

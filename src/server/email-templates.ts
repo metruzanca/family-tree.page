@@ -158,6 +158,90 @@ export function passwordResetMessage(input: {
   };
 }
 
+export type BirthdayEmailKind = "week_before" | "day_before" | "day_of";
+
+export function birthdayMessage(input: {
+  name: string;
+  kind: BirthdayEmailKind;
+  entries: {
+    personName: string;
+    treeName: string;
+    date: string;
+    age: number;
+  }[];
+  url: string;
+}): EmailMessage {
+  const when =
+    input.kind === "day_of"
+      ? "today"
+      : input.kind === "day_before"
+        ? "tomorrow"
+        : "this week";
+  const heading =
+    input.kind === "day_of"
+      ? "Birthdays today"
+      : input.kind === "day_before"
+        ? "Birthdays tomorrow"
+        : "Birthdays this week";
+  const subject =
+    input.entries.length === 1
+      ? `A birthday ${when} on Roots`
+      : `${input.entries.length} birthdays ${when} on Roots`;
+
+  const listItems = input.entries.map(entry => {
+    const name = escapeHtml(entry.personName);
+    const tree = escapeHtml(entry.treeName);
+    const date = escapeHtml(entry.date);
+    const timing =
+      input.kind === "day_of"
+        ? "today"
+        : input.kind === "day_before"
+          ? "tomorrow"
+          : `on ${date}`;
+    return `<li style="margin:0 0 10px;font-size:15px;line-height:1.6;color:${BRAND.body};"><strong style="color:${BRAND.ink};">${name}</strong> turns ${entry.age} ${timing} in ${tree}.</li>`;
+  });
+
+  const textLines = input.entries.map(entry => {
+    const timing =
+      input.kind === "day_of"
+        ? "today"
+        : input.kind === "day_before"
+          ? "tomorrow"
+          : `on ${entry.date}`;
+    return `- ${entry.personName} turns ${entry.age} ${timing} in ${entry.treeName}.`;
+  });
+
+  return {
+    subject: subjectLine(subject),
+    html: layout({
+      preheader:
+        input.entries.length === 1
+          ? `A birthday ${when} in your family tree.`
+          : `${input.entries.length} birthdays ${when} in your family trees.`,
+      heading,
+      paragraphs: [
+        `Hi ${escapeHtml(input.name)},`,
+        `<ul style="margin:0 0 16px;padding:0 0 0 18px;">${listItems.join("")}</ul>`,
+      ],
+      ctaLabel: "Open your trees",
+      ctaUrl: input.url,
+      footnote:
+        "You are receiving this because birthday reminders are on in your Roots account. You can change them any time in Account settings.",
+    }),
+    text: [
+      `Hi ${input.name},`,
+      "",
+      heading,
+      "",
+      ...textLines,
+      "",
+      input.url,
+      "",
+      "You are receiving this because birthday reminders are on in your Roots account. You can change them any time in Account settings.",
+    ].join("\n"),
+  };
+}
+
 export function inviteMessage(input: {
   treeName: string;
   inviterName: string;

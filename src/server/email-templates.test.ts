@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  birthdayMessage,
   escapeHtml,
   inviteMessage,
   passwordResetMessage,
@@ -33,6 +34,42 @@ describe("email templates", () => {
     });
     expect(message.html).toContain("https://roots.test/reset-password/abc");
     expect(message.text).toContain("60 minutes");
+  });
+
+  it("builds a birthday digest and escapes names", () => {
+    const message = birthdayMessage({
+      name: "Sam",
+      kind: "week_before",
+      entries: [
+        {
+          personName: "<Mia> Zanca",
+          treeName: 'The "Zanca" family',
+          date: "April 27",
+          age: 35,
+        },
+      ],
+      url: "https://roots.test/trees",
+    });
+    expect(message.subject).toContain("this week");
+    expect(message.html).toContain("&lt;Mia&gt; Zanca");
+    expect(message.html).toContain("&quot;Zanca&quot;");
+    expect(message.html).toContain("turns 35 on April 27");
+    expect(message.text).toContain("Mia");
+    expect(message.text).toContain("https://roots.test/trees");
+  });
+
+  it("uses a plural subject for several birthdays", () => {
+    const message = birthdayMessage({
+      name: "Sam",
+      kind: "day_of",
+      entries: [
+        { personName: "Mia", treeName: "Family", date: "April 27", age: 35 },
+        { personName: "Leo", treeName: "Family", date: "April 27", age: 31 },
+      ],
+      url: "https://roots.test/trees",
+    });
+    expect(message.subject).toContain("2 birthdays today");
+    expect(message.html).toContain("Birthdays today");
   });
 
   it("escapes tree names and inviter names in invitations", () => {
