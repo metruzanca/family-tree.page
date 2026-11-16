@@ -17,6 +17,7 @@ import {
   type BirthdayOffset,
   type DateParts,
 } from "../lib/calendar";
+import { fuzzyYear, type FuzzyDate } from "../lib/fuzzy-date";
 
 export type BirthdayRunSummary = {
   usersNotified: number;
@@ -32,7 +33,7 @@ type Candidate = {
   enabled: Record<BirthdayOffset, boolean>;
   people: {
     displayName: string;
-    birthDate: string;
+    birthDate: FuzzyDate;
     treeName: string;
   }[];
 };
@@ -156,12 +157,12 @@ export async function sendBirthdayNotifications(
             name: candidate.displayName,
             kind,
             entries: matches.map(person => {
-              const birthYear = Number(person.birthDate.slice(0, 4));
+              const birthYear = fuzzyYear(person.birthDate);
               return {
                 personName: person.displayName,
                 treeName: person.treeName,
                 date: formatMonthDay(target),
-                age: target.year - birthYear,
+                age: birthYear === null ? null : target.year - birthYear,
               };
             }),
             url: `${publicOrigin()}/trees`,

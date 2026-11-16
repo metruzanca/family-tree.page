@@ -44,7 +44,7 @@ export async function resolveCalendarFeed(token: string): Promise<CalendarFeedDa
     .innerJoin(trees, eq(trees.id, treeMembers.treeId))
     .innerJoin(people, eq(people.treeId, trees.id))
     .where(and(eq(treeMembers.userId, feed.userId), isNotNull(people.birthDate)))
-    .orderBy(asc(people.birthDate), asc(people.lastName), asc(people.firstName));
+    .orderBy(asc(people.lastName), asc(people.firstName));
 
   return {
     userName: feed.displayName,

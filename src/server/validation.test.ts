@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { exactFuzzyDate } from "../lib/fuzzy-date";
 import {
   deleteAccountSchema,
   emailChangeSchema,
@@ -32,12 +33,32 @@ describe("validation", () => {
       treeId: "00000000-0000-4000-8000-000000000000",
       firstName: "Sam",
       lastName: "",
-      birthDate: "",
-      deathDate: "",
+      birthDate: null,
+      deathDate: null,
     });
     expect(parsed.birthDate).toBeNull();
     expect(parsed.deathDate).toBeNull();
     expect(parsed.lastName).toBe("");
+  });
+
+  it("accepts partial and approximate dates", () => {
+    const parsed = personSchema.parse({
+      treeId: "00000000-0000-4000-8000-000000000000",
+      firstName: "Sam",
+      birthDate: { start: { year: 1952, month: null, day: null }, qualifier: "about" },
+      deathDate: {
+        start: { year: 1990, month: null, day: null },
+        end: { year: 2001, month: null, day: null },
+        qualifier: "between",
+      },
+    });
+    expect(parsed.birthDate).toEqual({
+      start: { year: 1952, month: null, day: null },
+      end: null,
+      qualifier: "about",
+    });
+    expect(parsed.deathDate?.qualifier).toBe("between");
+    expect(parsed.deathDate?.end?.year).toBe(2001);
   });
 
   it("rejects malformed dates", () => {
@@ -140,10 +161,13 @@ describe("validation", () => {
       treeId: "00000000-0000-4000-8000-000000000000",
       fileId: "00000000-0000-4000-8000-000000000001",
     };
-    expect(fileTakenAtSchema.parse({ ...base, takenAt: "1962-04-18" }).takenAt).toBe(
-      "1962-04-18",
-    );
-    expect(fileTakenAtSchema.parse({ ...base, takenAt: "" }).takenAt).toBeNull();
+    expect(
+      fileTakenAtSchema.parse({
+        ...base,
+        takenAt: exactFuzzyDate(1962, 4, 18),
+      }).takenAt,
+    ).toEqual({ ...exactFuzzyDate(1962, 4, 18), end: null });
+    expect(fileTakenAtSchema.parse({ ...base, takenAt: null }).takenAt).toBeNull();
     expect(fileTakenAtSchema.safeParse({ ...base, takenAt: "spring 1962" }).success).toBe(
       false,
     );

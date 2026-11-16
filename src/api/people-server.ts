@@ -9,20 +9,26 @@ import {
   parentChild,
   partnerships,
   people,
+  personEvents,
   trees,
   type ParentChild,
   type Partnership,
   type Person,
+  type PersonEvent,
   type StoredFile,
 } from "../../drizzle/schema";
+import type { FuzzyDate } from "../lib/fuzzy-date";
 import { requireTreeMember, type TreeRole } from "../server/guards";
 import { AppError, runAction, type ActionResult } from "../server/errors";
 import {
   addRelativeSchema,
   parentChildSchema,
   partnershipSchema,
+  personEventSchema,
+  personEventUpdateSchema,
   personSchema,
   personUpdateSchema,
+  type PersonEventInput,
   type PersonInput,
 } from "../server/validation";
 import { deletePrefix, TREE_PREFIX } from "../server/storage";
@@ -46,7 +52,7 @@ export type GraphFile = {
   width: number | null;
   height: number | null;
   sizeBytes: number;
-  takenAt: string | null;
+  takenAt: FuzzyDate | null;
   taggedPersonIds: string[];
   createdAt: Date;
   isAvatar: boolean;
@@ -70,8 +76,8 @@ export type GraphPerson = {
   displayName: string;
   maidenName: string | null;
   nickname: string | null;
-  birthDate: string | null;
-  deathDate: string | null;
+  birthDate: FuzzyDate | null;
+  deathDate: FuzzyDate | null;
   birthPlace: string | null;
   deathPlace: string | null;
   bio: string | null;
@@ -92,9 +98,20 @@ export type GraphRelationship =
       source: string;
       target: string;
       status: Partnership["status"];
-      startDate: string | null;
-      endDate: string | null;
+      startDate: FuzzyDate | null;
+      endDate: FuzzyDate | null;
     };
+
+export type GraphPersonEvent = {
+  id: string;
+  personId: string;
+  kind: PersonEvent["kind"];
+  title: string | null;
+  place: string | null;
+  date: FuzzyDate | null;
+  description: string | null;
+  createdAt: Date;
+};
 
 export type TreeGraph = {
   tree: { id: string; name: string; description: string | null };
@@ -103,6 +120,7 @@ export type TreeGraph = {
   relationships: GraphRelationship[];
   files: GraphFile[];
   groups: GraphFileGroup[];
+  events: GraphPersonEvent[];
 };
 
 export function personDisplayName(person: Pick<Person, "firstName" | "lastName" | "nickname">) {
@@ -112,20 +130,22 @@ export function personDisplayName(person: Pick<Person, "firstName" | "lastName" 
 
 export async function getTreeGraph(treeId: string): Promise<TreeGraph> {
   const access = await requireTreeMember(treeId);
-  const [peopleRows, parentRows, partnerRows, fileRows, groupRows, tagRows] = await Promise.all([
-    db.select().from(people).where(eq(people.treeId, treeId)),
-    db.select().from(parentChild).where(eq(parentChild.treeId, treeId)),
-    db.select().from(partnerships).where(eq(partnerships.treeId, treeId)),
-    db
-      .select()
-      .from(files)
-      .where(and(eq(files.treeId, treeId), eq(files.status, "ready"))),
-    db.select().from(fileGroups).where(eq(fileGroups.treeId, treeId)),
-    db
-      .select({ fileId: fileTags.fileId, personId: fileTags.personId })
-      .from(fileTags)
-      .where(eq(fileTags.treeId, treeId)),
-  ]);
+  const [peopleRows, parentRows, partnerRows, fileRows, groupRows, tagRows, eventRows] =
+    await Promise.all([
+      db.select().from(people).where(eq(people.treeId, treeId)),
+      db.select().from(parentChild).where(eq(parentChild.treeId, treeId)),
+      db.select().from(partnerships).where(eq(partnerships.treeId, treeId)),
+      db
+        .select()
+        .from(files)
+        .where(and(eq(files.treeId, treeId), eq(files.status, "ready"))),
+      db.select().from(fileGroups).where(eq(fileGroups.treeId, treeId)),
+      db
+        .select({ fileId: fileTags.fileId, personId: fileTags.personId })
+        .from(fileTags)
+        .where(eq(fileTags.treeId, treeId)),
+      db.select().from(personEvents).where(eq(personEvents.treeId, treeId)),
+    ]);
 
   const tagsByFile = new Map<string, string[]>();
   for (const tag of tagRows) {
@@ -200,6 +220,16 @@ export async function getTreeGraph(treeId: string): Promise<TreeGraph> {
     ],
     files: fileRows.map(file => toGraphFile(file, tagsByFile.get(file.id) ?? [])),
     groups: groupViews,
+    events: eventRows.map(event => ({
+      id: event.id,
+      personId: event.personId,
+      kind: event.kind,
+      title: event.title,
+      place: event.place,
+      date: event.date,
+      description: event.description,
+      createdAt: event.createdAt,
+    })),
   };
 }
 
@@ -620,6 +650,83 @@ export async function addRelative(input: {
       await tx.update(trees).set({ updatedAt: new Date() }).where(eq(trees.id, access.tree.id));
       return { personId: relativeId, relationshipIds };
     });
+  });
+}
+
+export async function createPersonEvent(
+  input: { treeId: string; personId: string } & PersonEventInput,
+): Promise<ActionResult<{ id: string }>> {
+  return runAction(async () => {
+    const access = await requireTreeMember(input.treeId, "editor");
+    const parsed = personEventSchema.parse(input);
+    await assertPeopleInTree(access.tree.id, [parsed.personId]);
+
+    const [event] = await db
+      .insert(personEvents)
+      .values({
+        treeId: access.tree.id,
+        personId: parsed.personId,
+        kind: parsed.kind,
+        title: parsed.title,
+        place: parsed.place,
+        date: parsed.date,
+        description: parsed.description,
+        createdBy: access.user.id,
+      })
+      .returning({ id: personEvents.id });
+
+    await touchTree(access.tree.id);
+    return { id: event.id };
+  });
+}
+
+export async function updatePersonEvent(
+  input: { treeId: string; eventId: string } & PersonEventInput,
+): Promise<ActionResult<undefined>> {
+  return runAction(async () => {
+    const access = await requireTreeMember(input.treeId, "editor");
+    const parsed = personEventUpdateSchema.parse(input);
+    const updated = await db
+      .update(personEvents)
+      .set({
+        kind: parsed.kind,
+        title: parsed.title,
+        place: parsed.place,
+        date: parsed.date,
+        description: parsed.description,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(personEvents.id, parsed.eventId),
+          eq(personEvents.treeId, access.tree.id),
+        ),
+      )
+      .returning({ id: personEvents.id });
+    if (!updated.length) throw new AppError("That event could not be found.");
+    await touchTree(access.tree.id);
+    return undefined;
+  });
+}
+
+export async function deletePersonEvent(input: {
+  treeId: string;
+  eventId: string;
+}): Promise<ActionResult<undefined>> {
+  return runAction(async () => {
+    const access = await requireTreeMember(input.treeId, "editor");
+    const deleted = await db
+      .delete(personEvents)
+      .where(
+        and(
+          eq(personEvents.id, input.eventId),
+          eq(personEvents.treeId, access.tree.id),
+        ),
+      )
+      .returning({ id: personEvents.id });
+    if (!deleted.length) throw new AppError("That event could not be found.");
+    await touchTree(access.tree.id);
+    return undefined;
   });
 }
 

@@ -1,6 +1,7 @@
 import { For, Show, createMemo } from "solid-js";
 import {
   CalendarDays,
+  Clock3,
   FileText,
   Image as ImageIcon,
   Layers,
@@ -16,6 +17,7 @@ import type {
   GraphFile,
   GraphFileGroup,
   GraphPerson,
+  GraphPersonEvent,
   GraphRelationship,
   TreeGraph,
 } from "~/api/people-server";
@@ -27,6 +29,8 @@ import { IconButton } from "../ui/icon-button";
 import { Progress, ProgressGroup, ProgressLabel, ProgressValueLabel } from "../ui/progress";
 import { FileUploadButton } from "../files/FileUploadButton";
 import { formatYears } from "~/lib/format";
+import { compareFuzzyDates, formatFuzzyDate } from "~/lib/fuzzy-date";
+import { personEventKindLabel } from "~/lib/person-events";
 
 type PersonPanelProps = {
   person: GraphPerson;
@@ -45,6 +49,9 @@ type PersonPanelProps = {
   onDeleteFile: (file: GraphFile) => void;
   onUpload: (files: File[]) => void;
   onRemoveRelationship: (relationship: GraphRelationship) => void;
+  onAddEvent: () => void;
+  onEditEvent: (event: GraphPersonEvent) => void;
+  onDeleteEvent: (event: GraphPersonEvent) => void;
 };
 
 export function PersonPanel(props: PersonPanelProps) {
@@ -67,6 +74,15 @@ export function PersonPanel(props: PersonPanelProps) {
     ),
   );
   const mediaCount = () => groups().length + files().length;
+  const events = createMemo(() =>
+    props.data.events
+      .filter(event => event.personId === props.person.id)
+      .sort(
+        (a, b) =>
+          compareFuzzyDates(a.date, b.date) ||
+          a.createdAt.getTime() - b.createdAt.getTime(),
+      ),
+  );
   const parents = createMemo(() =>
     props.data.relationships
       .filter(
@@ -204,6 +220,45 @@ export function PersonPanel(props: PersonPanelProps) {
             </Show>
           </section>
         </Show>
+
+        <section class="mb-5">
+          <div class="flex items-center justify-between">
+            <h3 class="field-label">Life events</h3>
+            <Show when={editable()}>
+              <button
+                type="button"
+                class="inline-flex items-center gap-1 rounded-lg px-1.5 py-1 text-[0.68rem] font-semibold text-muted-foreground transition hover:bg-primary/5 hover:text-foreground"
+                onClick={props.onAddEvent}
+              >
+                <Plus size={12} />
+                Add event
+              </button>
+            </Show>
+          </div>
+          <Show
+            when={events().length}
+            fallback={
+              <p class="mt-1.5 rounded-xl border border-dashed border-border px-3 py-4 text-center text-xs leading-relaxed text-muted-foreground">
+                {editable()
+                  ? "Add a residence, job, migration, or burial to build a timeline."
+                  : "No life events yet."}
+              </p>
+            }
+          >
+            <ol class="mt-2 space-y-2">
+              <For each={events()}>
+                {event => (
+                  <LifeEventEntry
+                    event={event}
+                    editable={editable()}
+                    onEdit={() => props.onEditEvent(event)}
+                    onDelete={() => props.onDeleteEvent(event)}
+                  />
+                )}
+              </For>
+            </ol>
+          </Show>
+        </section>
 
         <section class="mb-5 space-y-4">
           <RelationGroup
@@ -484,6 +539,67 @@ function TaggedPhotoTile(props: { file: GraphFile; onOpen: () => void }) {
         />
       </Show>
     </button>
+  );
+}
+
+function LifeEventEntry(props: {
+  event: GraphPersonEvent;
+  editable: boolean;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <li class="group rounded-xl border border-border bg-background/60 px-3 py-2.5">
+      <div class="flex items-start gap-2">
+        <Clock3 size={13} class="mt-0.5 shrink-0 text-muted-foreground" />
+        <div class="min-w-0 flex-1">
+          <p class="text-[0.66rem] font-semibold uppercase tracking-wide text-muted-foreground">
+            {formatFuzzyDate(props.event.date) || "Undated"}
+          </p>
+          <p class="mt-0.5 text-sm font-medium leading-snug">
+            {props.event.title ?? personEventKindLabel(props.event.kind)}
+          </p>
+          <Show when={props.event.title}>
+            <p class="text-[0.66rem] text-muted-foreground">
+              {personEventKindLabel(props.event.kind)}
+            </p>
+          </Show>
+          <Show when={props.event.place}>
+            <p class="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+              <MapPin size={11} />
+              {props.event.place}
+            </p>
+          </Show>
+          <Show when={props.event.description}>
+            <p class="mt-1 whitespace-pre-wrap text-xs leading-relaxed text-foreground/80">
+              {props.event.description}
+            </p>
+          </Show>
+        </div>
+        <Show when={props.editable}>
+          <div class="flex shrink-0 gap-0.5 opacity-70 transition sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100">
+            <button
+              type="button"
+              class="rounded-full p-1 text-muted-foreground transition hover:bg-primary/10 hover:text-foreground"
+              aria-label="Edit event"
+              title="Edit event"
+              onClick={props.onEdit}
+            >
+              <Pencil size={12} />
+            </button>
+            <button
+              type="button"
+              class="rounded-full p-1 text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"
+              aria-label="Delete event"
+              title="Delete event"
+              onClick={props.onDelete}
+            >
+              <Trash2 size={12} />
+            </button>
+          </div>
+        </Show>
+      </div>
+    </li>
   );
 }
 

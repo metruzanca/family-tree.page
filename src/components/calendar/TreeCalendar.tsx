@@ -13,6 +13,7 @@ import {
   type CalendarEvent,
   type DateParts,
 } from "~/lib/calendar";
+import { formatFuzzyYearRange } from "~/lib/fuzzy-date";
 import { cx } from "~/lib/utils";
 import { Avatar } from "../ui/Avatar";
 import { Button } from "../ui/button";
@@ -236,7 +237,8 @@ export function TreeCalendar(props: TreeCalendarProps) {
                           {entry.person.displayName}
                         </span>
                         <span class="block text-xs text-muted-foreground">
-                          {formatMonthDay(entry.date)} · turns {entry.age}
+                          {formatMonthDay(entry.date)}
+                          {entry.age === null ? " · birthday" : ` · turns ${entry.age}`}
                         </span>
                       </span>
                       <span class="shrink-0 rounded-full bg-warning/10 px-2 py-0.5 text-[0.65rem] font-semibold text-warning">
@@ -299,10 +301,13 @@ function EventChip(props: { event: CalendarEvent; treeId: string; compact?: bool
         : "border-border bg-muted/60 text-muted-foreground";
 
   const detail = () => {
-    if (isDeath()) return `Died ${props.event.person.deathDate?.slice(0, 4)}`;
-    return living()
-      ? `Turns ${props.event.years}`
-      : `Born ${props.event.person.birthDate?.slice(0, 4)}`;
+    if (isDeath()) {
+      return `Died ${formatFuzzyYearRange(props.event.person.deathDate, null)}`;
+    }
+    if (!living()) {
+      return `Born ${formatFuzzyYearRange(props.event.person.birthDate, null)}`;
+    }
+    return props.event.years === null ? "Birthday" : `Turns ${props.event.years}`;
   };
 
   return (

@@ -1,4 +1,9 @@
 import { z } from "zod";
+import {
+  isValidFuzzyDate,
+  isValidPartialDate,
+  type FuzzyDate,
+} from "../lib/fuzzy-date";
 
 const optionalText = (max: number) =>
   z
@@ -9,13 +14,54 @@ const optionalText = (max: number) =>
     .nullable()
     .transform(value => (value ? value : null));
 
-const optionalDate = z
-  .string()
-  .trim()
-  .regex(/^$|^\d{4}-\d{2}-\d{2}$/, "Use a date like 1952-04-18.")
-  .optional()
+const partialDateSchema = z
+  .object({
+    year: z.number().int().min(1, "Enter a year between 1 and 9999.").max(9999).nullable().default(null),
+    month: z.number().int().min(1, "Choose a month between 1 and 12.").max(12).nullable().default(null),
+    day: z.number().int().min(1, "Choose a day between 1 and 31.").max(31).nullable().default(null),
+  })
+  .superRefine((value, context) => {
+    if (!isValidPartialDate(value)) {
+      context.addIssue({
+        code: "custom",
+        message: "That date does not exist.",
+      });
+    }
+  });
+
+export const fuzzyDateSchema = z
+  .object({
+    start: partialDateSchema,
+    end: partialDateSchema.nullable().optional(),
+    qualifier: z.enum(["exact", "about", "before", "after", "between", "unknown"]),
+  })
+  .superRefine((value, context) => {
+    if (value.qualifier === "between" && !value.end) {
+      context.addIssue({
+        code: "custom",
+        path: ["end"],
+        message: "Choose an end date for the range.",
+      });
+    }
+    if (!isValidFuzzyDate(value as FuzzyDate)) {
+      context.addIssue({
+        code: "custom",
+        message: "That date is not valid.",
+      });
+    }
+  })
+  .transform(
+    (value): FuzzyDate => ({
+      start: value.start,
+      end: value.qualifier === "between" ? (value.end ?? null) : null,
+      qualifier: value.qualifier,
+    }),
+  );
+
+const optionalFuzzyDate = fuzzyDateSchema
   .nullable()
-  .transform(value => (value ? value : null));
+  .optional()
+  .transform(value => value ?? null);
 
 export const emailSchema = z
   .string()
@@ -116,14 +162,63 @@ export const personSchema = z.object({
   lastName: z.string().trim().max(80).optional().default(""),
   maidenName: optionalText(80),
   nickname: optionalText(80),
-  birthDate: optionalDate,
-  deathDate: optionalDate,
+  birthDate: optionalFuzzyDate,
+  deathDate: optionalFuzzyDate,
   birthPlace: optionalText(160),
   deathPlace: optionalText(160),
   bio: optionalText(4000),
 });
 
 export const personUpdateSchema = personSchema.omit({ treeId: true });
+
+export const personEventKindSchema = z.enum([
+  "residence",
+  "occupation",
+  "education",
+  "military",
+  "immigration",
+  "emigration",
+  "burial",
+  "other",
+]);
+
+export const personEventInputSchema = z
+  .object({
+    kind: personEventKindSchema.default("other"),
+    title: optionalText(120),
+    place: optionalText(160),
+    date: optionalFuzzyDate,
+    description: optionalText(2000),
+  })
+  .superRefine((value, context) => {
+    if (!value.title && !value.date && !value.place) {
+      context.addIssue({
+        code: "custom",
+        message: "Add a date, a title, or a place.",
+      });
+    }
+    if (value.kind === "other" && !value.title) {
+      context.addIssue({
+        code: "custom",
+        path: ["title"],
+        message: "Name this event.",
+      });
+    }
+  });
+
+export const personEventSchema = personEventInputSchema.and(
+  z.object({
+    treeId: z.string().uuid(),
+    personId: z.string().uuid(),
+  }),
+);
+
+export const personEventUpdateSchema = personEventInputSchema.and(
+  z.object({
+    treeId: z.string().uuid(),
+    eventId: z.string().uuid(),
+  }),
+);
 
 export const parentTypeSchema = z.enum([
   "biological",
@@ -154,8 +249,8 @@ export const partnershipSchema = z.object({
   personAId: z.string().uuid(),
   personBId: z.string().uuid(),
   status: partnershipStatusSchema.default("partnered"),
-  startDate: optionalDate,
-  endDate: optionalDate,
+  startDate: optionalFuzzyDate,
+  endDate: optionalFuzzyDate,
 });
 
 export const addRelativeSchema = z.discriminatedUnion("mode", [
@@ -202,7 +297,7 @@ export const prepareUploadSchema = z.object({
   thumbMime: z.enum(["image/webp", "image/jpeg"]).optional().nullable(),
   width: z.number().int().positive().max(50_000).optional().nullable(),
   height: z.number().int().positive().max(50_000).optional().nullable(),
-  takenAt: optionalDate,
+  takenAt: optionalFuzzyDate,
 });
 
 export const fileTagsSchema = z.object({
@@ -218,7 +313,8 @@ export const fileTagsSchema = z.object({
 export const fileTakenAtSchema = z.object({
   treeId: z.string().uuid(),
   fileId: z.string().uuid(),
-  takenAt: optionalDate,
+  takenAt: optionalFuzzyDate,
 });
 
 export type PersonInput = z.infer<typeof personUpdateSchema>;
+export type PersonEventInput = z.infer<typeof personEventInputSchema>;

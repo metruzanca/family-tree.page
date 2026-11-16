@@ -1,6 +1,7 @@
 import { cancelUpload, finalizeUpload, prepareUpload } from "~/api/files-server";
 import { friendlyMessage } from "./action-result";
 import { formatExifDate } from "./exif";
+import { exactDateFromISO } from "./fuzzy-date";
 import { makeThumbnail, mimeForFile } from "./image-thumb";
 
 export type UploadOptions = {
@@ -28,7 +29,9 @@ export async function uploadPersonFile(options: UploadOptions): Promise<UploadRe
     }
   }
 
-  const takenAt = mimeType.startsWith("image/") ? await readTakenAt(options.file) : null;
+  const takenAt = mimeType.startsWith("image/")
+    ? exactDateFromISO(await readTakenAt(options.file))
+    : null;
 
   let prepared: Awaited<ReturnType<typeof prepareUpload>>;
   try {

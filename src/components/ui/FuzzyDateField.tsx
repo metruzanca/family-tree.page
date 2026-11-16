@@ -1,0 +1,218 @@
+import { For, Show, createMemo } from "solid-js";
+import {
+  daysInMonth,
+  emptyPartialDate,
+  formatFuzzyDate,
+  isValidFuzzyDate,
+  type FuzzyDate,
+  type FuzzyDateQualifier,
+  type PartialDate,
+} from "~/lib/fuzzy-date";
+
+const qualifierOptions: { value: FuzzyDateQualifier; label: string }[] = [
+  { value: "exact", label: "Exact" },
+  { value: "about", label: "About" },
+  { value: "before", label: "Before" },
+  { value: "after", label: "After" },
+  { value: "between", label: "Between" },
+  { value: "unknown", label: "Unknown" },
+];
+
+const monthOptions = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+type FuzzyDateFieldProps = {
+  value: FuzzyDate | null;
+  onChange: (value: FuzzyDate | null) => void;
+  id?: string;
+  compact?: boolean;
+  disabled?: boolean;
+};
+
+export function FuzzyDateField(props: FuzzyDateFieldProps) {
+  const value = () => props.value ?? { start: emptyPartialDate(), qualifier: "exact" as const };
+  const qualifier = () => value().qualifier;
+  const start = () => value().start;
+  const end = () => value().end ?? emptyPartialDate();
+
+  const preview = createMemo(() => {
+    const current = props.value;
+    if (!current) return "";
+    return formatFuzzyDate(current);
+  });
+
+  const invalid = createMemo(() => Boolean(props.value) && !isValidFuzzyDate(props.value!));
+
+  function emit(next: Partial<Pick<FuzzyDate, "start" | "end" | "qualifier">>) {
+    const merged: FuzzyDate = {
+      start: next.start ?? start(),
+      end: next.end !== undefined ? next.end : qualifier() === "between" ? end() : null,
+      qualifier: next.qualifier ?? qualifier(),
+    };
+
+    if (merged.qualifier !== "between") merged.end = null;
+    if (merged.qualifier === "between" && !merged.end) merged.end = emptyPartialDate();
+
+    if (
+      merged.qualifier === "exact" &&
+      merged.start.year === null &&
+      merged.start.month === null &&
+      merged.start.day === null
+    ) {
+      props.onChange(null);
+      return;
+    }
+
+    props.onChange(merged);
+  }
+
+  function changeQualifier(next: FuzzyDateQualifier) {
+    if (next === "unknown") {
+      props.onChange({ start: emptyPartialDate(), qualifier: "unknown" });
+      return;
+    }
+    emit({
+      qualifier: next,
+      end: next === "between" ? (props.value?.end ?? emptyPartialDate()) : null,
+      start: props.value?.start ?? emptyPartialDate(),
+    });
+  }
+
+  function updatePart(target: "start" | "end", field: keyof PartialDate, raw: string) {
+    const current = target === "start" ? start() : end();
+    let next: PartialDate = { ...current };
+
+    if (field === "month") {
+      next.month = raw ? Number(raw) : null;
+      if (next.month === null) next.day = null;
+    } else if (field === "day") {
+      next.day = raw ? Number(raw) : null;
+    } else {
+      next.year = raw ? Number(raw) : null;
+    }
+
+    if (field === "year" && next.year === null && next.month === null) {
+      next.day = null;
+    }
+
+    emit(target === "start" ? { start: next } : { end: next });
+  }
+
+  return (
+    <div class="space-y-2">
+      <div class="flex items-center gap-2">
+        <select
+          class={`input ${props.compact ? "!py-1 text-xs" : ""}`}
+          value={qualifier()}
+          disabled={props.disabled}
+          aria-label="Date type"
+          onChange={event =>
+            changeQualifier(event.currentTarget.value as FuzzyDateQualifier)
+          }
+        >
+          <For each={qualifierOptions}>
+            {option => <option value={option.value}>{option.label}</option>}
+          </For>
+        </select>
+        <Show when={preview()}>
+          <span class="truncate text-xs text-muted-foreground">{preview()}</span>
+        </Show>
+      </div>
+
+      <Show when={qualifier() !== "unknown"}>
+        <DatePartsInputs
+          id={props.id}
+          parts={start()}
+          compact={props.compact}
+          disabled={props.disabled}
+          onChange={(field, raw) => updatePart("start", field, raw)}
+        />
+
+        <Show when={qualifier() === "between"}>
+          <div class="flex items-center gap-2">
+            <span class="text-[0.68rem] font-semibold uppercase tracking-wide text-muted-foreground">
+              to
+            </span>
+            <span class="h-px flex-1 bg-border" />
+          </div>
+          <DatePartsInputs
+            parts={end()}
+            compact={props.compact}
+            disabled={props.disabled}
+            onChange={(field, raw) => updatePart("end", field, raw)}
+          />
+        </Show>
+      </Show>
+
+      <Show when={invalid()}>
+        <p class="text-xs text-destructive">Check the date.</p>
+      </Show>
+    </div>
+  );
+}
+
+function DatePartsInputs(props: {
+  parts: PartialDate;
+  id?: string;
+  compact?: boolean;
+  disabled?: boolean;
+  onChange: (field: keyof PartialDate, raw: string) => void;
+}) {
+  const inputClass = () => `input min-w-0 ${props.compact ? "!py-1 text-xs" : ""}`;
+  const maxDay = () =>
+    props.parts.month ? daysInMonth(props.parts.year, props.parts.month) : 31;
+
+  return (
+    <div class="grid grid-cols-[minmax(0,0.9fr)_minmax(0,1.2fr)_minmax(0,0.8fr)] gap-2">
+      <input
+        id={props.id}
+        type="number"
+        class={inputClass()}
+        placeholder="Year"
+        min={1}
+        max={9999}
+        inputmode="numeric"
+        value={props.parts.year ?? ""}
+        disabled={props.disabled}
+        aria-label="Year"
+        onInput={event => props.onChange("year", event.currentTarget.value)}
+      />
+      <select
+        class={inputClass()}
+        value={props.parts.month ?? ""}
+        disabled={props.disabled}
+        aria-label="Month"
+        onChange={event => props.onChange("month", event.currentTarget.value)}
+      >
+        <option value="">Month</option>
+        <For each={monthOptions}>
+          {(month, index) => <option value={index() + 1}>{month}</option>}
+        </For>
+      </select>
+      <input
+        type="number"
+        class={inputClass()}
+        placeholder="Day"
+        min={1}
+        max={maxDay()}
+        inputmode="numeric"
+        value={props.parts.day ?? ""}
+        disabled={props.disabled || props.parts.month === null}
+        aria-label="Day"
+        onInput={event => props.onChange("day", event.currentTarget.value)}
+      />
+    </div>
+  );
+}

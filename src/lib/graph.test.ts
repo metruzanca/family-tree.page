@@ -160,6 +160,7 @@ describe("buildGraphModel", () => {
       },
     ],
     groups: [],
+    events: [],
   };
 
   it("adds non-avatar files when media is visible", () => {
@@ -240,6 +241,7 @@ describe("buildGraphModel", () => {
         relationships: familyRelationships,
         files: [],
         groups: [],
+        events: [],
       },
       false,
       "oldest-top",
@@ -269,6 +271,7 @@ function treeWith(
     relationships,
     files: [],
     groups: [],
+    events: [],
   };
 }
 

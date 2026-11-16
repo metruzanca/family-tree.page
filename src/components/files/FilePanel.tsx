@@ -17,6 +17,7 @@ import { IconButton } from "../ui/icon-button";
 import { FilePeopleSection } from "./FilePeopleSection";
 import { TakenAtField } from "./TakenAtField";
 import { formatBytes, formatDate, formatRelative } from "~/lib/format";
+import type { FuzzyDate } from "~/lib/fuzzy-date";
 
 type FilePanelProps = {
   file: GraphFile;
@@ -30,7 +31,7 @@ type FilePanelProps = {
   onSelectPerson: (id: string) => void;
   onSetAvatar: (fileId: string | null) => void;
   onSaveTags: (personIds: string[]) => void;
-  onSetTakenAt: (value: string | null) => void;
+  onSetTakenAt: (value: FuzzyDate | null) => void;
   onDelete: () => void;
 };
 

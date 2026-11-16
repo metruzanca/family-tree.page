@@ -7,10 +7,10 @@ import {
   monthGrid,
   nextBirthday,
   occurrenceForYear,
-  parseDateParts,
   sameDate,
   upcomingBirthdays,
 } from "./calendar";
+import { exactFuzzyDate } from "./fuzzy-date";
 
 function person(overrides: Partial<GraphPerson> & { id: string }): GraphPerson {
   return {
@@ -30,13 +30,6 @@ function person(overrides: Partial<GraphPerson> & { id: string }): GraphPerson {
 }
 
 describe("calendar helpers", () => {
-  it("parses valid dates only", () => {
-    expect(parseDateParts("1991-04-27")).toEqual({ year: 1991, month: 3, day: 27 });
-    expect(parseDateParts("1991-02-29")).toBeNull();
-    expect(parseDateParts("")).toBeNull();
-    expect(parseDateParts(null)).toBeNull();
-  });
-
   it("moves February 29 birthdays to February 28 in common years", () => {
     expect(occurrenceForYear({ year: 2000, month: 1, day: 29 }, 2024)).toEqual({
       year: 2024,
@@ -51,7 +44,11 @@ describe("calendar helpers", () => {
   });
 
   it("finds the next birthday and age", () => {
-    const next = nextBirthday("1991-04-27", { year: 2026, month: 3, day: 15 });
+    const next = nextBirthday(exactFuzzyDate(1991, 4, 27), {
+      year: 2026,
+      month: 3,
+      day: 15,
+    });
     expect(next).toEqual({
       date: { year: 2026, month: 3, day: 27 },
       age: 35,
@@ -60,16 +57,24 @@ describe("calendar helpers", () => {
   });
 
   it("rolls over to next year after the birthday", () => {
-    const next = nextBirthday("1991-04-27", { year: 2026, month: 4, day: 1 });
+    const next = nextBirthday(exactFuzzyDate(1991, 4, 27), {
+      year: 2026,
+      month: 4,
+      day: 1,
+    });
     expect(next?.date).toEqual({ year: 2027, month: 3, day: 27 });
     expect(next?.age).toBe(36);
   });
 
   it("lists only living people with known birthdays, soonest first", () => {
     const people = [
-      person({ id: "mia", displayName: "Mia Simpson", birthDate: "1991-04-27" }),
-      person({ id: "sam", displayName: "Sam Simpson", birthDate: "1988-04-20" }),
-      person({ id: "giuseppe", birthDate: "1928-04-21", deathDate: "2004-11-02" }),
+      person({ id: "mia", displayName: "Mia Simpson", birthDate: exactFuzzyDate(1991, 4, 27) }),
+      person({ id: "sam", displayName: "Sam Simpson", birthDate: exactFuzzyDate(1988, 4, 20) }),
+      person({
+        id: "giuseppe",
+        birthDate: exactFuzzyDate(1928, 4, 21),
+        deathDate: exactFuzzyDate(2004, 11, 2),
+      }),
       person({ id: "unknown" }),
     ];
     const rows = upcomingBirthdays(people, { year: 2026, month: 3, day: 18 });
@@ -91,8 +96,8 @@ describe("calendar helpers", () => {
   it("places birth and death anniversaries on the right days", () => {
     const giuseppe = person({
       id: "giuseppe",
-      birthDate: "1928-03-14",
-      deathDate: "2004-11-02",
+      birthDate: exactFuzzyDate(1928, 3, 14),
+      deathDate: exactFuzzyDate(2004, 11, 2),
     });
     const events = calendarEvents([giuseppe], 2026);
     expect(events).toHaveLength(2);
@@ -103,8 +108,32 @@ describe("calendar helpers", () => {
   });
 
   it("matches birthdays against an offset target day", () => {
-    expect(birthdayMatchesOn("1991-04-27", { year: 2026, month: 3, day: 27 })).toBe(true);
-    expect(birthdayMatchesOn("1991-04-27", { year: 2026, month: 3, day: 26 })).toBe(false);
-    expect(birthdayMatchesOn("2000-02-29", { year: 2025, month: 1, day: 28 })).toBe(true);
+    expect(
+      birthdayMatchesOn(exactFuzzyDate(1991, 4, 27), { year: 2026, month: 3, day: 27 }),
+    ).toBe(true);
+    expect(
+      birthdayMatchesOn(exactFuzzyDate(1991, 4, 27), { year: 2026, month: 3, day: 26 }),
+    ).toBe(false);
+    expect(
+      birthdayMatchesOn(exactFuzzyDate(2000, 2, 29), { year: 2025, month: 1, day: 28 }),
+    ).toBe(true);
+  });
+
+  it("ignores year-only dates for birthdays", () => {
+    const rows = upcomingBirthdays(
+      [person({ id: "year-only", birthDate: exactFuzzyDate(1952) })],
+      { year: 2026, month: 3, day: 18 },
+    );
+    expect(rows).toEqual([]);
+  });
+
+  it("keeps birthdays when the year is unknown", () => {
+    const next = nextBirthday(exactFuzzyDate(null, 4, 27), {
+      year: 2026,
+      month: 3,
+      day: 15,
+    });
+    expect(next?.date).toEqual({ year: 2026, month: 3, day: 27 });
+    expect(next?.age).toBeNull();
   });
 });

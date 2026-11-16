@@ -1,4 +1,5 @@
 import { sql } from "drizzle-orm";
+import type { FuzzyDate } from "../src/lib/fuzzy-date";
 import {
   boolean,
   check,
@@ -35,6 +36,16 @@ export const partnershipStatus = pgEnum("partnership_status", [
 ]);
 export const fileKind = pgEnum("file_kind", ["image", "document", "other"]);
 export const fileStatus = pgEnum("file_status", ["uploading", "ready", "failed"]);
+export const personEventKind = pgEnum("person_event_kind", [
+  "residence",
+  "occupation",
+  "education",
+  "military",
+  "immigration",
+  "emigration",
+  "burial",
+  "other",
+]);
 export const fileTagSource = pgEnum("file_tag_source", ["manual", "face"]);
 export const authTokenKind = pgEnum("auth_token_kind", [
   "email_verification",
@@ -174,8 +185,8 @@ export const people = pgTable(
     lastName: text("last_name").notNull().default(""),
     maidenName: text("maiden_name"),
     nickname: text("nickname"),
-    birthDate: date("birth_date", { mode: "string" }),
-    deathDate: date("death_date", { mode: "string" }),
+    birthDate: jsonb("birth_date").$type<FuzzyDate>(),
+    deathDate: jsonb("death_date").$type<FuzzyDate>(),
     birthPlace: text("birth_place"),
     deathPlace: text("death_place"),
     bio: text("bio"),
@@ -186,6 +197,34 @@ export const people = pgTable(
   t => [
     index("people_tree_idx").on(t.treeId),
     unique("people_id_tree_unique").on(t.id, t.treeId),
+  ],
+);
+
+export const personEvents = pgTable(
+  "person_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    treeId: uuid("tree_id")
+      .notNull()
+      .references(() => trees.id, { onDelete: "cascade" }),
+    personId: uuid("person_id").notNull(),
+    kind: personEventKind("kind").notNull().default("other"),
+    title: text("title"),
+    place: text("place"),
+    date: jsonb("date").$type<FuzzyDate>(),
+    description: text("description"),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  t => [
+    index("person_events_tree_idx").on(t.treeId),
+    index("person_events_person_idx").on(t.personId),
+    foreignKey({
+      columns: [t.personId, t.treeId],
+      foreignColumns: [people.id, people.treeId],
+      name: "person_events_person_fk",
+    }).onDelete("cascade"),
   ],
 );
 
@@ -253,8 +292,8 @@ export const partnerships = pgTable(
     personAId: uuid("person_a_id").notNull(),
     personBId: uuid("person_b_id").notNull(),
     status: partnershipStatus("status").notNull().default("partnered"),
-    startDate: date("start_date", { mode: "string" }),
-    endDate: date("end_date", { mode: "string" }),
+    startDate: jsonb("start_date").$type<FuzzyDate>(),
+    endDate: jsonb("end_date").$type<FuzzyDate>(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   t => [
@@ -292,7 +331,7 @@ export const files = pgTable(
     sizeBytes: integer("size_bytes").notNull().default(0),
     width: integer("width"),
     height: integer("height"),
-    takenAt: date("taken_at", { mode: "string" }),
+    takenAt: jsonb("taken_at").$type<FuzzyDate>(),
     status: fileStatus("status").notNull().default("uploading"),
     isAvatar: boolean("is_avatar").notNull().default(false),
     uploadedBy: uuid("uploaded_by").references(() => users.id, { onDelete: "set null" }),
@@ -365,6 +404,7 @@ export type Tree = typeof trees.$inferSelect;
 export type TreeMember = typeof treeMembers.$inferSelect;
 export type TreeInvite = typeof treeInvites.$inferSelect;
 export type Person = typeof people.$inferSelect;
+export type PersonEvent = typeof personEvents.$inferSelect;
 export type ParentChild = typeof parentChild.$inferSelect;
 export type Partnership = typeof partnerships.$inferSelect;
 export type FileGroup = typeof fileGroups.$inferSelect;

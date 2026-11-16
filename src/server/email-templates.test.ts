@@ -58,6 +58,20 @@ describe("email templates", () => {
     expect(message.text).toContain("https://family-tree.test/trees");
   });
 
+  it("omits the age when the birth year is unknown", () => {
+    const message = birthdayMessage({
+      name: "Sam",
+      kind: "day_of",
+      entries: [
+        { personName: "Mia", treeName: "Family", date: "April 27", age: null },
+      ],
+      url: "https://family-tree.test/trees",
+    });
+    expect(message.html).toContain("has a birthday today");
+    expect(message.text).toContain("has a birthday today");
+    expect(message.html).not.toContain("turns");
+  });
+
   it("uses a plural subject for several birthdays", () => {
     const message = birthdayMessage({
       name: "Sam",

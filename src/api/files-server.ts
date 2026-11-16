@@ -29,6 +29,7 @@ import {
   storageKeys,
 } from "../server/file-service";
 import { createUploadPost } from "../server/storage";
+import type { FuzzyDate } from "../lib/fuzzy-date";
 
 export type PreparedUpload = {
   fileId: string;
@@ -46,7 +47,7 @@ export async function prepareUpload(input: {
   thumbMime?: string | null;
   width?: number | null;
   height?: number | null;
-  takenAt?: string | null;
+  takenAt?: FuzzyDate | null;
 }): Promise<ActionResult<PreparedUpload>> {
   return runAction(async () => {
     const access = await requireTreeMember(input.treeId, "editor");
@@ -318,7 +319,7 @@ export async function updateFileTags(input: {
 export async function updateFileTakenAt(input: {
   treeId: string;
   fileId: string;
-  takenAt: string | null;
+  takenAt: FuzzyDate | null;
 }): Promise<ActionResult<undefined>> {
   return runAction(async () => {
     const access = await requireTreeMember(input.treeId, "editor");

@@ -5,9 +5,15 @@ import type {
   GraphFile,
   GraphFileGroup,
   GraphPerson,
+  GraphPersonEvent,
   GraphRelationship,
 } from "~/api/people-server";
-import { deleteParentChild, deletePartnership, deletePerson } from "~/api/people-server";
+import {
+  deleteParentChild,
+  deletePartnership,
+  deletePerson,
+  deletePersonEvent,
+} from "~/api/people-server";
 import {
   createFileGroup,
   deleteFile,
@@ -24,6 +30,7 @@ import { GraphToolbar } from "~/components/graph/GraphToolbar";
 import { GraphSearch } from "~/components/graph/GraphSearch";
 import { PersonPanel } from "~/components/people/PersonPanel";
 import { PersonFormDialog } from "~/components/people/PersonFormDialog";
+import { PersonEventDialog } from "~/components/people/PersonEventDialog";
 import { AddRelativeDialog } from "~/components/people/AddRelativeDialog";
 import { FilePanel } from "~/components/files/FilePanel";
 import { MediaLightbox } from "~/components/files/MediaLightbox";
@@ -33,6 +40,7 @@ import { Button } from "~/components/ui/button";
 import { useToast } from "~/components/ui/Toast";
 import { uploadPersonFile } from "~/lib/upload";
 import { attemptAction, friendlyMessage } from "~/lib/action-result";
+import type { FuzzyDate } from "~/lib/fuzzy-date";
 import { fileNodeId, groupNodeId, type GenerationDirection } from "~/lib/graph";
 import { analyzeRelationships, type RelationshipConflict } from "~/lib/relationships";
 import { track } from "~/lib/analytics";
@@ -73,6 +81,10 @@ function TreePageInner() {
   const [addPersonOpen, setAddPersonOpen] = createSignal(false);
   const [editPersonOpen, setEditPersonOpen] = createSignal(false);
   const [addRelativeOpen, setAddRelativeOpen] = createSignal(false);
+  const [eventDialogOpen, setEventDialogOpen] = createSignal(false);
+  const [eventTarget, setEventTarget] = createSignal<GraphPersonEvent | null>(null);
+  const [deleteEventTarget, setDeleteEventTarget] = createSignal<GraphPersonEvent | null>(null);
+  const [pendingDeleteEvent, setPendingDeleteEvent] = createSignal(false);
   const [deletePersonOpen, setDeletePersonOpen] = createSignal(false);
   const [deleteFileTarget, setDeleteFileTarget] = createSignal<GraphFile | null>(null);
   const [deleteGroupTarget, setDeleteGroupTarget] = createSignal<GraphFileGroup | null>(null);
@@ -365,7 +377,7 @@ function TreePageInner() {
     toast.show("Photo tags updated.", "success");
   }
 
-  async function handleSetTakenAt(fileId: string, value: string | null) {
+  async function handleSetTakenAt(fileId: string, value: FuzzyDate | null) {
     setTakenAtPending(true);
     const result = await attemptAction(() =>
       updateFileTakenAt({ treeId: params.treeId, fileId, takenAt: value }),
@@ -466,6 +478,33 @@ function TreePageInner() {
     await revalidate([getTreeGraph.key, getTreeOverview.key, getMyTrees.key]);
     track("relationship_removed", { relation: relationship.type });
     toast.show("Connection removed.", "success");
+  }
+
+  function openAddEvent() {
+    setEventTarget(null);
+    setEventDialogOpen(true);
+  }
+
+  function openEditEvent(event: GraphPersonEvent) {
+    setEventTarget(event);
+    setEventDialogOpen(true);
+  }
+
+  async function handleDeleteEvent() {
+    const event = deleteEventTarget();
+    if (!event) return;
+    setPendingDeleteEvent(true);
+    const result = await attemptAction(() =>
+      deletePersonEvent({ treeId: params.treeId, eventId: event.id }),
+    );
+    setPendingDeleteEvent(false);
+    if (!result.ok) {
+      toast.show(result.error, "error");
+      return;
+    }
+    setDeleteEventTarget(null);
+    await revalidate(getTreeGraph.key);
+    toast.show("Event removed.", "success");
   }
 
   const lightboxFiles = createMemo(() => {
@@ -599,6 +638,9 @@ function TreePageInner() {
                 onDeleteFile={file => setDeleteFileTarget(file)}
                 onUpload={handleUpload}
                 onRemoveRelationship={handleRemoveRelationship}
+                onAddEvent={openAddEvent}
+                onEditEvent={openEditEvent}
+                onDeleteEvent={event => setDeleteEventTarget(event)}
               />
             )}
           </Show>
@@ -709,6 +751,29 @@ function TreePageInner() {
             relationships={graph().relationships}
             anchorParentCount={selectedParentCount()}
             onAdded={focusPerson}
+          />
+
+          <Show when={selectedPerson()}>
+            {person => (
+              <PersonEventDialog
+                open={eventDialogOpen()}
+                onClose={() => setEventDialogOpen(false)}
+                treeId={params.treeId}
+                person={person()}
+                event={eventTarget()}
+              />
+            )}
+          </Show>
+
+          <ConfirmDialog
+            open={Boolean(deleteEventTarget())}
+            onClose={() => setDeleteEventTarget(null)}
+            title={`Delete ${deleteEventTarget()?.title ?? "this event"}?`}
+            message="The life event will be removed from this person's timeline."
+            confirmLabel="Delete event"
+            danger
+            pending={pendingDeleteEvent()}
+            onConfirm={handleDeleteEvent}
           />
 
           <ConfirmDialog

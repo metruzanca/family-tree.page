@@ -4,6 +4,7 @@ import type { TreeGraph } from "~/api/people-server";
 import type { TreeRole } from "~/server/guards";
 import type { PresencePeer } from "~/lib/presence-protocol";
 import { presenceColor } from "~/lib/presence-color";
+import { formatFuzzyYearRange } from "~/lib/fuzzy-date";
 import { cx } from "~/lib/utils";
 import {
   branchColor,
@@ -395,12 +396,9 @@ export function GraphView(props: GraphViewProps) {
         context.fillStyle = colors.ink;
         context.fillText(label, node.x ?? 0, labelY);
 
-        const years =
-          node.person?.birthDate || node.person?.deathDate
-            ? [node.person?.birthDate?.slice(0, 4), node.person?.deathDate?.slice(0, 4)]
-                .filter(Boolean)
-                .join(" - ")
-            : "";
+        const years = node.person
+          ? formatFuzzyYearRange(node.person.birthDate, node.person.deathDate)
+          : "";
         if (years && globalScale > 1.35) {
           const small = 9.5 / globalScale;
           context.font = `400 ${small}px ui-sans-serif, system-ui, sans-serif`;

@@ -18,8 +18,10 @@ import {
 } from "../ui/select";
 import { Modal } from "../ui/Modal";
 import { useToast } from "../ui/Toast";
+import { FuzzyDateField } from "../ui/FuzzyDateField";
 import { attemptAction } from "~/lib/action-result";
 import { track } from "~/lib/analytics";
+import { formatFuzzyYearRange, type FuzzyDate } from "~/lib/fuzzy-date";
 
 type Relation = "parent" | "partner" | "child";
 
@@ -64,8 +66,8 @@ export function AddRelativeDialog(props: {
     firstName: "",
     lastName: "",
     nickname: "",
-    birthDate: "",
-    deathDate: "",
+    birthDate: null as FuzzyDate | null,
+    deathDate: null as FuzzyDate | null,
   });
 
   const parentDisabled = () => props.anchorParentCount >= 2;
@@ -126,7 +128,7 @@ export function AddRelativeDialog(props: {
         setError("");
         setMode("existing");
         setRelation(parentDisabled() ? "child" : "parent");
-        setForm({ firstName: "", lastName: "", nickname: "", birthDate: "", deathDate: "" });
+        setForm({ firstName: "", lastName: "", nickname: "", birthDate: null, deathDate: null });
       },
     ),
   );
@@ -135,7 +137,7 @@ export function AddRelativeDialog(props: {
     setSearch("");
     setSelectedId(null);
     setError("");
-    setForm({ firstName: "", lastName: "", nickname: "", birthDate: "", deathDate: "" });
+    setForm({ firstName: "", lastName: "", nickname: "", birthDate: null, deathDate: null });
     requestAnimationFrame(() => {
       const target =
         mode() === "new"
@@ -393,7 +395,7 @@ export function AddRelativeDialog(props: {
                         <span class="block truncate text-sm font-medium">{person.displayName}</span>
                         <Show when={person.birthDate}>
                           <span class="block text-[0.7rem] text-muted-foreground">
-                            Born {person.birthDate!.slice(0, 4)}
+                            Born {formatFuzzyYearRange(person.birthDate, null)}
                           </span>
                         </Show>
                       </span>
@@ -425,21 +427,17 @@ export function AddRelativeDialog(props: {
               />
             </Field>
             <Field label="Born" for="relative-birth">
-              <input
+              <FuzzyDateField
                 id="relative-birth"
-                type="date"
-                class="input"
                 value={form.birthDate}
-                onInput={event => setForm("birthDate", event.currentTarget.value)}
+                onChange={value => setForm("birthDate", value)}
               />
             </Field>
             <Field label="Died" for="relative-death">
-              <input
+              <FuzzyDateField
                 id="relative-death"
-                type="date"
-                class="input"
                 value={form.deathDate}
-                onInput={event => setForm("deathDate", event.currentTarget.value)}
+                onChange={value => setForm("deathDate", value)}
               />
             </Field>
           </div>

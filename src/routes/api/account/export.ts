@@ -11,6 +11,7 @@ import {
   parentChild,
   partnerships,
   people,
+  personEvents,
   treeMembers,
   trees,
   users,
@@ -71,20 +72,29 @@ export async function GET(event: APIEvent) {
     const membership = memberships.find(row => row.treeId === tree.id);
     if (!membership) continue;
 
-    const [peopleRows, parentRows, partnerRows, groupRows, fileRows, tagRows, memberRows] =
-      await Promise.all([
-        db.select().from(people).where(eq(people.treeId, tree.id)),
-        db.select().from(parentChild).where(eq(parentChild.treeId, tree.id)),
-        db.select().from(partnerships).where(eq(partnerships.treeId, tree.id)),
-        db.select().from(fileGroups).where(eq(fileGroups.treeId, tree.id)),
-        db.select().from(files).where(eq(files.treeId, tree.id)),
-        db.select().from(fileTags).where(eq(fileTags.treeId, tree.id)),
-        db
-          .select({ displayName: users.displayName, role: treeMembers.role })
-          .from(treeMembers)
-          .innerJoin(users, eq(users.id, treeMembers.userId))
-          .where(eq(treeMembers.treeId, tree.id)),
-      ]);
+    const [
+      peopleRows,
+      parentRows,
+      partnerRows,
+      groupRows,
+      fileRows,
+      tagRows,
+      memberRows,
+      eventRows,
+    ] = await Promise.all([
+      db.select().from(people).where(eq(people.treeId, tree.id)),
+      db.select().from(parentChild).where(eq(parentChild.treeId, tree.id)),
+      db.select().from(partnerships).where(eq(partnerships.treeId, tree.id)),
+      db.select().from(fileGroups).where(eq(fileGroups.treeId, tree.id)),
+      db.select().from(files).where(eq(files.treeId, tree.id)),
+      db.select().from(fileTags).where(eq(fileTags.treeId, tree.id)),
+      db
+        .select({ displayName: users.displayName, role: treeMembers.role })
+        .from(treeMembers)
+        .innerJoin(users, eq(users.id, treeMembers.userId))
+        .where(eq(treeMembers.treeId, tree.id)),
+      db.select().from(personEvents).where(eq(personEvents.treeId, tree.id)),
+    ]);
 
     exportTrees.push({
       tree: {
@@ -117,6 +127,7 @@ export async function GET(event: APIEvent) {
         updatedAt: file.updatedAt,
       })),
       fileTags: tagRows,
+      personEvents: eventRows,
     });
 
     if (includeMedia) {

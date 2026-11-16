@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildBirthdayCalendar, type BirthdayPerson } from "./birthday-ical";
+import { exactFuzzyDate } from "./fuzzy-date";
 
 function person(overrides: Partial<BirthdayPerson> & { id: string }): BirthdayPerson {
   return {
@@ -7,7 +8,7 @@ function person(overrides: Partial<BirthdayPerson> & { id: string }): BirthdayPe
     firstName: overrides.firstName ?? overrides.id,
     lastName: overrides.lastName ?? "Simpson",
     nickname: overrides.nickname ?? null,
-    birthDate: overrides.birthDate ?? "1991-04-27",
+    birthDate: overrides.birthDate ?? exactFuzzyDate(1991, 4, 27),
     deathDate: overrides.deathDate ?? null,
     treeId: overrides.treeId ?? "tree-1",
     treeName: overrides.treeName ?? "Simpson family",
@@ -26,8 +27,8 @@ describe("birthday calendar", () => {
           id: "giuseppe",
           firstName: "Giuseppe",
           lastName: "Simpson",
-          birthDate: "1928-03-14",
-          deathDate: "2004-11-02",
+          birthDate: exactFuzzyDate(1928, 3, 14),
+          deathDate: exactFuzzyDate(2004, 11, 2),
         }),
       ],
     });
@@ -39,10 +40,10 @@ describe("birthday calendar", () => {
     expect(unfolded).toContain("DTEND;VALUE=DATE:19910428\r\n");
     expect(unfolded).toContain("SUMMARY:Mia Simpson's birthday\r\n");
     expect(unfolded).toContain(
-      "DESCRIPTION:Born 1991.\\nSimpson family.\\nhttps://family-tree.page/trees/tree-1?person=mia\r\n",
+      "DESCRIPTION:Born Apr 27\\, 1991.\\nSimpson family.\\nhttps://family-tree.page/trees/tree-1?person=mia\r\n",
     );
     expect(unfolded).toContain(
-      "DESCRIPTION:Born 1928.\\nDied 2004.\\nSimpson family.\\nhttps://family-tree.page/trees/tree-1?person=giuseppe\r\n",
+      "DESCRIPTION:Born Mar 14\\, 1928.\\nDied Nov 2\\, 2004.\\nSimpson family.\\nhttps://family-tree.page/trees/tree-1?person=giuseppe\r\n",
     );
     expect(body.match(/RRULE:FREQ=YEARLY\r\n/g)).toHaveLength(2);
   });
@@ -51,7 +52,7 @@ describe("birthday calendar", () => {
     const body = buildBirthdayCalendar({
       userName: "Ada",
       origin: "https://family-tree.page",
-      people: [person({ id: "leap", birthDate: "2000-02-29" })],
+      people: [person({ id: "leap", birthDate: exactFuzzyDate(2000, 2, 29) })],
     });
 
     expect(body).toContain(
@@ -59,11 +60,11 @@ describe("birthday calendar", () => {
     );
   });
 
-  it("skips people without a valid birth date", () => {
+  it("skips people without a month and day", () => {
     const body = buildBirthdayCalendar({
       userName: "Ada",
       origin: "https://family-tree.page",
-      people: [person({ id: "unknown", birthDate: "" })],
+      people: [person({ id: "unknown", birthDate: exactFuzzyDate(1952) })],
     });
 
     expect(body).not.toContain("BEGIN:VEVENT");

@@ -28,6 +28,7 @@ import { IconButton } from "../ui/icon-button";
 import { FilePeopleSection } from "./FilePeopleSection";
 import { TakenAtField } from "./TakenAtField";
 import { formatBytes, formatDate, formatRelative } from "~/lib/format";
+import type { FuzzyDate } from "~/lib/fuzzy-date";
 
 type MediaLightboxProps = {
   files: GraphFile[];
@@ -43,7 +44,7 @@ type MediaLightboxProps = {
   onSelectPerson: (id: string) => void;
   onSetAvatar: (personId: string, fileId: string | null) => void;
   onSaveTags: (fileId: string, personIds: string[]) => void;
-  onSetTakenAt: (fileId: string, value: string | null) => void;
+  onSetTakenAt: (fileId: string, value: FuzzyDate | null) => void;
   onDeleteFile: (file: GraphFile) => void;
   onRenameGroup?: (name: string) => void;
   onDeleteGroup?: () => void;

@@ -236,7 +236,7 @@ export function birthdayMessage(input: {
     personName: string;
     treeName: string;
     date: string;
-    age: number;
+    age: number | null;
   }[];
   url: string;
 }): EmailMessage {
@@ -267,7 +267,11 @@ export function birthdayMessage(input: {
         : input.kind === "day_before"
           ? "tomorrow"
           : `on ${date}`;
-    return `<li style="margin:0 0 10px;font-size:15px;line-height:1.6;color:${BRAND.body};"><strong style="color:${BRAND.ink};">${name}</strong> turns ${entry.age} ${timing} in ${tree}.</li>`;
+    const detail =
+      entry.age === null
+        ? `has a birthday ${timing}`
+        : `turns ${entry.age} ${timing}`;
+    return `<li style="margin:0 0 10px;font-size:15px;line-height:1.6;color:${BRAND.body};"><strong style="color:${BRAND.ink};">${name}</strong> ${detail} in ${tree}.</li>`;
   });
 
   const textLines = input.entries.map(entry => {
@@ -277,7 +281,9 @@ export function birthdayMessage(input: {
         : input.kind === "day_before"
           ? "tomorrow"
           : `on ${entry.date}`;
-    return `- ${entry.personName} turns ${entry.age} ${timing} in ${entry.treeName}.`;
+    return entry.age === null
+      ? `- ${entry.personName} has a birthday ${timing} in ${entry.treeName}.`
+      : `- ${entry.personName} turns ${entry.age} ${timing} in ${entry.treeName}.`;
   });
 
   return {

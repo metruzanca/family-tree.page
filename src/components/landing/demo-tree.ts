@@ -6,6 +6,7 @@ import type {
   TreeGraph,
 } from "~/api/people-server";
 import type { GraphNode } from "~/lib/graph";
+import { exactDateFromISO } from "~/lib/fuzzy-date";
 
 /**
  * A static demo tree for the landing page. It is deliberately separate from the
@@ -136,7 +137,7 @@ export const demoPeople: GraphPerson[] = personSeeds.map(person => ({
   displayName: `${person.firstName} ${person.lastName}`,
   maidenName: null,
   nickname: null,
-  birthDate: person.birthDate,
+  birthDate: exactDateFromISO(person.birthDate),
   deathDate: null,
   birthPlace: person.birthPlace,
   deathPlace: null,
@@ -156,7 +157,7 @@ const partnership = (
   source,
   target,
   status,
-  startDate,
+  startDate: exactDateFromISO(startDate),
   endDate: null,
 });
 
@@ -211,7 +212,7 @@ const file = (
   width: 360,
   height: 240,
   sizeBytes: 18_000,
-  takenAt: options.createdAt ? options.createdAt.slice(0, 10) : null,
+  takenAt: exactDateFromISO(options.createdAt ?? null),
   taggedPersonIds: [],
   createdAt: new Date(options.createdAt ?? "2017-05-12T00:00:00Z"),
   isAvatar: false,
@@ -263,6 +264,7 @@ export const demoTree: TreeGraph = {
   relationships: demoRelationships,
   files: demoFiles,
   groups: demoGroups,
+  events: [],
 };
 
 const avatarUrls: Record<string, string> = Object.fromEntries(

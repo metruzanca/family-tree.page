@@ -8,16 +8,18 @@ import { Button } from "../ui/button";
 import { Field } from "../ui/Field";
 import { Modal } from "../ui/Modal";
 import { useToast } from "../ui/Toast";
+import { FuzzyDateField } from "../ui/FuzzyDateField";
 import { attemptAction } from "~/lib/action-result";
 import { track } from "~/lib/analytics";
+import type { FuzzyDate } from "~/lib/fuzzy-date";
 
 export type PersonFormState = {
   firstName: string;
   lastName: string;
   maidenName: string;
   nickname: string;
-  birthDate: string;
-  deathDate: string;
+  birthDate: FuzzyDate | null;
+  deathDate: FuzzyDate | null;
   birthPlace: string;
   deathPlace: string;
   bio: string;
@@ -28,8 +30,8 @@ const emptyForm: PersonFormState = {
   lastName: "",
   maidenName: "",
   nickname: "",
-  birthDate: "",
-  deathDate: "",
+  birthDate: null,
+  deathDate: null,
   birthPlace: "",
   deathPlace: "",
   bio: "",
@@ -57,8 +59,8 @@ export function PersonFormDialog(props: {
             lastName: person.lastName,
             maidenName: person.maidenName ?? "",
             nickname: person.nickname ?? "",
-            birthDate: person.birthDate ?? "",
-            deathDate: person.deathDate ?? "",
+            birthDate: person.birthDate,
+            deathDate: person.deathDate,
             birthPlace: person.birthPlace ?? "",
             deathPlace: person.deathPlace ?? "",
             bio: person.bio ?? "",
@@ -167,21 +169,17 @@ export function PersonFormDialog(props: {
             />
           </Field>
           <Field label="Born" for="person-birth">
-            <input
+            <FuzzyDateField
               id="person-birth"
-              type="date"
-              class="input"
               value={form.birthDate}
-              onInput={event => setForm("birthDate", event.currentTarget.value)}
+              onChange={value => setForm("birthDate", value)}
             />
           </Field>
           <Field label="Died" for="person-death">
-            <input
+            <FuzzyDateField
               id="person-death"
-              type="date"
-              class="input"
               value={form.deathDate}
-              onInput={event => setForm("deathDate", event.currentTarget.value)}
+              onChange={value => setForm("deathDate", value)}
             />
           </Field>
           <Field label="Birthplace" for="person-birthplace">

@@ -1,6 +1,7 @@
 import { For, Show, createEffect, createMemo, createSignal } from "solid-js";
 import { FileText, Image as ImageIcon, Search } from "lucide-solid";
 import type { GraphFile, GraphPerson, TreeGraph } from "~/api/people-server";
+import { formatFuzzyYearRange } from "~/lib/fuzzy-date";
 import { Avatar } from "../ui/Avatar";
 import { Kbd, KbdGroup } from "../ui/kbd";
 import { Modal } from "../ui/Modal";
@@ -87,9 +88,9 @@ export function GraphSearch(props: {
                     <span class="min-w-0 flex-1">
                       <span class="block truncate text-sm font-medium">{person.displayName}</span>
                       <span class="block truncate text-xs text-muted-foreground">
-                        {[person.birthDate?.slice(0, 4), person.deathDate?.slice(0, 4)]
-                          .filter(Boolean)
-                          .join(" - ") || person.bio?.slice(0, 60) || "No dates yet"}
+                        {formatFuzzyYearRange(person.birthDate, person.deathDate) ||
+                          person.bio?.slice(0, 60) ||
+                          "No dates yet"}
                       </span>
                     </span>
                   </button>

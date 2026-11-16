@@ -11,6 +11,7 @@ import {
   trees,
   users,
 } from "../drizzle/schema";
+import { exactDateFromISO } from "../src/lib/fuzzy-date";
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
@@ -69,6 +70,7 @@ try {
     birthDate?: string;
     deathDate?: string;
     birthPlace?: string;
+    deathPlace?: string;
     bio?: string;
   }) => {
     const [person] = await db
@@ -79,9 +81,10 @@ try {
         lastName: values.lastName ?? "Simpson",
         nickname: values.nickname ?? null,
         maidenName: values.maidenName ?? null,
-        birthDate: values.birthDate ?? null,
-        deathDate: values.deathDate ?? null,
+        birthDate: exactDateFromISO(values.birthDate),
+        deathDate: exactDateFromISO(values.deathDate),
         birthPlace: values.birthPlace ?? null,
+        deathPlace: values.deathPlace ?? null,
         bio: values.bio ?? null,
         createdBy: user.id,
       })

@@ -1,4 +1,5 @@
 import type { GraphPerson } from "~/api/people-server";
+import { birthdayParts, type FuzzyDate } from "./fuzzy-date";
 
 export type DateParts = {
   year: number;
@@ -15,13 +16,13 @@ export type CalendarEvent = {
   kind: CalendarEventKind;
   date: DateParts;
   /** Age reached on a birth anniversary, or years since a death. */
-  years: number;
+  years: number | null;
 };
 
 export type UpcomingBirthday = {
   person: GraphPerson;
   date: DateParts;
-  age: number;
+  age: number | null;
   daysAway: number;
 };
 
@@ -44,16 +45,20 @@ export function daysInMonth(year: number, month: number) {
   return new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
 }
 
-export function parseDateParts(value: string | null | undefined): DateParts | null {
-  if (!value) return null;
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  if (!match) return null;
-  const year = Number(match[1]);
-  const month = Number(match[2]) - 1;
-  const day = Number(match[3]);
-  if (month < 0 || month > 11) return null;
-  if (day < 1 || day > daysInMonth(year, month)) return null;
-  return { year, month, day };
+/**
+ * Converts a fuzzy date to the month and day used by the calendar. Unknown
+ * years use 2000 as a placeholder, so February 29 stays valid.
+ */
+export function birthdayDateParts(
+  value: FuzzyDate | null | undefined,
+): DateParts | null {
+  const parts = birthdayParts(value);
+  if (!parts) return null;
+  return {
+    year: parts.year ?? 2000,
+    month: parts.month - 1,
+    day: parts.day,
+  };
 }
 
 export function dateFromParts(parts: DateParts) {
@@ -97,18 +102,19 @@ export function addDays(parts: DateParts, days: number): DateParts {
 }
 
 export function nextBirthday(
-  birthDate: string | null | undefined,
+  birthDate: FuzzyDate | null | undefined,
   today: DateParts,
-): { date: DateParts; age: number; daysAway: number } | null {
-  const birth = parseDateParts(birthDate);
+): { date: DateParts; age: number | null; daysAway: number } | null {
+  const birth = birthdayParts(birthDate);
   if (!birth) return null;
-  let date = occurrenceForYear(birth, today.year);
+  const anchor = { year: birth.year ?? 2000, month: birth.month - 1, day: birth.day };
+  let date = occurrenceForYear(anchor, today.year);
   if (compareDateParts(date, today) < 0) {
-    date = occurrenceForYear(birth, today.year + 1);
+    date = occurrenceForYear(anchor, today.year + 1);
   }
   return {
     date,
-    age: date.year - birth.year,
+    age: birth.year === null ? null : date.year - birth.year,
     daysAway: dayNumber(date) - dayNumber(today),
   };
 }
@@ -139,26 +145,32 @@ export function calendarEvents(
 ): CalendarEvent[] {
   const events: CalendarEvent[] = [];
   for (const person of people) {
-    const birth = parseDateParts(person.birthDate);
-    const death = parseDateParts(person.deathDate);
+    const birth = birthdayParts(person.birthDate);
+    const death = birthdayParts(person.deathDate);
     if (birth) {
-      const date = occurrenceForYear(birth, year);
+      const date = occurrenceForYear(
+        { year: birth.year ?? 2000, month: birth.month - 1, day: birth.day },
+        year,
+      );
       events.push({
         key: `${person.id}:birth:${year}`,
         person,
         kind: "birth",
         date,
-        years: year - birth.year,
+        years: birth.year === null ? null : year - birth.year,
       });
     }
     if (death) {
-      const date = occurrenceForYear(death, year);
+      const date = occurrenceForYear(
+        { year: death.year ?? 2000, month: death.month - 1, day: death.day },
+        year,
+      );
       events.push({
         key: `${person.id}:death:${year}`,
         person,
         kind: "death",
         date,
-        years: year - death.year,
+        years: death.year === null ? null : year - death.year,
       });
     }
   }
@@ -198,12 +210,15 @@ export function birthdayTargetDay(today: DateParts, offset: BirthdayOffset) {
 }
 
 export function birthdayMatchesOn(
-  birthDate: string | null | undefined,
+  birthDate: FuzzyDate | null | undefined,
   target: DateParts,
 ) {
-  const birth = parseDateParts(birthDate);
+  const birth = birthdayParts(birthDate);
   if (!birth) return false;
-  const occurrence = occurrenceForYear(birth, target.year);
+  const occurrence = occurrenceForYear(
+    { year: birth.year ?? 2000, month: birth.month - 1, day: birth.day },
+    target.year,
+  );
   return occurrence.month === target.month && occurrence.day === target.day;
 }
 

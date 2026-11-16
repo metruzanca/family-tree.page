@@ -1,4 +1,5 @@
-import { addDays, parseDateParts } from "./calendar";
+import { addDays, birthdayDateParts } from "./calendar";
+import { formatFuzzyDate, type FuzzyDate } from "./fuzzy-date";
 import { buildICalendar, type ICalEvent } from "./ical";
 
 export type BirthdayPerson = {
@@ -6,8 +7,8 @@ export type BirthdayPerson = {
   firstName: string;
   lastName: string;
   nickname: string | null;
-  birthDate: string;
-  deathDate: string | null;
+  birthDate: FuzzyDate;
+  deathDate: FuzzyDate | null;
   treeId: string;
   treeName: string;
 };
@@ -29,12 +30,12 @@ export function buildBirthdayCalendar(input: BirthdayCalendarInput) {
   const events: ICalEvent[] = [];
 
   for (const person of input.people) {
-    const birth = parseDateParts(person.birthDate);
+    const birth = birthdayDateParts(person.birthDate);
     if (!birth) continue;
 
     const details = [
-      `Born ${birth.year}.`,
-      person.deathDate ? `Died ${person.deathDate.slice(0, 4)}.` : null,
+      `Born ${formatFuzzyDate(person.birthDate)}.`,
+      person.deathDate ? `Died ${formatFuzzyDate(person.deathDate)}.` : null,
       `${person.treeName}.`,
       `${input.origin}/trees/${person.treeId}?person=${person.id}`,
     ].filter(Boolean);
