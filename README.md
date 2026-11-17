@@ -32,6 +32,8 @@ The graph is the main view. People are nodes, parent and partner relationships a
 - Parent pairs join at one small junction before branching to their children, so each child gets one parent-line arrow
 - Direction flip for oldest-at-top or oldest-at-bottom layouts
 - Disconnected groups inside a tree get their own side-by-side space, so a new unconnected person never overlaps the rest of the tree
+- "This is me" links a member to their person, so the tree opens around their own branch instead of the whole family
+- Focus rings from immediate family out to first cousins, with a "Show more" chip and an Everyone option that reveals the rest of the tree in one click
 - Search, neighbor highlighting, zoom and pan
 - Calendar tab with birth and death anniversaries, plus upcoming birthdays for living relatives
 - Subscribe to all tree birthdays from Google Calendar, Apple Calendar, or Outlook with a private iCal URL
@@ -450,7 +452,7 @@ drizzle/            schema and SQL migrations
 scripts/            migration, seed, storage, dev-service scripts
 src/api/            server functions and query wrappers
 src/components/     graph, people, files, trees, UI primitives
-src/lib/            pure client helpers: graph model, thumbnails, uploads, formatting, presence socket
+src/lib/            pure client helpers: graph model, focus distances, thumbnails, uploads, formatting, presence socket
 src/routes/         file-based routes and API handlers
 src/server/         auth, guards, storage, file service, config, presence state
 server/routes/      Nitro server routes for WebSocket endpoints (not SolidStart routes)
@@ -478,6 +480,21 @@ Account settings has three exits for your own data:
 
 Account settings also shows storage and people usage against your limits, with a link to ask for more. The published policy is at `/privacy` and the terms are at `/terms`. See [Privacy and GDPR](#privacy-and-gdpr) for the engineering side.
 
+## Focused browsing
+
+Every member can mark the person they represent with "This is me" on a profile. The graph then opens with distance rings around that person instead of the whole family:
+
+- 1 hop: partner, parents and children
+- 2 hops: siblings, grandparents, grandchildren and in-laws
+- 3 hops: aunts, uncles, nieces, nephews and great-grandparents
+- 4 hops: first cousins, great-aunts and great-uncles
+
+The default is 4 for trees of 25 people or more, and Everyone below that. The Show more chip adds the next ring, Everyone reveals the whole tree, and the focus menu switches bands or changes who you are. Partners of visible people come along with them, so a spouse is never cut off one hop away. Unconnected people are always shown, and the chosen band is remembered per tree in the browser.
+
+Selecting a search result or opening a deep link outside the focus reveals the shortest chain of relationships to that person, so they arrive in context without expanding every branch. Owners can unlink a member from the Members tab in tree settings.
+
+This is a reading aid, not access control. The whole graph is still sent to every member.
+
 ## Known limitations
 
 - No realtime co-editing. Presence is live, but the graph still refreshes after changes.
@@ -485,6 +502,7 @@ Account settings also shows storage and people usage against your limits, with a
 - HEIC photos work only when the browser can decode them; otherwise the user is asked to export as JPEG.
 - Backups live in a second Railway bucket in the same region and are not encrypted by the app. Backups run daily, so enable PostgreSQL point-in-time recovery for the gap between dumps.
 - Dates are Gregorian and structured. Seasons and free-text dates such as "spring 1918" are not represented; use an event note for those.
+- Focus is a presentation aid, not access control. The whole tree is still loaded for every member, and anyone can reveal all branches with one click.
 - No GEDCOM import/export, public share links, OCR, or face detection yet.
 
 ## License

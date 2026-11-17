@@ -164,12 +164,21 @@ export const treeMembers = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     role: treeRole("role").notNull().default("viewer"),
+    /**
+     * The person this member represents inside the tree. Used to centre the
+     * focused view, so a cousin sees their own part of the family first.
+     */
+    personId: uuid("person_id").references(() => people.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   t => [
     primaryKey({ columns: [t.treeId, t.userId], name: "tree_members_pk" }),
     index("tree_members_user_idx").on(t.userId),
     index("tree_members_tree_idx").on(t.treeId),
+    index("tree_members_person_idx").on(t.personId),
+    uniqueIndex("tree_members_person_unique")
+      .on(t.treeId, t.personId)
+      .where(sql`${t.personId} is not null`),
   ],
 );
 

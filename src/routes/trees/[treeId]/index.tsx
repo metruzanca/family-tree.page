@@ -1,6 +1,15 @@
-import { For, Show, Suspense, createMemo, createSignal, onCleanup, onMount } from "solid-js";
+import {
+  For,
+  Show,
+  Suspense,
+  createEffect,
+  createMemo,
+  createSignal,
+  onCleanup,
+  onMount,
+} from "solid-js";
 import { createAsync, revalidate, useParams, useSearchParams } from "@solidjs/router";
-import { Plus, Sprout, TriangleAlert } from "lucide-solid";
+import { Plus, Sprout, Target, TriangleAlert, X } from "lucide-solid";
 import type {
   GraphFile,
   GraphFileGroup,
@@ -13,6 +22,7 @@ import {
   deletePartnership,
   deletePerson,
   deletePersonEvent,
+  setMyPerson,
 } from "~/api/people-server";
 import {
   createFileGroup,
@@ -23,12 +33,18 @@ import {
   updateFileTags,
   updateFileTakenAt,
 } from "~/api/files-server";
-import { getMyTrees, getTreeGraph, getTreeOverview } from "~/api";
+import {
+  getMyTrees,
+  getTreeGraph,
+  getTreeMembers,
+  getTreeOverview,
+} from "~/api";
 import { AppErrorBoundary } from "~/components/app/AppErrorBoundary";
 import { GraphView, type GraphHandle } from "~/components/graph/GraphView";
 import { GraphToolbar } from "~/components/graph/GraphToolbar";
 import { GraphSearch } from "~/components/graph/GraphSearch";
 import { PersonPanel } from "~/components/people/PersonPanel";
+import { FocusPersonDialog } from "~/components/people/FocusPersonDialog";
 import { PersonFormDialog } from "~/components/people/PersonFormDialog";
 import { PersonEventDialog } from "~/components/people/PersonEventDialog";
 import { AddRelativeDialog } from "~/components/people/AddRelativeDialog";
@@ -42,6 +58,15 @@ import { uploadPersonFile } from "~/lib/upload";
 import { attemptAction, friendlyMessage } from "~/lib/action-result";
 import type { FuzzyDate } from "~/lib/fuzzy-date";
 import { fileNodeId, groupNodeId, type GenerationDirection } from "~/lib/graph";
+import {
+  defaultFocusRadius,
+  parseFocusRadius,
+  resolveFocus,
+  shortestPath,
+  SMALL_TREE_SIZE,
+  type FocusRadius,
+  type FocusView,
+} from "~/lib/focus";
 import { analyzeRelationships, type RelationshipConflict } from "~/lib/relationships";
 import { sizeBucket, track } from "~/lib/analytics";
 import { createTreePresence } from "~/lib/presence";
@@ -142,6 +167,116 @@ function TreePageInner() {
   });
   const editable = () => data()?.role === "owner" || data()?.role === "editor";
 
+  const [focusRadius, setFocusRadius] = createSignal<FocusRadius | null>(null);
+  const [pinnedPeople, setPinnedPeople] = createSignal<string[]>([]);
+  const [focusPersonOpen, setFocusPersonOpen] = createSignal(false);
+  const [claimingPerson, setClaimingPerson] = createSignal(false);
+  const [focusPromptDismissed, setFocusPromptDismissed] = createSignal(true);
+
+  const focusStorageKey = () => `family-tree-focus-radius:${params.treeId}`;
+  const focusPromptKey = () => `family-tree-focus-prompt:${params.treeId}`;
+
+  const viewerPersonId = () => data()?.viewerPersonId ?? null;
+  const viewerPerson = () =>
+    data()?.people.find(person => person.id === viewerPersonId()) ?? null;
+
+  const effectiveFocusRadius = (): FocusRadius => {
+    const stored = focusRadius();
+    if (stored) return stored;
+    const graph = data();
+    if (!graph || !graph.viewerPersonId) return "all";
+    return defaultFocusRadius(graph.people.length);
+  };
+
+  const focus = createMemo<FocusView>(() => {
+    const graph = data();
+    if (!graph) {
+      return {
+        visible: new Set<string>(),
+        distances: new Map(),
+        nextRadius: null,
+        nextRingCount: 0,
+        total: 0,
+      };
+    }
+    return resolveFocus(graph.people, graph.relationships, {
+      focusId: graph.viewerPersonId,
+      radius: effectiveFocusRadius(),
+      pinned: pinnedPeople(),
+    });
+  });
+
+  const hiddenCount = () => Math.max(0, focus().total - focus().visible.size);
+  const canShowMore = () =>
+    Boolean(viewerPersonId()) && hiddenCount() > 0 && focus().nextRadius != null;
+  const showFocusPrompt = () =>
+    !viewerPersonId() &&
+    (data()?.people.length ?? 0) >= SMALL_TREE_SIZE &&
+    !focusPromptDismissed();
+
+  function chooseFocusRadius(radius: FocusRadius) {
+    setFocusRadius(radius);
+    localStorage.setItem(focusStorageKey(), String(radius));
+    track("focus_radius_changed", { radius: String(radius) });
+    setTimeout(() => handle()?.fit(), 160);
+  }
+
+  function showMore() {
+    const next = focus().nextRadius;
+    if (next) chooseFocusRadius(next);
+  }
+
+  function revealPerson(id: string) {
+    const graph = data();
+    const focusId = graph?.viewerPersonId;
+    if (!graph || !focusId || id === focusId) return;
+    if (focus().visible.has(id)) return;
+    const path = shortestPath(graph.relationships, focusId, id);
+    if (!path || path.length < 2) return;
+    setPinnedPeople(current => {
+      const next = new Set(current);
+      let changed = false;
+      for (const pathId of path) {
+        if (next.has(pathId)) continue;
+        next.add(pathId);
+        changed = true;
+      }
+      return changed ? [...next] : current;
+    });
+  }
+
+  function dismissFocusPrompt() {
+    setFocusPromptDismissed(true);
+    localStorage.setItem(focusPromptKey(), "off");
+  }
+
+  async function saveViewerPerson(personId: string | null) {
+    setClaimingPerson(true);
+    const result = await attemptAction(() =>
+      setMyPerson({ treeId: params.treeId, personId }),
+    );
+    setClaimingPerson(false);
+    if (!result.ok) {
+      toast.show(result.error, "error");
+      return;
+    }
+    setFocusPersonOpen(false);
+    setPinnedPeople([]);
+    if (!personId) {
+      setFocusRadius("all");
+    } else if (!focusRadius()) {
+      setFocusRadius(defaultFocusRadius(data()?.people.length ?? 0));
+    }
+    await revalidate([getTreeGraph.key, getTreeMembers.key]);
+    track(personId ? "focus_identity_claimed" : "focus_identity_cleared");
+    toast.show(
+      personId
+        ? "Your place in the tree is saved. The graph now opens around you."
+        : "Your link to this tree was cleared. Everyone is visible again.",
+      "success",
+    );
+  }
+
   const selectedParentCount = createMemo(() => {
     const person = selectedPerson();
     const graph = data();
@@ -198,6 +333,9 @@ function TreePageInner() {
     if (localStorage.getItem("family-tree-generation-direction") === "oldest-bottom") {
       setGenerationDirection("oldest-bottom");
     }
+    const storedFocus = parseFocusRadius(localStorage.getItem(focusStorageKey()));
+    if (storedFocus) setFocusRadius(storedFocus);
+    setFocusPromptDismissed(localStorage.getItem(focusPromptKey()) === "off");
 
     const listener = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
@@ -239,24 +377,35 @@ function TreePageInner() {
   }
 
   function focusPerson(id: string) {
+    revealPerson(id);
     selectPerson(id);
-    setTimeout(() => handle()?.focus(id), 50);
+    setTimeout(() => handle()?.focus(id), 80);
   }
 
   function focusGroup(id: string, fileId?: string | null) {
+    const group = data()?.groups.find(candidate => candidate.id === id);
+    if (group) revealPerson(group.personId);
     selectGroup(id, fileId);
-    setTimeout(() => handle()?.focus(groupNodeId(id)), 50);
+    setTimeout(() => handle()?.focus(groupNodeId(id)), 80);
   }
 
   function focusFile(id: string) {
     const file = data()?.files.find(candidate => candidate.id === id);
+    if (file) revealPerson(file.personId);
     if (file?.groupId) {
       focusGroup(file.groupId, file.id);
       return;
     }
     selectFile(id);
-    setTimeout(() => handle()?.focus(fileNodeId(id)), 50);
+    setTimeout(() => handle()?.focus(fileNodeId(id)), 80);
   }
+
+  // A deep link or a search result can point at someone outside the focus.
+  // Reveal the chain from the viewer to that person so they arrive in context.
+  createEffect(() => {
+    const id = selectedId();
+    if (id && data()) revealPerson(id);
+  });
 
   function handleGraphSelection(id: string | null) {
     if (id) {
@@ -534,6 +683,8 @@ function TreePageInner() {
             role={graph().role}
             selectedId={selectedNodeId()}
             showMedia={showMedia()}
+            visible={focus().visible}
+            fitPadding={canShowMore() || showFocusPrompt() ? 190 : 110}
             layout={layout()}
             generationDirection={generationDirection()}
             presence={presence.peers()}
@@ -580,11 +731,18 @@ function TreePageInner() {
           <GraphToolbar
             treeId={params.treeId}
             treeName={graph().tree.name}
-            peopleCount={graph().people.length}
             role={graph().role}
             showMedia={showMedia()}
             layout={layout()}
             generationDirection={generationDirection()}
+            focus={{
+              personName: viewerPerson()?.displayName ?? null,
+              radius: effectiveFocusRadius(),
+              visibleCount: focus().visible.size,
+              total: focus().total,
+            }}
+            onFocusRadius={chooseFocusRadius}
+            onChangeFocusPerson={() => setFocusPersonOpen(true)}
             presence={{
               status: presence.status(),
               peers: presence.peers(),
@@ -636,6 +794,8 @@ function TreePageInner() {
                 onEdit={() => setEditPersonOpen(true)}
                 onDelete={() => setDeletePersonOpen(true)}
                 onAddRelative={() => setAddRelativeOpen(true)}
+                isViewer={viewerPersonId() === person().id}
+                onClaimPerson={() => saveViewerPerson(person().id)}
                 onSelectPerson={focusPerson}
                 onSelectFile={file => focusFile(file.id)}
                 onSelectGroup={groupId => focusGroup(groupId)}
@@ -714,6 +874,60 @@ function TreePageInner() {
             </span>
           </div>
 
+          <Show when={canShowMore()}>
+            <div class="pointer-events-none absolute inset-x-0 bottom-20 z-20 flex justify-center px-4 sm:bottom-24">
+              <div class="pointer-events-auto flex items-center gap-1.5 rounded-full border border-white/15 bg-black/60 py-1.5 pl-3 pr-1.5 text-xs text-white/80 shadow-xl backdrop-blur-md">
+                <Target size={14} class="text-gold" />
+                <span class="pr-1">
+                  {focus().nextRingCount} more{" "}
+                  {focus().nextRingCount === 1 ? "relative" : "relatives"}
+                </span>
+                <button
+                  type="button"
+                  class="rounded-full bg-white/10 px-3 py-1 font-semibold text-white transition hover:bg-white/20"
+                  onClick={showMore}
+                >
+                  Show more
+                </button>
+                <button
+                  type="button"
+                  class="rounded-full px-2.5 py-1 text-white/55 transition hover:text-white"
+                  onClick={() => chooseFocusRadius("all")}
+                >
+                  Everyone
+                </button>
+              </div>
+            </div>
+          </Show>
+
+          <Show when={showFocusPrompt()}>
+            <div class="pointer-events-none absolute inset-x-0 bottom-20 z-20 flex justify-center px-4 sm:bottom-24">
+              <div class="pointer-events-auto relative w-full max-w-md rounded-2xl border border-white/10 bg-black/60 p-4 pr-10 text-white/85 shadow-xl backdrop-blur-md">
+                <button
+                  type="button"
+                  class="absolute right-2 top-2 grid size-7 place-items-center rounded-full text-white/45 transition hover:bg-white/10 hover:text-white"
+                  aria-label="Dismiss"
+                  onClick={dismissFocusPrompt}
+                >
+                  <X size={15} />
+                </button>
+                <p class="text-sm font-semibold">Who are you in this tree?</p>
+                <p class="mt-1 text-xs leading-relaxed text-white/55">
+                  Pick yourself and the tree will open around your part of the family.
+                  Everyone can still see the whole tree with one click.
+                </p>
+                <Button
+                  size="sm"
+                  class="mt-3"
+                  onClick={() => setFocusPersonOpen(true)}
+                >
+                  <Target size={14} />
+                  Find yourself
+                </Button>
+              </div>
+            </div>
+          </Show>
+
           <Show when={editable()}>
             <button
               type="button"
@@ -729,8 +943,18 @@ function TreePageInner() {
             open={searchOpen()}
             onClose={() => setSearchOpen(false)}
             data={graph()}
+            isOutsideFocus={personId => !focus().visible.has(personId)}
             onPerson={person => focusPerson(person.id)}
             onFile={file => focusFile(file.id)}
+          />
+
+          <FocusPersonDialog
+            open={focusPersonOpen()}
+            onClose={() => setFocusPersonOpen(false)}
+            people={graph().people}
+            viewerPersonId={graph().viewerPersonId}
+            pending={claimingPerson()}
+            onSave={saveViewerPerson}
           />
 
           <PersonFormDialog

@@ -10,6 +10,8 @@ export function GraphSearch(props: {
   open: boolean;
   onClose: () => void;
   data: TreeGraph;
+  /** True when the person sits outside the focused part of the tree. */
+  isOutsideFocus?: (personId: string) => boolean;
   onPerson: (person: GraphPerson) => void;
   onFile: (file: GraphFile) => void;
 }) {
@@ -88,9 +90,16 @@ export function GraphSearch(props: {
                     <span class="min-w-0 flex-1">
                       <span class="block truncate text-sm font-medium">{person.displayName}</span>
                       <span class="block truncate text-xs text-muted-foreground">
-                        {formatFuzzyYearRange(person.birthDate, person.deathDate) ||
-                          person.bio?.slice(0, 60) ||
-                          "No dates yet"}
+                        <Show
+                          when={props.isOutsideFocus?.(person.id)}
+                          fallback={
+                            formatFuzzyYearRange(person.birthDate, person.deathDate) ||
+                            person.bio?.slice(0, 60) ||
+                            "No dates yet"
+                          }
+                        >
+                          Outside your focus · opens in context
+                        </Show>
                       </span>
                     </span>
                   </button>
@@ -130,6 +139,10 @@ export function GraphSearch(props: {
                       <span class="block truncate text-sm font-medium">{file.name}</span>
                       <span class="block truncate text-xs text-muted-foreground">
                         {personById().get(file.personId)?.displayName ?? "Unknown person"}
+                        <Show when={props.isOutsideFocus?.(file.personId)}>
+                          {" "}
+                          · outside your focus
+                        </Show>
                       </span>
                     </span>
                   </button>

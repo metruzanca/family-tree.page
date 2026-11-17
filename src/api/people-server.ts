@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, ne } from "drizzle-orm";
 import { db } from "../server/db";
 import {
   fileGroups,
@@ -10,6 +10,7 @@ import {
   partnerships,
   people,
   personEvents,
+  treeMembers,
   trees,
   type ParentChild,
   type Partnership,
@@ -117,6 +118,8 @@ export type GraphPersonEvent = {
 export type TreeGraph = {
   tree: { id: string; name: string; description: string | null };
   role: TreeRole;
+  /** The person the signed-in member represents in this tree, when they claimed one. */
+  viewerPersonId: string | null;
   people: GraphPerson[];
   relationships: GraphRelationship[];
   files: GraphFile[];
@@ -187,6 +190,7 @@ export async function getTreeGraph(treeId: string): Promise<TreeGraph> {
       description: access.tree.description,
     },
     role: access.role,
+    viewerPersonId: access.personId,
     people: peopleRows.map(person => ({
       id: person.id,
       firstName: person.firstName,
@@ -232,6 +236,57 @@ export async function getTreeGraph(treeId: string): Promise<TreeGraph> {
       createdAt: event.createdAt,
     })),
   };
+}
+
+/**
+ * Links the signed-in member to the person they represent in this tree. The
+ * focused view is centred on that person, so an invited cousin sees their own
+ * part of the family first.
+ */
+export async function setMyPerson(input: {
+  treeId: string;
+  personId: string | null;
+}): Promise<ActionResult<undefined>> {
+  return runAction(async () => {
+    const access = await requireTreeMember(input.treeId);
+    if (input.personId) {
+      const rows = await db
+        .select({ id: people.id })
+        .from(people)
+        .where(
+          and(eq(people.id, input.personId), eq(people.treeId, access.tree.id)),
+        )
+        .limit(1);
+      if (!rows.length) throw new AppError("That person is not part of this tree.");
+      const claimed = await db
+        .select({ userId: treeMembers.userId })
+        .from(treeMembers)
+        .where(
+          and(
+            eq(treeMembers.treeId, access.tree.id),
+            eq(treeMembers.personId, input.personId),
+            ne(treeMembers.userId, access.user.id),
+          ),
+        )
+        .limit(1);
+      if (claimed.length) {
+        throw new AppError(
+          "That person is already linked to another member. Ask an owner to unlink them first.",
+        );
+      }
+    }
+
+    await db
+      .update(treeMembers)
+      .set({ personId: input.personId })
+      .where(
+        and(
+          eq(treeMembers.treeId, access.tree.id),
+          eq(treeMembers.userId, access.user.id),
+        ),
+      );
+    return undefined;
+  });
 }
 
 function toGraphFile(file: StoredFile, taggedPersonIds: string[]): GraphFile {

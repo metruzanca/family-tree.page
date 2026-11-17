@@ -21,9 +21,9 @@ import { AppError, runAction, type ActionResult } from "../server/errors";
 import { inviteEmailSchema, inviteSchema, treeRoleSchema, treeSchema } from "../server/validation";
 import { deletePrefix, TREE_PREFIX } from "../server/storage";
 import { publicOrigin } from "../server/config";
-import { recordUsage } from "../server/usage";
 import { sendEmail } from "../server/email";
 import { inviteMessage } from "../server/email-templates";
+import { recordUsage } from "../server/usage";
 
 export type TreeSummary = {
   id: string;
@@ -158,6 +158,9 @@ export type TreeMemberView = {
   displayName: string;
   role: TreeRole;
   joinedAt: Date;
+  /** The person this member represents in the tree, when they claimed one. */
+  personId: string | null;
+  personName: string | null;
 };
 
 export async function getTreeMembers(treeId: string): Promise<TreeMemberView[]> {
@@ -169,12 +172,49 @@ export async function getTreeMembers(treeId: string): Promise<TreeMemberView[]> 
       displayName: users.displayName,
       role: treeMembers.role,
       joinedAt: treeMembers.createdAt,
+      personId: people.id,
+      firstName: people.firstName,
+      lastName: people.lastName,
+      nickname: people.nickname,
     })
     .from(treeMembers)
     .innerJoin(users, eq(users.id, treeMembers.userId))
+    .leftJoin(people, eq(people.id, treeMembers.personId))
     .where(eq(treeMembers.treeId, treeId))
     .orderBy(asc(treeMembers.createdAt));
-  return rows;
+  return rows.map(row => ({
+    userId: row.userId,
+    email: row.email,
+    displayName: row.displayName,
+    role: row.role,
+    joinedAt: row.joinedAt,
+    personId: row.personId,
+    personName: row.personId
+      ? `${row.firstName ?? ""} ${row.lastName ?? ""}`.trim() || row.nickname || "Unnamed person"
+      : null,
+  }));
+}
+
+/** Owners can correct a claim, for example when someone linked the wrong person. */
+export async function clearMemberPerson(input: {
+  treeId: string;
+  userId: string;
+}): Promise<ActionResult<undefined>> {
+  return runAction(async () => {
+    await requireTreeMember(input.treeId, "owner");
+    const updated = await db
+      .update(treeMembers)
+      .set({ personId: null })
+      .where(
+        and(
+          eq(treeMembers.treeId, input.treeId),
+          eq(treeMembers.userId, input.userId),
+        ),
+      )
+      .returning({ userId: treeMembers.userId });
+    if (!updated.length) throw new AppError("That person is not a member of this tree.");
+    return undefined;
+  });
 }
 
 export async function updateMemberRole(input: {

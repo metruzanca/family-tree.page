@@ -29,6 +29,9 @@ export type AnalyticsEvent =
   | "file_date_taken_set"
   | "file_deleted"
   | "file_people_tagged"
+  | "focus_identity_claimed"
+  | "focus_identity_cleared"
+  | "focus_radius_changed"
   | "invite_accepted"
   | "invite_created"
   | "media_uploaded"
@@ -52,6 +55,9 @@ type AnalyticsPayloads = {
   file_date_taken_set: { cleared: boolean };
   file_deleted: { album: boolean };
   file_people_tagged: { count: number };
+  focus_identity_claimed: undefined;
+  focus_identity_cleared: undefined;
+  focus_radius_changed: { radius: string };
   invite_accepted: undefined;
   invite_created: { role: string; delivery: "email" | "link" };
   media_uploaded: { count: number; album: boolean; size_bucket?: string };
@@ -76,6 +82,9 @@ const PAYLOAD_KEYS: Record<AnalyticsEvent, readonly string[]> = {
   file_date_taken_set: ["cleared"],
   file_deleted: ["album"],
   file_people_tagged: ["count"],
+  focus_identity_claimed: [],
+  focus_identity_cleared: [],
+  focus_radius_changed: ["radius"],
   invite_accepted: [],
   invite_created: ["role", "delivery"],
   media_uploaded: ["count", "album", "size_bucket"],

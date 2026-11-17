@@ -1,7 +1,8 @@
 import { For, Show, createEffect, createSignal } from "solid-js";
 import { A, createAsync, useNavigate, useParams, revalidate } from "@solidjs/router";
-import { Copy, Link2, LogOut, Mail, Plus, RotateCw, Settings, Shield, Trash2, Users } from "lucide-solid";
+import { Copy, Link2, LogOut, Mail, Plus, RotateCw, Settings, Shield, Trash2, Unlink, Users } from "lucide-solid";
 import {
+  clearMemberPerson,
   createInvite,
   deleteTree,
   getTreeInvites,
@@ -199,6 +200,18 @@ function TreeSettingsInner() {
     }
     await revalidate([membersQuery.key, overviewQuery.key, getMyTrees.key]);
     toast.show("Member role updated.", "success");
+  }
+
+  async function unlinkMemberPerson(userId: string, name: string) {
+    const result = await attemptAction(() =>
+      clearMemberPerson({ treeId: params.treeId, userId }),
+    );
+    if (!result.ok) {
+      toast.show(result.error, "error");
+      return;
+    }
+    await revalidate([membersQuery.key, getTreeGraph.key]);
+    toast.show(`${name} is no longer linked to a person.`, "success");
   }
 
   async function createNewInvite() {
@@ -430,6 +443,14 @@ function TreeSettingsInner() {
                               </Show>
                             </p>
                             <p class="truncate text-xs text-muted-foreground">{member.email}</p>
+                            <p class="truncate text-xs text-muted-foreground">
+                              <Show
+                                when={member.personName}
+                                fallback="Not linked to a person in the tree"
+                              >
+                                Linked to {member.personName}
+                              </Show>
+                            </p>
                           </div>
                           <Show
                             when={isOwner() && member.userId !== currentUser().id}
@@ -460,6 +481,18 @@ function TreeSettingsInner() {
                                 <SelectContent />
                               </SelectPortal>
                             </Select>
+                            <Show when={member.personId}>
+                              <IconButton
+                                label={`Unlink ${member.displayName} from ${member.personName}`}
+                                variant="ghost"
+                                size="icon-sm"
+                                onClick={() =>
+                                  unlinkMemberPerson(member.userId, member.displayName)
+                                }
+                              >
+                                <Unlink />
+                              </IconButton>
+                            </Show>
                             <IconButton
                               label={`Remove ${member.displayName}`}
                               variant="ghost"

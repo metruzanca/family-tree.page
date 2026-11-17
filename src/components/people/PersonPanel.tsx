@@ -10,6 +10,7 @@ import {
   Plus,
   Trash2,
   Upload,
+  UserCheck,
   UserPlus,
   X,
 } from "lucide-solid";
@@ -42,6 +43,9 @@ type PersonPanelProps = {
   onEdit: () => void;
   onDelete: () => void;
   onAddRelative: () => void;
+  /** True when this person is the signed-in member's own place in the tree. */
+  isViewer: boolean;
+  onClaimPerson: () => void;
   onSelectPerson: (id: string) => void;
   onSelectFile: (file: GraphFile) => void;
   onSelectGroup: (groupId: string) => void;
@@ -159,6 +163,20 @@ export function PersonPanel(props: PersonPanelProps) {
       </div>
 
       <div class="flex items-center gap-2 overflow-x-auto border-y border-border px-5 py-2.5 no-scrollbar">
+        <Show
+          when={props.isViewer}
+          fallback={
+            <Button size="sm" variant="secondary" onClick={props.onClaimPerson}>
+              <UserCheck size={13} />
+              This is me
+            </Button>
+          }
+        >
+          <span class="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-accent px-2.5 py-1 text-xs font-semibold text-primary">
+            <UserCheck size={13} />
+            This is you
+          </span>
+        </Show>
         <Show when={editable()}>
           <Button size="sm" variant="secondary" onClick={props.onEdit}>
             <Pencil size={13} />

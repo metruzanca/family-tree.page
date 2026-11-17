@@ -35,6 +35,11 @@ type GraphViewProps = {
   role: TreeRole;
   selectedId: string | null;
   showMedia: boolean;
+  /**
+   * People to draw. Omitted or undefined draws the whole tree. Generations are
+   * always computed from the full tree, so expanding keeps rows in place.
+   */
+  visible?: ReadonlySet<string>;
   layout: "generations" | "freeform";
   generationDirection: GenerationDirection;
   presence?: PresencePeer[];
@@ -71,10 +76,13 @@ export function GraphView(props: GraphViewProps) {
   let backgroundStart = { x: 0, y: 0 };
   let pointer = { x: 0, y: 0 };
   let suppressClickUntil = 0;
-  let model: GraphModel = buildGraphModel(
-    props.data,
-    props.showMedia,
-    props.generationDirection,
+  const [model, setModel] = createSignal<GraphModel>(
+    buildGraphModel(
+      props.data,
+      props.showMedia,
+      props.generationDirection,
+      props.visible,
+    ),
   );
   const [hovered, setHovered] = createSignal<string | null>(null);
   const [ready, setReady] = createSignal(false);
@@ -93,8 +101,8 @@ export function GraphView(props: GraphViewProps) {
   const active = createMemo(() => {
     const id = activeId();
     if (!id) return null;
-    const set = neighborsOf(model.semanticLinks, id);
-    for (const node of model.nodes) {
+    const set = neighborsOf(model().semanticLinks, id);
+    for (const node of model().nodes) {
       if (node.kind !== "union") continue;
       const connectsActiveParent = node.parentIds?.some(parentId => set.has(parentId));
       const connectsActiveChild = node.childIds?.some(childId => set.has(childId));
@@ -605,9 +613,14 @@ export function GraphView(props: GraphViewProps) {
   }
 
   function reset() {
-    const fresh = buildGraphModel(props.data, props.showMedia, props.generationDirection);
+    const fresh = buildGraphModel(
+      props.data,
+      props.showMedia,
+      props.generationDirection,
+      props.visible,
+    );
     applyFixedLayout(fresh);
-    model = fresh;
+    setModel(fresh);
     graph?.graphData({
       nodes: fresh.nodes,
       links: fresh.links,
@@ -688,7 +701,7 @@ export function GraphView(props: GraphViewProps) {
     let nodes: GraphNode[] = [];
     const force = (alpha: number) => {
       const byId = new Map(nodes.map(node => [node.id, node]));
-      for (const link of model.links) {
+      for (const link of model().links) {
         if (link.kind !== "partner") continue;
         const a =
           typeof link.source === "string" ? byId.get(link.source) : (link.source as GraphNode);
@@ -739,7 +752,7 @@ export function GraphView(props: GraphViewProps) {
   function componentColumnForce(strength: number) {
     let nodes: GraphNode[] = [];
     const force = (alpha: number) => {
-      const byNode = model.byNode;
+      const byNode = model().byNode;
       for (const node of nodes) {
         if (node.kind !== "person") continue;
         const component = byNode.get(node.id);
@@ -755,7 +768,7 @@ export function GraphView(props: GraphViewProps) {
 
   function packComponentBands() {
     if (!graph) return;
-    packComponents(graph.graphData().nodes as GraphNode[], model.components, model.byNode);
+    packComponents(graph.graphData().nodes as GraphNode[], model().components, model().byNode);
   }
 
   function snapPartnerRows() {
@@ -825,8 +838,8 @@ export function GraphView(props: GraphViewProps) {
       .autoPauseRedraw(true);
 
     applyLayout(props.layout);
-    applyFixedLayout(model);
-    graph.graphData({ nodes: model.nodes, links: model.links });
+    applyFixedLayout(model());
+    graph.graphData({ nodes: model().nodes, links: model().links });
     if (props.cooldownTicks) graph.d3ReheatSimulation();
     snapPartnerRows();
     if (import.meta.env.DEV) {
@@ -964,9 +977,9 @@ export function GraphView(props: GraphViewProps) {
     const direction = props.generationDirection;
     const directionChanged = direction !== previousDirection;
     previousDirection = direction;
-    const next = buildGraphModel(props.data, props.showMedia, direction);
+    const next = buildGraphModel(props.data, props.showMedia, direction, props.visible);
     if (!graph) {
-      model = next;
+      setModel(next);
       return;
     }
     const previous = new Map<string, GraphNode>(
@@ -986,7 +999,7 @@ export function GraphView(props: GraphViewProps) {
       needsFit = true;
     }
     applyFixedLayout(next);
-    model = next;
+    setModel(next);
     graph.graphData({ nodes: next.nodes, links: next.links });
     if (props.cooldownTicks) {
       needsFit = true;
@@ -1009,6 +1022,7 @@ export function GraphView(props: GraphViewProps) {
     paintVersion();
     props.presence;
     props.selfPeerId;
+    model();
     if (graph) {
       graph.nodeCanvasObject(drawNode);
       graph.linkColor(linkColor);

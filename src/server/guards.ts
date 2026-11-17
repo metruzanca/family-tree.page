@@ -22,6 +22,8 @@ export type TreeAccess = {
   user: PublicUser;
   tree: Tree;
   role: TreeRole;
+  /** The person this member represents in the tree, when they claimed one. */
+  personId: string | null;
 };
 
 export async function requireTreeMember(
@@ -39,7 +41,11 @@ export async function requireTreeMember(
     throw new AppError("Too many requests. Wait a minute and try again.", 429);
   }
   const rows = await db
-    .select({ role: treeMembers.role, tree: trees })
+    .select({
+      role: treeMembers.role,
+      personId: treeMembers.personId,
+      tree: trees,
+    })
     .from(treeMembers)
     .innerJoin(trees, eq(trees.id, treeMembers.treeId))
     .where(and(eq(treeMembers.treeId, treeId), eq(treeMembers.userId, user.id)))
@@ -51,7 +57,12 @@ export async function requireTreeMember(
     throw new Error("You do not have permission to do that.");
   }
 
-  return { user, tree: membership.tree, role: membership.role };
+  return {
+    user,
+    tree: membership.tree,
+    role: membership.role,
+    personId: membership.personId,
+  };
 }
 
 export function canEdit(role: TreeRole) {

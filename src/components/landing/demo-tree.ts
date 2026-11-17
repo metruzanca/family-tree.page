@@ -260,6 +260,7 @@ export const demoTree: TreeGraph = {
       "A fictional slice of Springfield. Click a face, open a photo, and follow the branches.",
   },
   role: "viewer",
+  viewerPersonId: null,
   people: demoPeople,
   relationships: demoRelationships,
   files: demoFiles,

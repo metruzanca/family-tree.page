@@ -76,21 +76,35 @@ export function buildGraphModel(
   data: TreeGraph,
   showMedia: boolean,
   direction: GenerationDirection = "oldest-top",
+  /**
+   * People to draw. Generations still come from the whole tree, so hiding a
+   * branch never shifts the rows that are visible.
+   */
+  visible?: ReadonlySet<string>,
 ): GraphModel {
   const generations = computeGenerations(data.people, data.relationships);
+  const people = visible
+    ? data.people.filter(person => visible.has(person.id))
+    : data.people;
+  const relationships = visible
+    ? data.relationships.filter(
+        relationship =>
+          visible.has(relationship.source) && visible.has(relationship.target),
+      )
+    : data.relationships;
   const { components, byPerson } = personComponents(
-    data.people,
-    data.relationships,
+    people,
+    relationships,
     generations,
   );
   const degree = new Map<string, number>();
-  for (const relationship of data.relationships) {
+  for (const relationship of relationships) {
     degree.set(relationship.source, (degree.get(relationship.source) ?? 0) + 1);
     degree.set(relationship.target, (degree.get(relationship.target) ?? 0) + 1);
   }
 
   const nodes: GraphNode[] = [];
-  for (const person of data.people) {
+  for (const person of people) {
     const level = generations.get(person.id) ?? 0;
     const component = byPerson.get(person.id);
     const centerX = component?.centerX ?? 0;
@@ -112,7 +126,7 @@ export function buildGraphModel(
   const links: GraphLink[] = [];
   const semanticLinks: GraphLink[] = [];
 
-  for (const relationship of data.relationships) {
+  for (const relationship of relationships) {
     if (relationship.type !== "partner") continue;
     const link: GraphLink = {
       id: relationship.id,
@@ -131,7 +145,7 @@ export function buildGraphModel(
     parentType: "biological" | "adoptive" | "foster" | "step" | "unknown";
   };
   const parentsByChild = new Map<string, ParentEdge[]>();
-  for (const relationship of data.relationships) {
+  for (const relationship of relationships) {
     if (relationship.type !== "parent") continue;
     const list = parentsByChild.get(relationship.target) ?? [];
     list.push({

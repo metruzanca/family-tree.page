@@ -123,6 +123,7 @@ describe("buildGraphModel", () => {
   const data: TreeGraph = {
     tree: { id: "tree", name: "Test", description: null },
     role: "owner",
+    viewerPersonId: null,
     people,
     relationships,
     files: [
@@ -237,6 +238,7 @@ describe("buildGraphModel", () => {
       {
         tree: { id: "family", name: "Family", description: null },
         role: "owner",
+        viewerPersonId: null,
         people: familyPeople,
         relationships: familyRelationships,
         files: [],
@@ -267,6 +269,7 @@ function treeWith(
   return {
     tree: { id: "tree", name: "Test", description: null },
     role: "owner",
+    viewerPersonId: null,
     people,
     relationships,
     files: [],
@@ -495,5 +498,104 @@ describe("media card sizing", () => {
     expect(card.aspect).toBeCloseTo(1.5);
     expect(card.width).toBeGreaterThan(card.height);
     expect(card.width * card.height).toBeCloseTo(32 * 32);
+  });
+});
+
+describe("focused graph model", () => {
+  const people = ["a", "b", "c", "d"].map(id => person(id));
+  const relationships = [
+    parent("r1", "a", "b"),
+    parent("r2", "b", "c"),
+    parent("r3", "c", "d"),
+  ];
+
+  it("draws only people and links inside the visible set", () => {
+    const model = buildGraphModel(
+      treeWith(people, relationships),
+      false,
+      "oldest-top",
+      new Set(["a", "b"]),
+    );
+    expect(model.nodes.map(node => node.id).sort()).toEqual(["a", "b"]);
+    expect(model.links).toHaveLength(1);
+    expect(model.links[0].id).toBe("r1");
+  });
+
+  it("keeps generation rows from the whole tree", () => {
+    const model = buildGraphModel(
+      treeWith(people, relationships),
+      false,
+      "oldest-top",
+      new Set(["c", "d"]),
+    );
+    const full = buildGraphModel(treeWith(people, relationships), false, "oldest-top");
+    const c = model.nodes.find(node => node.id === "c")!;
+    const d = model.nodes.find(node => node.id === "d")!;
+    expect(c.level).toBe(2);
+    expect(d.level).toBe(3);
+    expect(c.y).toBe(full.nodes.find(node => node.id === "c")!.y);
+    expect(d.y).toBe(full.nodes.find(node => node.id === "d")!.y);
+    expect(Math.abs(c.y! - generationRowY(2, "oldest-top"))).toBeLessThan(60);
+    expect(Math.abs(d.y! - generationRowY(3, "oldest-top"))).toBeLessThan(60);
+  });
+
+  it("drops media whose owner is hidden", () => {
+    const data = treeWith(people, relationships);
+    data.files = [
+      {
+        id: "doc",
+        personId: "d",
+        groupId: null,
+        name: "letter.pdf",
+        mimeType: "application/pdf",
+        kind: "document",
+        thumbUrl: null,
+        width: null,
+        height: null,
+        sizeBytes: 2000,
+        takenAt: null,
+        taggedPersonIds: [],
+        createdAt: new Date(),
+        isAvatar: false,
+      },
+    ];
+    const narrowed = buildGraphModel(data, true, "oldest-top", new Set(["a", "b"]));
+    expect(narrowed.nodes.some(node => node.id === "file:doc")).toBe(false);
+
+    const full = buildGraphModel(data, true, "oldest-top");
+    expect(full.nodes.some(node => node.id === "file:doc")).toBe(true);
+  });
+
+  it("only includes visible children in a shared parent junction", () => {
+    const family = [person("a"), person("b"), person("c"), person("d")];
+    const data = treeWith(family, [
+      partner("p1", "a", "b"),
+      parent("r1", "a", "c"),
+      parent("r2", "b", "c"),
+      parent("r3", "a", "d"),
+      parent("r4", "b", "d"),
+    ]);
+    const model = buildGraphModel(
+      data,
+      false,
+      "oldest-top",
+      new Set(["a", "b", "c"]),
+    );
+    const unions = model.nodes.filter(node => node.kind === "union");
+    expect(unions).toHaveLength(1);
+    expect(unions[0].childIds).toEqual(["c"]);
+  });
+
+  it("matches the unfiltered model when everyone is visible", () => {
+    const full = buildGraphModel(treeWith(people, relationships), false, "oldest-top");
+    const same = buildGraphModel(
+      treeWith(people, relationships),
+      false,
+      "oldest-top",
+      new Set(people.map(person => person.id)),
+    );
+    expect(same.nodes.map(node => [node.id, node.level, node.x, node.y])).toEqual(
+      full.nodes.map(node => [node.id, node.level, node.x, node.y]),
+    );
   });
 });

@@ -1,5 +1,5 @@
 import { A } from "@solidjs/router";
-import { Show, type JSX } from "solid-js";
+import { For, Show, type JSX } from "solid-js";
 import {
   ArrowDownUp,
   ArrowLeft,
@@ -13,11 +13,14 @@ import {
   RotateCcw,
   Search,
   Settings,
+  Target,
+  UserRound,
   Waves,
   ZoomIn,
   ZoomOut,
 } from "lucide-solid";
 import type { GenerationDirection } from "~/lib/graph";
+import { FOCUS_BANDS, type FocusRadius } from "~/lib/focus";
 import type { PresencePeer, PresenceStatus } from "~/lib/presence-protocol";
 import type { TreeRole } from "~/server/guards";
 import { roleLabel } from "~/lib/format";
@@ -28,6 +31,8 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./../ui/dropdown-menu";
@@ -36,11 +41,18 @@ import { Tooltip, TooltipContent, TooltipPortal, TooltipTrigger } from "./../ui/
 type ToolbarProps = {
   treeId: string;
   treeName: string;
-  peopleCount: number;
   role: TreeRole;
   showMedia: boolean;
   layout: "generations" | "freeform";
   generationDirection: GenerationDirection;
+  focus: {
+    personName: string | null;
+    radius: FocusRadius;
+    visibleCount: number;
+    total: number;
+  };
+  onFocusRadius: (radius: FocusRadius) => void;
+  onChangeFocusPerson: () => void;
   presence: {
     status: PresenceStatus;
     peers: PresencePeer[];
@@ -75,7 +87,10 @@ export function GraphToolbar(props: ToolbarProps) {
             {props.treeName}
           </span>
           <span class="hidden text-[0.65rem] uppercase tracking-wide text-white/40 sm:inline">
-            {props.peopleCount} {props.peopleCount === 1 ? "person" : "people"}
+            {props.focus.personName && props.focus.radius !== "all"
+              ? `${props.focus.visibleCount} of ${props.focus.total}`
+              : props.focus.total}{" "}
+            {props.focus.total === 1 ? "person" : "people"}
           </span>
           <Badge
             variant="outline"
@@ -96,6 +111,11 @@ export function GraphToolbar(props: ToolbarProps) {
           <ToolButton label="Search people and files" shortcut="/" onClick={props.onSearch}>
             <Search size={17} />
           </ToolButton>
+          <FocusMenu
+            focus={props.focus}
+            onRadius={props.onFocusRadius}
+            onChangePerson={props.onChangeFocusPerson}
+          />
           <Show when={editable()}>
             <button
               type="button"
@@ -184,6 +204,21 @@ export function GraphToolbar(props: ToolbarProps) {
               <GlassItem label="Flip generations" onSelect={props.onFlipDirection}>
                 <ArrowDownUp />
               </GlassItem>
+              <GlassItem
+                label={
+                  props.focus.personName
+                    ? `Focused on ${props.focus.personName}. Change who you are`
+                    : "Tell us who you are"
+                }
+                onSelect={props.onChangeFocusPerson}
+              >
+                <UserRound />
+              </GlassItem>
+              <Show when={props.focus.radius !== "all"}>
+                <GlassItem label="Show the whole tree" onSelect={() => props.onFocusRadius("all")}>
+                  <Target />
+                </GlassItem>
+              </Show>
               <DropdownMenuSeparator class="my-1 bg-white/10" />
               <GlassItem label="Zoom out" onSelect={props.onZoomOut}>
                 <ZoomOut />
@@ -219,6 +254,73 @@ export function GraphToolbar(props: ToolbarProps) {
         </div>
       </div>
     </div>
+  );
+}
+
+function FocusMenu(props: {
+  focus: {
+    personName: string | null;
+    radius: FocusRadius;
+    visibleCount: number;
+    total: number;
+  };
+  onRadius: (radius: FocusRadius) => void;
+  onChangePerson: () => void;
+}) {
+  return (
+    <DropdownMenu placement="bottom-end">
+      <DropdownMenuTrigger
+        class={`${glass} size-10 px-0 ${
+          props.focus.personName ? "!text-white" : "!text-white/55 hover:!text-white"
+        }`}
+        aria-label="Focus and visibility"
+      >
+        <Target size={17} />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent class="w-72 rounded-2xl border-white/10 bg-[#161b14] p-1.5 text-white/80">
+        <div class="px-3 pb-1 pt-2">
+          <p class="text-xs font-semibold text-white/90">
+            {props.focus.personName
+              ? `Focused on ${props.focus.personName}`
+              : "Showing the whole tree"}
+          </p>
+          <p class="mt-0.5 text-[0.7rem] text-white/45">
+            {props.focus.visibleCount} of {props.focus.total} people visible
+          </p>
+        </div>
+        <DropdownMenuSeparator class="my-1 bg-white/10" />
+        <DropdownMenuRadioGroup
+          value={String(props.focus.radius)}
+          onChange={value => {
+            const band = FOCUS_BANDS.find(candidate => String(candidate.radius) === value);
+            if (band) props.onRadius(band.radius);
+          }}
+        >
+          <For each={FOCUS_BANDS}>
+            {band => (
+              <DropdownMenuRadioItem
+                value={String(band.radius)}
+                class="items-start gap-2 rounded-xl py-2 pr-2 pl-8 text-white/80 outline-none data-[highlighted]:bg-white/10 data-[highlighted]:text-white"
+              >
+                <span class="flex min-w-0 flex-col">
+                  <span class="text-sm font-medium">{band.label}</span>
+                  <span class="text-[0.65rem] leading-snug text-white/40">
+                    {band.description}
+                  </span>
+                </span>
+              </DropdownMenuRadioItem>
+            )}
+          </For>
+        </DropdownMenuRadioGroup>
+        <DropdownMenuSeparator class="my-1 bg-white/10" />
+        <GlassItem
+          label={props.focus.personName ? "Change who I am" : "Tell us who you are"}
+          onSelect={props.onChangePerson}
+        >
+          <UserRound />
+        </GlassItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

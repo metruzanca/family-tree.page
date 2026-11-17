@@ -71,6 +71,13 @@
       "when": 1794863384535,
       "tag": "0009_organic_juggernaut",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1794868448725,
+      "tag": "0010_nervous_wind_dancer",
+      "breakpoints": true
     }
   ]
 }
