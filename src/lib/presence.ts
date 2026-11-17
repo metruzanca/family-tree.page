@@ -53,7 +53,10 @@ export function createTreePresence(options: {
 
   const socket = createReconnectingWS(endpoint.toString(), undefined, { delay: 2500 });
 
+  let sentNodeId: string | null | undefined;
+
   function sendFocus(nodeId: string | null) {
+    sentNodeId = nodeId;
     socket.send(JSON.stringify({ type: "focus", nodeId } satisfies PresenceClientMessage));
   }
 
@@ -66,6 +69,7 @@ export function createTreePresence(options: {
     setStatus("offline");
     setPeers([]);
     setSelfPeerId(null);
+    sentNodeId = undefined;
   });
 
   socket.addEventListener("message", event => {
@@ -94,7 +98,9 @@ export function createTreePresence(options: {
   });
 
   createEffect(() => {
-    sendFocus(options.nodeId());
+    const nodeId = options.nodeId();
+    if (nodeId === sentNodeId) return;
+    sendFocus(nodeId);
   });
 
   return { peers, status, selfPeerId, change };

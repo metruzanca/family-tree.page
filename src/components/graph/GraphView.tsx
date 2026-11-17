@@ -59,6 +59,11 @@ type GraphViewProps = {
   data: TreeGraph;
   role: TreeRole;
   selectedId: string | null;
+  /**
+   * The node that keeps the highlight ring. It can outlive the open panel,
+   * which leaves `selectedId` null so the rest of the tree is not dimmed.
+   */
+  highlightId?: string | null;
   showMedia: boolean;
   /**
    * People to draw. Omitted or undefined draws the whole tree. Generations are
@@ -135,6 +140,9 @@ export function GraphView(props: GraphViewProps) {
     }
     return set;
   });
+
+  /** The ring can outlive the panel while the dimming set does not. */
+  const ringId = () => props.highlightId ?? props.selectedId;
 
   const colors = {
     ink: "#f3eee3",
@@ -360,7 +368,7 @@ export function GraphView(props: GraphViewProps) {
   ) {
     const radius = nodeRadius(node);
     const isActive = !active() || active()!.has(node.id);
-    const isSelected = node.id === props.selectedId;
+    const isSelected = node.id === ringId();
     const isHovered = node.id === hovered();
     context.save();
     context.globalAlpha = isActive ? 1 : 0.16;
@@ -427,7 +435,7 @@ export function GraphView(props: GraphViewProps) {
       const years = node.person
         ? formatFuzzyYearRange(node.person.birthDate, node.person.deathDate)
         : "";
-      if (years && globalScale > 1.35) {
+      if (years) {
         const small = 9.5 / globalScale;
         context.font = `400 ${small}px ui-sans-serif, system-ui, sans-serif`;
         context.fillStyle = "rgba(243,238,227,0.62)";
@@ -459,7 +467,7 @@ export function GraphView(props: GraphViewProps) {
     context: CanvasRenderingContext2D,
     globalScale: number,
   ) {
-    const isSelected = node.id === props.selectedId;
+    const isSelected = node.id === ringId();
     const isHovered = node.id === hovered();
     const isActive = !active() || (node.ownerId ? active()!.has(node.ownerId) : false);
     context.save();
@@ -991,6 +999,7 @@ export function GraphView(props: GraphViewProps) {
 
   createEffect(() => {
     props.selectedId;
+    props.highlightId;
     hovered();
     paintVersion();
     props.presence;

@@ -1,4 +1,4 @@
-import { Show, createMemo, createSignal } from "solid-js";
+import { Show, createEffect, createMemo, createSignal } from "solid-js";
 import type { GraphFile, GraphPerson, TreeGraph } from "~/api/people-server";
 import { GraphView, type GraphHandle } from "~/components/graph/GraphView";
 import { GraphToolbar } from "~/components/graph/GraphToolbar";
@@ -61,6 +61,12 @@ export function SharedTreeView(props: SharedTreeViewProps) {
     if (selectedFile()) return fileNodeId(selectedFile()!.id);
     return null;
   });
+  const [lastHighlightedId, setLastHighlightedId] = createSignal<string | null>(null);
+  createEffect(() => {
+    const id = selectedNodeId();
+    if (id) setLastHighlightedId(id);
+  });
+  const highlightedNodeId = () => selectedNodeId() ?? lastHighlightedId();
   function closePanels() {
     setSelectedPersonId(null);
     setSelectedFileId(null);
@@ -130,6 +136,7 @@ export function SharedTreeView(props: SharedTreeViewProps) {
         data={props.graph}
         role="viewer"
         selectedId={selectedNodeId()}
+        highlightId={highlightedNodeId()}
         showMedia={showMedia()}
         ageOrder={ageOrder()}
         thumbUrlFor={props.thumbUrlFor}
@@ -182,7 +189,6 @@ export function SharedTreeView(props: SharedTreeViewProps) {
             onDelete={noop}
             onAddRelative={noop}
             isViewer={false}
-            onClaimPerson={noop}
             onSelectPerson={focusPerson}
             onSelectFile={file => focusFile(file.id)}
             onSelectGroup={groupId => focusGroup(groupId)}

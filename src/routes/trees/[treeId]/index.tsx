@@ -174,6 +174,14 @@ function TreePageInner() {
     if (selectedFile()) return fileNodeId(selectedFile()!.id);
     return null;
   });
+  // Keep a local highlight after the panel closes so the graph still shows the
+  // last node someone opened, without dimming the rest of the tree.
+  const [lastHighlightedId, setLastHighlightedId] = createSignal<string | null>(null);
+  createEffect(() => {
+    const id = selectedNodeId();
+    if (id) setLastHighlightedId(id);
+  });
+  const highlightedNodeId = () => selectedNodeId() ?? lastHighlightedId();
   const editable = () => data()?.role === "owner" || data()?.role === "editor";
 
   const [focusRadius, setFocusRadius] = createSignal<FocusRadius | null>(null);
@@ -318,7 +326,7 @@ function TreePageInner() {
 
   const presence = createTreePresence({
     treeId: params.treeId,
-    nodeId: () => selectedNodeId(),
+    nodeId: () => highlightedNodeId(),
   });
 
   const [pendingRefresh, setPendingRefresh] = createSignal(false);
@@ -845,6 +853,7 @@ function TreePageInner() {
             data={graph()}
             role={graph().role}
             selectedId={selectedNodeId()}
+            highlightId={highlightedNodeId()}
             showMedia={showMedia()}
             ageOrder={ageOrder()}
             visible={focus().visible}
@@ -965,7 +974,9 @@ function TreePageInner() {
                 onDelete={() => setDeletePersonOpen(true)}
                 onAddRelative={() => setAddRelativeOpen(true)}
                 isViewer={viewerPersonId() === person().id}
-                onClaimPerson={() => saveViewerPerson(person().id)}
+                claimedBy={(graph().memberClaims ?? [])
+                  .filter(claim => claim.personId === person().id)
+                  .map(claim => claim.displayName)}
                 onSelectPerson={focusPerson}
                 onSelectFile={file => focusFile(file.id)}
                 onSelectGroup={groupId => focusGroup(groupId)}
