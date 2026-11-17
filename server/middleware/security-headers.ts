@@ -24,4 +24,12 @@ export default defineEventHandler(event => {
       "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
     });
   }
+
+  const path = event.path || "";
+  if (path.startsWith("/share/")) {
+    setResponseHeaders(event, {
+      "X-Robots-Tag": "noindex, nofollow, noarchive",
+      "Cache-Control": "private, no-store",
+    });
+  }
 });

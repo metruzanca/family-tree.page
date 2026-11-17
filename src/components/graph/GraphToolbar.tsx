@@ -50,7 +50,7 @@ type ToolbarProps = {
   };
   onFocusRadius: (radius: FocusRadius) => void;
   onChangeFocusPerson: () => void;
-  presence: {
+  presence?: {
     status: PresenceStatus;
     peers: PresencePeer[];
     selfPeerId: string | null;
@@ -62,7 +62,12 @@ type ToolbarProps = {
   onFit: () => void;
   onZoomIn: () => void;
   onZoomOut: () => void;
-  onAddPerson: () => void;
+  onAddPerson?: () => void;
+  showFocus?: boolean;
+  showTreeLinks?: boolean;
+  backHref?: string;
+  backLabel?: string;
+  badgeLabel?: string;
 };
 
 const glass =
@@ -74,13 +79,13 @@ export function GraphToolbar(props: ToolbarProps) {
     <div class="pointer-events-none absolute inset-x-0 top-0 z-20 p-3 sm:p-4">
       <div class="pointer-events-auto flex items-center gap-2">
         <A
-          href="/trees"
+          href={props.backHref ?? "/trees"}
           class={`${glass} px-3`}
-          aria-label="Back to your trees"
+          aria-label={props.backLabel ?? "Back to your trees"}
           data-testid="tree-toolbar-back"
         >
           <ArrowLeft size={16} />
-          <span class="hidden sm:inline">Trees</span>
+          <span class="hidden sm:inline">{props.backLabel ?? "Trees"}</span>
         </A>
         <div
           class="flex min-w-0 items-center gap-2 rounded-full border border-white/10 bg-black/35 px-3 py-2 backdrop-blur-md"
@@ -99,16 +104,18 @@ export function GraphToolbar(props: ToolbarProps) {
             variant="outline"
             class="border-white/10 bg-white/10 text-[0.58rem] font-semibold uppercase tracking-wide text-white/60"
           >
-            {roleLabel(props.role)}
+            {props.badgeLabel ?? roleLabel(props.role)}
           </Badge>
         </div>
 
-        <PresenceBar
-          status={props.presence.status}
-          peers={props.presence.peers}
-          selfPeerId={props.presence.selfPeerId}
-          resolveNode={props.resolveNode}
-        />
+        <Show when={props.presence}>
+          <PresenceBar
+            status={props.presence!.status}
+            peers={props.presence!.peers}
+            selfPeerId={props.presence!.selfPeerId}
+            resolveNode={props.resolveNode}
+          />
+        </Show>
 
         <div class="ml-auto flex items-center gap-1.5">
           <ToolButton
@@ -119,18 +126,20 @@ export function GraphToolbar(props: ToolbarProps) {
           >
             <Search size={17} />
           </ToolButton>
-          <FocusMenu
-            focus={props.focus}
-            onRadius={props.onFocusRadius}
-            onChangePerson={props.onChangeFocusPerson}
-          />
-          <Show when={editable()}>
+          <Show when={props.showFocus !== false}>
+            <FocusMenu
+              focus={props.focus}
+              onRadius={props.onFocusRadius}
+              onChangePerson={props.onChangeFocusPerson}
+            />
+          </Show>
+          <Show when={editable() && props.onAddPerson}>
             <button
               type="button"
               class={`${glass} font-semibold`}
               aria-label="Add person"
               data-testid="tree-toolbar-add-person"
-              onClick={props.onAddPerson}
+              onClick={() => props.onAddPerson?.()}
             >
               <Plus size={16} />
               <span class="hidden sm:inline">Add person</span>
@@ -182,27 +191,29 @@ export function GraphToolbar(props: ToolbarProps) {
             >
               <Maximize2 size={17} />
             </ToolButton>
-            <ToolButton
-              testId="tree-toolbar-activity"
-              label="Activity"
-              href={`/trees/${props.treeId}/activity`}
-            >
-              <History size={17} />
-            </ToolButton>
-            <ToolButton
-              testId="tree-toolbar-calendar"
-              label="Calendar"
-              href={`/trees/${props.treeId}/calendar`}
-            >
-              <CalendarDays size={17} />
-            </ToolButton>
-            <ToolButton
-              testId="tree-toolbar-settings"
-              label="Tree settings"
-              href={`/trees/${props.treeId}/settings`}
-            >
-              <Settings size={17} />
-            </ToolButton>
+            <Show when={props.showTreeLinks !== false}>
+              <ToolButton
+                testId="tree-toolbar-activity"
+                label="Activity"
+                href={`/trees/${props.treeId}/activity`}
+              >
+                <History size={17} />
+              </ToolButton>
+              <ToolButton
+                testId="tree-toolbar-calendar"
+                label="Calendar"
+                href={`/trees/${props.treeId}/calendar`}
+              >
+                <CalendarDays size={17} />
+              </ToolButton>
+              <ToolButton
+                testId="tree-toolbar-settings"
+                label="Tree settings"
+                href={`/trees/${props.treeId}/settings`}
+              >
+                <Settings size={17} />
+              </ToolButton>
+            </Show>
           </div>
 
           <DropdownMenu placement="bottom-end">
@@ -230,25 +241,27 @@ export function GraphToolbar(props: ToolbarProps) {
               >
                 <ArrowDownUp />
               </GlassItem>
-              <GlassItem
-                testId="tree-toolbar-more-focus-person"
-                label={
-                  props.focus.personName
-                    ? `Focused on ${props.focus.personName}. Change who you are`
-                    : "Tell us who you are"
-                }
-                onSelect={props.onChangeFocusPerson}
-              >
-                <UserRound />
-              </GlassItem>
-              <Show when={props.focus.radius !== "all"}>
+              <Show when={props.showFocus !== false}>
                 <GlassItem
-                  testId="tree-toolbar-more-show-all"
-                  label="Show the whole tree"
-                  onSelect={() => props.onFocusRadius("all")}
+                  testId="tree-toolbar-more-focus-person"
+                  label={
+                    props.focus.personName
+                      ? `Focused on ${props.focus.personName}. Change who you are`
+                      : "Tell us who you are"
+                  }
+                  onSelect={props.onChangeFocusPerson}
                 >
-                  <Target />
+                  <UserRound />
                 </GlassItem>
+                <Show when={props.focus.radius !== "all"}>
+                  <GlassItem
+                    testId="tree-toolbar-more-show-all"
+                    label="Show the whole tree"
+                    onSelect={() => props.onFocusRadius("all")}
+                  >
+                    <Target />
+                  </GlassItem>
+                </Show>
               </Show>
               <DropdownMenuSeparator class="my-1 bg-white/10" />
               <GlassItem
@@ -268,34 +281,36 @@ export function GraphToolbar(props: ToolbarProps) {
               <GlassItem testId="tree-toolbar-more-fit" label="Fit tree" onSelect={props.onFit}>
                 <Maximize2 />
               </GlassItem>
-              <DropdownMenuSeparator class="my-1 bg-white/10" />
-              <DropdownMenuItem
-                as={A}
-                href={`/trees/${props.treeId}/activity`}
-                data-testid="tree-toolbar-more-activity"
-                class="gap-2 rounded-xl px-3 py-2 text-white/80 data-[highlighted]:bg-white/10 data-[highlighted]:text-white"
-              >
-                <History />
-                Activity
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                as={A}
-                href={`/trees/${props.treeId}/calendar`}
-                data-testid="tree-toolbar-more-calendar"
-                class="gap-2 rounded-xl px-3 py-2 text-white/80 data-[highlighted]:bg-white/10 data-[highlighted]:text-white"
-              >
-                <CalendarDays />
-                Calendar
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                as={A}
-                href={`/trees/${props.treeId}/settings`}
-                data-testid="tree-toolbar-more-settings"
-                class="gap-2 rounded-xl px-3 py-2 text-white/80 data-[highlighted]:bg-white/10 data-[highlighted]:text-white"
-              >
-                <Settings />
-                Tree settings
-              </DropdownMenuItem>
+              <Show when={props.showTreeLinks !== false}>
+                <DropdownMenuSeparator class="my-1 bg-white/10" />
+                <DropdownMenuItem
+                  as={A}
+                  href={`/trees/${props.treeId}/activity`}
+                  data-testid="tree-toolbar-more-activity"
+                  class="gap-2 rounded-xl px-3 py-2 text-white/80 data-[highlighted]:bg-white/10 data-[highlighted]:text-white"
+                >
+                  <History />
+                  Activity
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  as={A}
+                  href={`/trees/${props.treeId}/calendar`}
+                  data-testid="tree-toolbar-more-calendar"
+                  class="gap-2 rounded-xl px-3 py-2 text-white/80 data-[highlighted]:bg-white/10 data-[highlighted]:text-white"
+                >
+                  <CalendarDays />
+                  Calendar
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  as={A}
+                  href={`/trees/${props.treeId}/settings`}
+                  data-testid="tree-toolbar-more-settings"
+                  class="gap-2 rounded-xl px-3 py-2 text-white/80 data-[highlighted]:bg-white/10 data-[highlighted]:text-white"
+                >
+                  <Settings />
+                  Tree settings
+                </DropdownMenuItem>
+              </Show>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

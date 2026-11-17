@@ -1,6 +1,6 @@
 import { For, Show, createEffect, createSignal } from "solid-js";
 import { A, createAsync, useNavigate, useParams, revalidate } from "@solidjs/router";
-import { Copy, Link2, LogOut, Mail, Plus, RotateCw, Settings, Shield, Trash2, Unlink, Users } from "lucide-solid";
+import { Copy, Link2, LogOut, Mail, Plus, RotateCw, Settings, Share2, Shield, Trash2, Unlink, Users } from "lucide-solid";
 import {
   clearMemberPerson,
   createInvite,
@@ -23,8 +23,16 @@ import {
   getTreeMembers as membersQuery,
   getTreeOverview as overviewQuery,
   getTreeInvites as invitesQuery,
+  getTreeShareLinks as shareLinksQuery,
   requireUserPage,
 } from "~/api";
+import {
+  createTreeShareLink,
+  revokeTreeShareLink,
+  type CreatedTreeShareLink,
+  type TreeShareLinkView,
+} from "~/api/share-server";
+import type { LivingVisibility } from "~/lib/share";
 import type { TreeRole } from "~/server/guards";
 import { AppErrorBoundary } from "~/components/app/AppErrorBoundary";
 import { AppHeader } from "~/components/app/AppHeader";
@@ -103,6 +111,11 @@ function TreeSettingsInner() {
   const invites = createAsync(() =>
     overview()?.role === "owner" ? getTreeInvites(params.treeId) : Promise.resolve([]),
   );
+  const shareLinks = createAsync(() =>
+    overview()?.role === "owner"
+      ? shareLinksQuery(params.treeId)
+      : Promise.resolve([] as TreeShareLinkView[]),
+  );
 
   const [name, setName] = createSignal("");
   const [description, setDescription] = createSignal("");
@@ -115,10 +128,22 @@ function TreeSettingsInner() {
   const [createdInvite, setCreatedInvite] = createSignal<CreatedInvite | null>(null);
   const [resendingId, setResendingId] = createSignal<string | null>(null);
   const [inviteRows, setInviteRows] = createSignal<InviteView[] | null>(null);
+  const [shareLabel, setShareLabel] = createSignal("");
+  const [shareLiving, setShareLiving] = createSignal<LivingVisibility>("name");
+  const [shareMedia, setShareMedia] = createSignal(false);
+  const [shareExpiry, setShareExpiry] = createSignal("30");
+  const [creatingShare, setCreatingShare] = createSignal(false);
+  const [createdShare, setCreatedShare] = createSignal<CreatedTreeShareLink | null>(null);
+  const [shareRows, setShareRows] = createSignal<TreeShareLinkView[] | null>(null);
 
   createEffect(() => {
     const rows = invites();
     if (rows) setInviteRows(rows);
+  });
+
+  createEffect(() => {
+    const rows = shareLinks();
+    if (rows) setShareRows(rows);
   });
 
   function applyCreatedInvite(created: CreatedInvite) {
@@ -153,6 +178,7 @@ function TreeSettingsInner() {
     | { kind: "leave" }
     | { kind: "delete" }
     | { kind: "revoke"; inviteId: string }
+    | { kind: "revoke-share"; linkId: string }
     | null
   >(null);
   const [pending, setPending] = createSignal(false);
@@ -296,6 +322,40 @@ function TreeSettingsInner() {
     }
   }
 
+  async function copyShareLink(url: string) {
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.show("Share link copied.", "success");
+    } catch {
+      window.prompt("Copy this share link", url);
+    }
+  }
+
+  async function createShare() {
+    if (creatingShare()) return;
+    setCreatingShare(true);
+    const expiresInDays = shareExpiry() === "never" ? null : Number(shareExpiry());
+    const result = await attemptAction(() =>
+      createTreeShareLink({
+        treeId: params.treeId,
+        label: shareLabel().trim() || null,
+        livingVisibility: shareLiving(),
+        includeMedia: shareMedia(),
+        expiresInDays,
+      }),
+    );
+    setCreatingShare(false);
+    if (!result.ok) {
+      toast.show(result.error, "error");
+      return;
+    }
+    setCreatedShare(result.data);
+    setShareRows(rows => [result.data, ...(rows ?? [])]);
+    setShareLabel("");
+    await revalidate(shareLinksQuery.key);
+    toast.show("Share link created.", "success");
+  }
+
   async function runConfirm() {
     const action = confirm();
     if (!action) return;
@@ -336,6 +396,19 @@ function TreeSettingsInner() {
         );
         await revalidate(invitesQuery.key);
         toast.show("Invite revoked.", "success");
+      } else if (action.kind === "revoke-share") {
+        const result = await attemptAction(() =>
+          revokeTreeShareLink({ treeId: params.treeId, linkId: action.linkId }),
+        );
+        if (!result.ok) return toast.show(result.error, "error");
+        setShareRows(rows =>
+          rows?.map(row =>
+            row.id === action.linkId ? { ...row, revokedAt: new Date() } : row,
+          ) ?? rows,
+        );
+        if (createdShare()?.id === action.linkId) setCreatedShare(null);
+        await revalidate(shareLinksQuery.key);
+        toast.show("Share link revoked.", "success");
       }
       setConfirm(null);
     } finally {
@@ -383,6 +456,10 @@ function TreeSettingsInner() {
                   <TabsTrigger value="invites">
                     <Link2 />
                     Invites
+                  </TabsTrigger>
+                  <TabsTrigger value="sharing" data-testid="tree-settings-tab-sharing">
+                    <Share2 />
+                    Sharing
                   </TabsTrigger>
                 </Show>
               </TabsList>
@@ -755,6 +832,159 @@ function TreeSettingsInner() {
                     </div>
                   </SectionCard>
                 </TabsContent>
+
+                <TabsContent value="sharing">
+                  <SectionCard
+                    title="Public share links"
+                    description="Create a read-only link anyone can open without an account. Living people default to names only, and media is off."
+                  >
+                    <div class="grid gap-3 sm:grid-cols-2 sm:items-end">
+                      <Field label="Label" for="share-label" hint="Only you see this.">
+                        <input
+                          id="share-label"
+                          class="input"
+                          maxlength={80}
+                          placeholder="Cousins in Ohio"
+                          value={shareLabel()}
+                          onInput={event => setShareLabel(event.currentTarget.value)}
+                          data-testid="share-create-label"
+                        />
+                      </Field>
+                      <Field label="Living people" for="share-living">
+                        <select
+                          id="share-living"
+                          class="input"
+                          value={shareLiving()}
+                          onChange={event =>
+                            setShareLiving(event.currentTarget.value as LivingVisibility)
+                          }
+                          data-testid="share-create-living"
+                        >
+                          <option value="hidden">Hide living people</option>
+                          <option value="name">Names only</option>
+                          <option value="full">Full details</option>
+                        </select>
+                      </Field>
+                      <Field label="Expires" for="share-expiry">
+                        <select
+                          id="share-expiry"
+                          class="input"
+                          value={shareExpiry()}
+                          onChange={event => setShareExpiry(event.currentTarget.value)}
+                          data-testid="share-create-expiry"
+                        >
+                          <option value="1">In 1 day</option>
+                          <option value="7">In 7 days</option>
+                          <option value="30">In 30 days</option>
+                          <option value="90">In 90 days</option>
+                          <option value="never">Never</option>
+                        </select>
+                      </Field>
+                      <label class="flex items-center gap-2.5 rounded-xl border border-border px-3 py-2.5 text-sm">
+                        <input
+                          type="checkbox"
+                          class="size-4 accent-primary"
+                          checked={shareMedia()}
+                          onChange={event => setShareMedia(event.currentTarget.checked)}
+                          data-testid="share-create-media"
+                        />
+                        Include photos as thumbnails
+                      </label>
+                      <div class="sm:col-span-2">
+                        <Button
+                          type="button"
+                          onClick={createShare}
+                          disabled={creatingShare()}
+                          data-testid="share-create-submit"
+                        >
+                          <Plus />
+                          {creatingShare() ? "Creating…" : "Create share link"}
+                        </Button>
+                      </div>
+                    </div>
+
+                    <Show when={createdShare()}>
+                      {created => (
+                        <div
+                          class="mt-5 rounded-xl border border-primary/25 bg-accent/50 p-3"
+                          data-testid="share-created"
+                        >
+                          <p class="text-xs font-semibold text-primary">
+                            Copy this link now. It is not shown again.
+                          </p>
+                          <div class="mt-2 flex flex-wrap gap-2">
+                            <input
+                              readonly
+                              class="input min-w-0 flex-1 font-mono text-xs"
+                              value={created().url}
+                              data-testid="share-created-url"
+                            />
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => copyShareLink(created().url)}
+                              data-testid="share-created-copy"
+                            >
+                              <Copy size={14} />
+                              Copy
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </Show>
+
+                    <div class="mt-6">
+                      <h3 class="field-label">Active and past links</h3>
+                      <Show
+                        when={shareRows()?.length}
+                        fallback={
+                          <p
+                            class="mt-2 rounded-xl border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground"
+                            data-testid="share-links-empty"
+                          >
+                            No share links yet.
+                          </p>
+                        }
+                      >
+                        <div class="mt-2 space-y-1" data-testid="share-links-list">
+                          <For each={shareRows()}>
+                            {link => (
+                              <div
+                                class="flex flex-wrap items-center gap-3 rounded-xl px-2 py-2 text-sm transition hover:bg-accent/50"
+                                data-testid={`share-link-row-${link.id}`}
+                              >
+                                <Share2 size={15} class="text-muted-foreground" />
+                                <div class="min-w-0 flex-1">
+                                  <p class="font-medium">{link.label}</p>
+                                  <p class="text-xs text-muted-foreground">
+                                    {shareLivingLabel(link.livingVisibility)} ·{" "}
+                                    {link.includeMedia ? "Photos on" : "No photos"} ·{" "}
+                                    {shareStatus(link)} · {formatRelative(link.createdAt)}
+                                  </p>
+                                </div>
+                                <Show when={!link.revokedAt && linkStatusActive(link)}>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    class="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                    onClick={() =>
+                                      setConfirm({ kind: "revoke-share", linkId: link.id })
+                                    }
+                                    data-testid={`share-link-revoke-${link.id}`}
+                                  >
+                                    Revoke
+                                  </Button>
+                                </Show>
+                              </div>
+                            )}
+                          </For>
+                        </div>
+                      </Show>
+                    </div>
+                  </SectionCard>
+                </TabsContent>
               </Show>
             </Tabs>
 
@@ -787,7 +1017,7 @@ function TreeSettingsInner() {
             title={confirmTitle(confirm())}
             message={confirmMessage(confirm(), overview()?.tree.name ?? "this tree")}
             confirmLabel={confirmLabel(confirm())}
-            danger={confirm()?.kind === "delete" || confirm()?.kind === "remove"}
+            danger={confirm()?.kind === "delete" || confirm()?.kind === "remove" || confirm()?.kind === "revoke-share"}
             pending={pending()}
             onConfirm={runConfirm}
           />
@@ -825,11 +1055,35 @@ function inviteStatus(invite: {
   return "Pending";
 }
 
+function shareLivingLabel(visibility: LivingVisibility) {
+  if (visibility === "hidden") return "Living hidden";
+  if (visibility === "full") return "Living full details";
+  return "Living names only";
+}
+
+function linkStatusActive(link: { revokedAt: Date | null; expiresAt: Date | null }) {
+  if (link.revokedAt) return false;
+  if (link.expiresAt && new Date(link.expiresAt).getTime() <= Date.now()) return false;
+  return true;
+}
+
+function shareStatus(link: {
+  revokedAt: Date | null;
+  expiresAt: Date | null;
+  lastAccessedAt: Date | null;
+}) {
+  if (link.revokedAt) return "Revoked";
+  if (link.expiresAt && new Date(link.expiresAt).getTime() <= Date.now()) return "Expired";
+  if (link.expiresAt) return `Expires ${formatRelative(link.expiresAt)}`;
+  return "No expiry";
+}
+
 function confirmTitle(action: { kind: string } | null) {
   if (!action) return "";
   if (action.kind === "remove") return "Remove this member?";
   if (action.kind === "leave") return "Leave this tree?";
   if (action.kind === "delete") return "Delete this tree?";
+  if (action.kind === "revoke-share") return "Revoke this share link?";
   return "Revoke this invite?";
 }
 
@@ -838,6 +1092,7 @@ function confirmLabel(action: { kind: string } | null) {
   if (action.kind === "remove") return "Remove member";
   if (action.kind === "leave") return "Leave tree";
   if (action.kind === "delete") return "Delete tree";
+  if (action.kind === "revoke-share") return "Revoke link";
   return "Revoke invite";
 }
 
@@ -851,6 +1106,9 @@ function confirmMessage(action: { kind: string; name?: string } | null, treeName
   }
   if (action.kind === "delete") {
     return `${treeName}, everyone's connections, and all uploaded files will be permanently deleted. This cannot be undone.`;
+  }
+  if (action.kind === "revoke-share") {
+    return "Anyone with this link will lose access immediately. You can create a new link at any time.";
   }
   return "Anyone using this link will no longer be able to join.";
 }

@@ -33,6 +33,10 @@ type FilePanelProps = {
   onSaveTags: (personIds: string[]) => void;
   onSetTakenAt: (value: FuzzyDate | null) => void;
   onDelete: () => void;
+  /** When false, the download button is hidden. Used by share views. */
+  allowDownload?: boolean;
+  /** Overrides thumbnail URLs for portraits, used by demo and share views. */
+  thumbUrlFor?: (fileId: string) => string;
 };
 
 export function FilePanel(props: FilePanelProps) {
@@ -110,15 +114,17 @@ export function FilePanel(props: FilePanelProps) {
             View full size
           </Button>
         </Show>
-        <a
-          href={`/api/files/${props.file.id}/download`}
-          class={buttonVariants({ variant: "secondary", size: "sm" })}
-          download={props.file.name}
-          data-testid="file-panel-download"
-        >
-          <Download size={14} />
-          Download
-        </a>
+        <Show when={props.allowDownload !== false}>
+          <a
+            href={`/api/files/${props.file.id}/download`}
+            class={buttonVariants({ variant: "secondary", size: "sm" })}
+            download={props.file.name}
+            data-testid="file-panel-download"
+          >
+            <Download size={14} />
+            Download
+          </a>
+        </Show>
         <Show when={editable() && isImage()}>
           <Button
             size="sm"
@@ -198,6 +204,11 @@ export function FilePanel(props: FilePanelProps) {
                 <Avatar
                   name={person().displayName}
                   fileId={person().avatarFileId}
+                  thumbUrl={
+                    props.thumbUrlFor && person().avatarFileId
+                      ? props.thumbUrlFor(person().avatarFileId!)
+                      : undefined
+                  }
                   size={36}
                 />
                 <span class="min-w-0 flex-1">
@@ -225,7 +236,12 @@ export function FilePanel(props: FilePanelProps) {
         </Show>
 
         <p class="mt-6 text-[0.68rem] leading-relaxed text-muted-foreground">
-          Files stay private to this tree. Downloads use a short-lived signed link.
+          <Show
+            when={props.allowDownload !== false}
+            fallback="This tree is shared read-only. Media is shown as thumbnails."
+          >
+            Files stay private to this tree. Downloads use a short-lived signed link.
+          </Show>
         </p>
       </div>
     </aside>

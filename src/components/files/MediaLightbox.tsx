@@ -48,10 +48,24 @@ type MediaLightboxProps = {
   onDeleteFile: (file: GraphFile) => void;
   onRenameGroup?: (name: string) => void;
   onDeleteGroup?: () => void;
+  /** When false, only thumbnails are shown and download links are hidden. */
+  allowDownload?: boolean;
+  /** Overrides the image and download URLs, used by demo and share views. */
+  fileUrlFor?: (file: GraphFile, inline: boolean) => string;
+  /** Overrides thumbnail URLs for portraits, used by demo and share views. */
+  thumbUrlFor?: (fileId: string) => string;
 };
 
 export function MediaLightbox(props: MediaLightboxProps) {
   const editable = () => props.role === "owner" || props.role === "editor";
+  const canDownload = () => props.allowDownload !== false;
+  const previewUrl = (file: GraphFile) => {
+    if (props.fileUrlFor) return props.fileUrlFor(file, true);
+    if (!canDownload() && file.thumbUrl) return file.thumbUrl;
+    return `/api/files/${file.id}/download?inline=1`;
+  };
+  const downloadUrl = (file: GraphFile) =>
+    props.fileUrlFor ? props.fileUrlFor(file, false) : `/api/files/${file.id}/download`;
   const initialIndex = () => {
     if (!props.files.length) return 0;
     const found = props.files.findIndex(file => file.id === props.initialFileId);
@@ -142,10 +156,10 @@ export function MediaLightbox(props: MediaLightboxProps) {
                   <p class="text-sm text-white/60">
                     This file is downloaded rather than previewed.
                   </p>
-                  <Show when={current()}>
+                  <Show when={canDownload() ? current() : null}>
                     {file => (
                       <a
-                        href={`/api/files/${file().id}/download`}
+                        href={downloadUrl(file())}
                         class={buttonVariants({ variant: "secondary", size: "sm" })}
                         download={file().name}
                         data-testid="media-lightbox-download-fallback"
@@ -160,7 +174,7 @@ export function MediaLightbox(props: MediaLightboxProps) {
             >
               {file => (
                 <img
-                  src={`/api/files/${file().id}/download?inline=1`}
+                  src={previewUrl(file())}
                   alt={file().name}
                   class="max-h-full max-w-full object-contain"
                 />
@@ -301,10 +315,10 @@ export function MediaLightbox(props: MediaLightboxProps) {
             </div>
 
             <div class="mt-4 flex flex-wrap items-center gap-2">
-              <Show when={current()}>
+              <Show when={canDownload() ? current() : null}>
                 {file => (
                   <a
-                    href={`/api/files/${file().id}/download`}
+                    href={downloadUrl(file())}
                     class={buttonVariants({ variant: "secondary", size: "sm" })}
                     download={file().name}
                     data-testid="media-lightbox-download"
@@ -403,6 +417,11 @@ export function MediaLightbox(props: MediaLightboxProps) {
                     <Avatar
                       name={person().displayName}
                       fileId={person().avatarFileId}
+                      thumbUrl={
+                        props.thumbUrlFor && person().avatarFileId
+                      ? props.thumbUrlFor(person().avatarFileId!)
+                          : undefined
+                      }
                       size={36}
                     />
                     <span class="min-w-0 flex-1">
@@ -451,7 +470,12 @@ export function MediaLightbox(props: MediaLightboxProps) {
             </Show>
 
             <p class="mt-5 text-[0.68rem] leading-relaxed text-muted-foreground">
-              Files stay private to this tree. Downloads use a short-lived signed link.
+              <Show
+                when={canDownload()}
+                fallback="This tree is shared read-only. Media is shown as thumbnails."
+              >
+                Files stay private to this tree. Downloads use a short-lived signed link.
+              </Show>
             </p>
           </div>
         </aside>

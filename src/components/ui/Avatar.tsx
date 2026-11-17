@@ -17,11 +17,14 @@ type AvatarProps = {
   size?: number;
   class?: string;
   ring?: boolean;
+  /** Overrides the thumbnail URL, used by demo and share views. */
+  thumbUrl?: string | null;
 };
 
 export function Avatar(props: AvatarProps) {
   const size = () => props.size ?? 40;
   const colors = createMemo(() => avatarColors(props.name));
+  const src = () => props.thumbUrl ?? (props.fileId ? `/api/files/${props.fileId}/thumb` : null);
   return (
     <span
       class={`relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full ${props.ring ? "ring-2 ring-card" : ""} ${props.class ?? ""}`}
@@ -35,11 +38,11 @@ export function Avatar(props: AvatarProps) {
       aria-hidden="true"
     >
       <Show
-        when={props.fileId}
+        when={src()}
         fallback={<span class="font-semibold tracking-wide">{initials(props.name)}</span>}
       >
         <img
-          src={`/api/files/${props.fileId}/thumb`}
+          src={src()!}
           alt=""
           class="h-full w-full object-cover"
           loading="lazy"

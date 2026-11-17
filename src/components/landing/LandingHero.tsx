@@ -2,6 +2,7 @@ import { For, Show, createMemo, createSignal, type JSX } from "solid-js";
 import { A } from "@solidjs/router";
 import {
   ArrowRight,
+  ArrowUpRight,
   Check,
   ImageOff,
   Images,
@@ -131,6 +132,14 @@ export function LandingHero() {
                 })}
               >
                 Sign in
+              </A>
+              <A
+                href="/demo"
+                class="inline-flex items-center gap-1.5 px-1 text-sm font-semibold text-[#b9c4b0] underline decoration-white/20 underline-offset-4 transition hover:text-white"
+                data-testid="landing-hero-demo"
+              >
+                Open the full demo
+                <ArrowUpRight size={14} />
               </A>
             </div>
 

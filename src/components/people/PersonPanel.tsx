@@ -56,6 +56,10 @@ type PersonPanelProps = {
   onAddEvent: () => void;
   onEditEvent: (event: GraphPersonEvent) => void;
   onDeleteEvent: (event: GraphPersonEvent) => void;
+  /** Hides member-only affordances such as claiming a person. */
+  readOnly?: boolean;
+  /** Overrides thumbnail URLs for portraits, used by demo and share views. */
+  thumbUrlFor?: (fileId: string) => string;
 };
 
 export function PersonPanel(props: PersonPanelProps) {
@@ -145,7 +149,16 @@ export function PersonPanel(props: PersonPanelProps) {
       </div>
 
       <div class="flex items-start gap-3 px-5 pb-4 pt-2 sm:pt-5" data-testid="person-panel-header">
-        <Avatar name={props.person.displayName} fileId={props.person.avatarFileId} size={58} />
+        <Avatar
+          name={props.person.displayName}
+          fileId={props.person.avatarFileId}
+          thumbUrl={
+            props.thumbUrlFor && props.person.avatarFileId
+              ? props.thumbUrlFor(props.person.avatarFileId!)
+              : undefined
+          }
+          size={58}
+        />
         <div class="min-w-0 flex-1">
           <h2 class="truncate font-display text-2xl leading-tight tracking-tight">
             {props.person.displayName}
@@ -170,26 +183,27 @@ export function PersonPanel(props: PersonPanelProps) {
         </div>
       </div>
 
-      <div class="flex items-center gap-2 overflow-x-auto border-y border-border px-5 py-2.5 no-scrollbar">
-        <Show
-          when={props.isViewer}
-          fallback={
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={props.onClaimPerson}
-              data-testid="person-panel-claim"
-            >
+      <Show when={!props.readOnly}>
+        <div class="flex items-center gap-2 overflow-x-auto border-y border-border px-5 py-2.5 no-scrollbar">
+          <Show
+            when={props.isViewer}
+            fallback={
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={props.onClaimPerson}
+                data-testid="person-panel-claim"
+              >
+                <UserCheck size={13} />
+                This is me
+              </Button>
+            }
+          >
+            <span class="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-accent px-2.5 py-1 text-xs font-semibold text-primary">
               <UserCheck size={13} />
-              This is me
-            </Button>
-          }
-        >
-          <span class="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-accent px-2.5 py-1 text-xs font-semibold text-primary">
-            <UserCheck size={13} />
-            This is you
-          </span>
-        </Show>
+              This is you
+            </span>
+          </Show>
         <Show when={editable()}>
           <Button
             size="sm"
@@ -231,6 +245,7 @@ export function PersonPanel(props: PersonPanelProps) {
           </IconButton>
         </Show>
       </div>
+      </Show>
 
       <Show when={props.uploading}>
         <div class="border-b border-border px-5 py-2.5" data-testid="person-panel-upload-progress">
@@ -367,7 +382,10 @@ export function PersonPanel(props: PersonPanelProps) {
                 class="mt-2 rounded-xl border border-dashed border-border px-3 py-5 text-center text-xs leading-relaxed text-muted-foreground"
                 data-testid="person-panel-media-empty"
               >
-                No files yet. Add a portrait or a document about {firstName(props.person)}.
+                No files yet.{" "}
+                {props.readOnly
+                  ? "There are no photos or files shared for this person."
+                  : `Add a portrait or a document about ${firstName(props.person)}.`}
               </p>
             }
           >
