@@ -1,4 +1,5 @@
 import type { ActionResult } from "~/server/errors";
+import { errorRequestId } from "./request-tracking";
 
 /** Redirects thrown by server functions must reach the router instead of becoming error text. */
 export function isRedirectResponse(value: unknown): value is Response {
@@ -37,6 +38,15 @@ export function friendlyMessage(error: unknown): string {
   return "Something went wrong. Please try again.";
 }
 
+export function withReference(message: string, reference: string | undefined) {
+  if (!reference || message.includes(`Reference: ${reference}`)) return message;
+  return `${message} Reference: ${reference}`;
+}
+
+export function failureReference(error: unknown, result?: { reference?: string }) {
+  return result?.reference ?? (errorRequestId(error)?.slice(0, 8) || undefined);
+}
+
 /**
  * Client-side wrapper for server actions. Server actions already convert
  * expected failures into `{ ok: false }`, but a rejected call (network drop,
@@ -47,10 +57,20 @@ export async function attemptAction<T>(
   fn: () => Promise<ActionResult<T>>,
 ): Promise<ActionResult<T>> {
   try {
-    return await fn();
+    const result = await fn();
+    if (result.ok) return result;
+    return {
+      ...result,
+      error: withReference(result.error, failureReference(undefined, result)),
+    };
   } catch (error) {
     if (isRedirectResponse(error)) throw error;
     console.error(error);
-    return { ok: false, error: friendlyMessage(error) };
+    const reference = failureReference(error);
+    return {
+      ok: false,
+      error: withReference(friendlyMessage(error), reference),
+      reference,
+    };
   }
 }

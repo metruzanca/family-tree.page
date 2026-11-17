@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { attemptAction, friendlyMessage, isRedirectResponse } from "./action-result";
+import { attemptAction, failureReference, friendlyMessage, isRedirectResponse, withReference } from "./action-result";
+import { annotateError, errorRequestId } from "./request-tracking";
 
 describe("friendlyMessage", () => {
   it("passes through useful server messages", () => {
@@ -63,5 +64,40 @@ describe("attemptAction", () => {
         throw redirect;
       }),
     ).rejects.toBe(redirect);
+  });
+});
+
+describe("action failure references", () => {
+  it("adds a reference once", () => {
+    expect(withReference("Could not save. Reference: abc12345", "abc12345")).toBe(
+      "Could not save. Reference: abc12345",
+    );
+    expect(withReference("Could not save.", "abc12345")).toBe(
+      "Could not save. Reference: abc12345",
+    );
+    expect(withReference("Could not save.", undefined)).toBe("Could not save.");
+  });
+
+  it("reads a request id from a network error", () => {
+    const error = annotateError(new Error("Failed to fetch"), "12345678-abcd");
+    expect(errorRequestId(error)).toBe("12345678-abcd");
+    expect(failureReference(error)).toBe("12345678");
+  });
+
+  it("prefers the reference returned by the server", () => {
+    expect(failureReference(new Error("ignored"), { reference: "deadbeef" })).toBe("deadbeef");
+  });
+
+  it("appends the server reference to the message", async () => {
+    const result = await attemptAction(async () => ({
+      ok: false as const,
+      error: "That person could not be found.",
+      reference: "deadbeef",
+    }));
+    expect(result).toEqual({
+      ok: false,
+      error: "That person could not be found. Reference: deadbeef",
+      reference: "deadbeef",
+    });
   });
 });
