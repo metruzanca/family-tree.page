@@ -118,10 +118,13 @@ export async function finalizeFile(fileId: string, userId: string): Promise<Stor
     await assertDetectedType(file.mimeType, bytes);
 
     let thumbKey = file.thumbKey;
+    let thumbSizeBytes: number | null = null;
     if (thumbKey) {
       const thumbHead = await headObject(thumbKey);
       if (!thumbHead || !thumbHead.ContentLength || thumbHead.ContentLength > MAX_THUMB_BYTES) {
         thumbKey = null;
+      } else {
+        thumbSizeBytes = thumbHead.ContentLength;
       }
     }
 
@@ -131,6 +134,7 @@ export async function finalizeFile(fileId: string, userId: string): Promise<Stor
         status: "ready",
         sizeBytes: head.ContentLength,
         thumbKey,
+        thumbSizeBytes,
         updatedAt: new Date(),
       })
       .where(eq(files.id, file.id))
@@ -201,7 +205,9 @@ export async function cleanupFile(file: StoredFile) {
   await db.delete(files).where(eq(files.id, file.id));
 }
 
-export async function deleteFileRecord(fileId: string, userId: string) {
+export type DeletedUsage = { bytes: number; count: number };
+
+export async function deleteFileRecord(fileId: string, userId: string): Promise<DeletedUsage> {
   const file = await getFileById(fileId);
   if (!file) throw new AppError("That file could not be found.");
   const memberships = await db
@@ -213,6 +219,10 @@ export async function deleteFileRecord(fileId: string, userId: string) {
     throw new AppError("You do not have permission to delete this file.");
   }
   const groupId = file.groupId;
+  const usage = {
+    bytes: file.sizeBytes + (file.thumbSizeBytes ?? 0),
+    count: 1,
+  };
   await cleanupFile(file);
   if (groupId) {
     const remaining = await db
@@ -227,9 +237,13 @@ export async function deleteFileRecord(fileId: string, userId: string) {
     }
   }
   await touchTree(file.treeId);
+  return usage;
 }
 
-export async function deleteFileGroup(groupId: string, treeId: string) {
+export async function deleteFileGroup(
+  groupId: string,
+  treeId: string,
+): Promise<DeletedUsage> {
   const groupRows = await db
     .select()
     .from(fileGroups)
@@ -244,6 +258,13 @@ export async function deleteFileGroup(groupId: string, treeId: string) {
   const keys = groupFiles
     .flatMap(file => [file.storageKey, file.thumbKey])
     .filter((key): key is string => Boolean(key));
+  const usage = groupFiles.reduce<DeletedUsage>(
+    (sum, file) => ({
+      bytes: sum.bytes + file.sizeBytes + (file.thumbSizeBytes ?? 0),
+      count: sum.count + 1,
+    }),
+    { bytes: 0, count: 0 },
+  );
   if (keys.length) {
     try {
       await deleteKeys(keys);
@@ -255,6 +276,7 @@ export async function deleteFileGroup(groupId: string, treeId: string) {
     .delete(fileGroups)
     .where(and(eq(fileGroups.id, groupId), eq(fileGroups.treeId, treeId)));
   await touchTree(treeId);
+  return usage;
 }
 
 export async function setAvatarRecord(input: {

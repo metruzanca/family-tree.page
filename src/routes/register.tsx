@@ -85,6 +85,17 @@ export default function RegisterPage() {
             We will send a link to confirm your email address. Your family data stays private in the
             meantime.
           </p>
+          <p class="text-center text-[0.7rem] leading-relaxed text-muted-foreground">
+            By creating an account you agree to the{" "}
+            <A href="/terms" class="underline decoration-border underline-offset-2 hover:text-foreground">
+              Terms of Service
+            </A>{" "}
+            and the{" "}
+            <A href="/privacy" class="underline decoration-border underline-offset-2 hover:text-foreground">
+              Privacy Policy
+            </A>
+            .
+          </p>
         </form>
       </Card>
     </AuthLayout>

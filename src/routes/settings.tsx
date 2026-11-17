@@ -1,5 +1,5 @@
 import { Show, createEffect, createSignal } from "solid-js";
-import { createAsync, revalidate } from "@solidjs/router";
+import { A, createAsync, revalidate } from "@solidjs/router";
 import {
   BellRing,
   CalendarPlus,
@@ -7,6 +7,7 @@ import {
   Copy,
   Download,
   ExternalLink,
+  HardDrive,
   KeyRound,
   Mail,
   RotateCw,
@@ -25,7 +26,7 @@ import {
   requestEmailChange,
 } from "~/api/account-server";
 import { createCalendarFeed, disableCalendarFeed } from "~/api/calendar-server";
-import { getCalendarFeed, getPendingEmailChange, getUser, requireUserPage } from "~/api";
+import { getCalendarFeed, getPendingEmailChange, getUsage, getUser, requireUserPage } from "~/api";
 import { AppErrorBoundary } from "~/components/app/AppErrorBoundary";
 import { AppHeader } from "~/components/app/AppHeader";
 import { VerifyEmailNotice } from "~/components/auth/VerifyEmailNotice";
@@ -34,7 +35,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/com
 import { ConfirmDialog } from "~/components/ui/ConfirmDialog";
 import { Field } from "~/components/ui/Field";
 import { Modal } from "~/components/ui/Modal";
-import { formatRelative } from "~/lib/format";
+import { formatBytes, formatRelative } from "~/lib/format";
 import {
   Switch,
   SwitchControl,
@@ -52,6 +53,7 @@ export const route = {
     requireUserPage();
     getCalendarFeed();
     getPendingEmailChange();
+    getUsage();
   },
 };
 
@@ -65,6 +67,7 @@ export default function AccountSettingsPage() {
         getUser.key,
         getCalendarFeed.key,
         getPendingEmailChange.key,
+        getUsage.key,
       ]}
       back={{ href: "/trees", label: "Back to your trees" }}
     >
@@ -88,6 +91,7 @@ function AccountSettingsInner() {
   });
   const [notificationsPending, setNotificationsPending] = createSignal(false);
   const feed = createAsync(() => getCalendarFeed());
+  const usage = createAsync(() => getUsage());
   const [feedPending, setFeedPending] = createSignal(false);
   const [feedConfirm, setFeedConfirm] = createSignal<"rotate" | "disable" | null>(null);
   const pendingEmailChange = createAsync(() => getPendingEmailChange());
@@ -427,6 +431,106 @@ function AccountSettingsInner() {
               </CardContent>
             </Card>
 
+            <Card id="usage" class="mt-5 scroll-mt-24 gap-4 py-5 sm:py-6">
+              <CardHeader class="gap-1 px-5 sm:px-6">
+                <div class="flex items-center gap-3">
+                  <span class="grid size-9 place-items-center rounded-xl bg-accent text-accent-foreground">
+                    <HardDrive size={17} />
+                  </span>
+                  <div>
+                    <CardTitle class="font-display text-xl">Storage and limits</CardTitle>
+                    <CardDescription class="text-xs">
+                      What this account is using, across every tree you belong to.
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent class="px-5 sm:px-6">
+                <Show
+                  when={usage()}
+                  fallback={
+                    <p class="text-sm text-muted-foreground">Loading usage…</p>
+                  }
+                >
+                  {currentUsage => (
+                    <div class="space-y-5">
+                      <div>
+                        <div class="flex items-baseline justify-between gap-3 text-xs">
+                          <span class="font-medium text-foreground">Media storage</span>
+                          <span class="text-muted-foreground">
+                            {formatBytes(currentUsage().storageBytes)} of{" "}
+                            {formatBytes(currentUsage().storageQuotaBytes)}
+                          </span>
+                        </div>
+                        <div class="mt-2 h-2 w-full overflow-hidden rounded-full bg-primary/15">
+                          <div
+                            class="h-full rounded-full bg-primary transition-[width]"
+                            style={{
+                              width: `${Math.min(
+                                100,
+                                Math.round(
+                                  (currentUsage().storageBytes /
+                                    Math.max(1, currentUsage().storageQuotaBytes)) *
+                                    100,
+                                ),
+                              )}%`,
+                            }}
+                          />
+                        </div>
+                        <p class="mt-2 text-xs leading-relaxed text-muted-foreground">
+                          Originals and thumbnails you uploaded. Deleting a file frees space again.
+                          <Show when={currentUsage().pendingUploads > 0}>
+                            {" "}
+                            {currentUsage().pendingUploads} upload
+                            {currentUsage().pendingUploads === 1 ? " is" : "s are"} in progress.
+                          </Show>
+                        </p>
+                      </div>
+
+                      <div class="border-t border-border pt-4">
+                        <div class="flex items-baseline justify-between gap-3 text-xs">
+                          <span class="font-medium text-foreground">People created</span>
+                          <span class="text-muted-foreground">
+                            {currentUsage().peopleCreated} of {currentUsage().peopleQuota}
+                          </span>
+                        </div>
+                        <div class="mt-2 h-2 w-full overflow-hidden rounded-full bg-primary/15">
+                          <div
+                            class="h-full rounded-full bg-primary transition-[width]"
+                            style={{
+                              width: `${Math.min(
+                                100,
+                                Math.round(
+                                  (currentUsage().peopleCreated /
+                                    Math.max(1, currentUsage().peopleQuota)) *
+                                    100,
+                                ),
+                              )}%`,
+                            }}
+                          />
+                        </div>
+                        <p class="mt-2 text-xs leading-relaxed text-muted-foreground">
+                          A lifetime count of people you add, including people you later delete.
+                          Editing or adding relationships does not use a slot.
+                        </p>
+                      </div>
+
+                      <p class="rounded-xl border border-border bg-muted/35 px-3.5 py-3 text-xs leading-relaxed text-muted-foreground">
+                        Need more space for a large family or a genealogy project?{" "}
+                        <a
+                          class="font-medium text-primary underline decoration-primary/30 underline-offset-4"
+                          href={`mailto:${currentUsage().supportEmail}?subject=Increase%20my%20family-tree%20limits`}
+                        >
+                          Email us
+                        </a>{" "}
+                        and tell us what you are working on.
+                      </p>
+                    </div>
+                  )}
+                </Show>
+              </CardContent>
+            </Card>
+
             <Card class="mt-5 gap-4 py-5 sm:py-6">
               <CardHeader class="gap-1 px-5 sm:px-6">
                 <div class="flex items-center gap-3">
@@ -736,6 +840,16 @@ function AccountSettingsInner() {
             <p class="mt-6 text-center text-xs leading-relaxed text-muted-foreground">
               Forgot your password? Sign out and choose “Forgot your password?” on the sign-in page
               to get a reset link by email.
+            </p>
+
+            <p class="mt-3 text-center text-[0.7rem] leading-relaxed text-muted-foreground">
+              <A href="/privacy" class="underline decoration-border underline-offset-2 hover:text-foreground">
+                Privacy Policy
+              </A>
+              <span class="px-1.5">and</span>
+              <A href="/terms" class="underline decoration-border underline-offset-2 hover:text-foreground">
+                Terms of Service
+              </A>
             </p>
           </main>
 

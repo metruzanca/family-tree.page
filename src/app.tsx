@@ -7,6 +7,7 @@ import { ThemeProvider } from "./components/ui/Theme";
 import { ToastProvider } from "./components/ui/Toast";
 import { LoadingScreen } from "./components/ui/Loading";
 import { AppErrorBoundary } from "./components/app/AppErrorBoundary";
+import { AnalyticsPageviews } from "./components/app/AnalyticsPageviews";
 
 function CacheBoundary(props: ParentProps) {
   const location = useLocation();
@@ -25,6 +26,7 @@ export default function App() {
         <Router
           root={props => (
             <CacheBoundary>
+              <AnalyticsPageviews />
               <Suspense fallback={<LoadingScreen />}>
                 <AppErrorBoundary
                   title="Something went wrong"

@@ -1,6 +1,6 @@
 import "./env";
 import { randomBytes, scrypt } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { count, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import {
@@ -202,6 +202,15 @@ try {
     { treeId: tree.id, parentId: homer.id, childId: maggie.id },
     { treeId: tree.id, parentId: marge.id, childId: maggie.id },
   ]);
+
+  const [createdPeople] = await db
+    .select({ value: count() })
+    .from(people)
+    .where(eq(people.createdBy, user.id));
+  await db
+    .update(users)
+    .set({ peopleCreatedCount: Number(createdPeople?.value ?? 0) })
+    .where(eq(users.id, user.id));
 
   console.log(`Seeded tree ${tree.id} for demo@family-tree.local (password: family-tree-demo-12345)`);
 } finally {

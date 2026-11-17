@@ -29,6 +29,12 @@ import {
   storageKeys,
 } from "../server/file-service";
 import { createUploadPost } from "../server/storage";
+import {
+  QuotaError,
+  recordRejection,
+  reserveStorage,
+  recordUsage,
+} from "../server/usage";
 import type { FuzzyDate } from "../lib/fuzzy-date";
 
 export type PreparedUpload = {
@@ -44,6 +50,7 @@ export async function prepareUpload(input: {
   fileName: string;
   mimeType: string;
   sizeBytes: number;
+  thumbSizeBytes?: number | null;
   thumbMime?: string | null;
   width?: number | null;
   height?: number | null;
@@ -54,7 +61,22 @@ export async function prepareUpload(input: {
     const parsed = prepareUploadSchema.parse(input);
     const mimeType = parsed.mimeType.split(";")[0].trim().toLowerCase();
     const thumbMime = parsed.thumbMime ?? null;
-    assertAllowedUpload(mimeType, parsed.sizeBytes, Boolean(thumbMime));
+    const kind = kindForMime(mimeType);
+
+    try {
+      assertAllowedUpload(mimeType, parsed.sizeBytes, Boolean(thumbMime));
+    } catch (error) {
+      const typeRejected =
+        kind === "other" ||
+        ((mimeType === "image/heic" || mimeType === "image/heif") && !thumbMime);
+      await recordRejection({
+        userId: access.user.id,
+        kind: typeRejected ? "upload_rejected_type" : "upload_rejected_size",
+        treeId: access.tree.id,
+        bytes: parsed.sizeBytes,
+      });
+      throw error;
+    }
 
     const personRows = await db
       .select({ id: people.id })
@@ -80,31 +102,55 @@ export async function prepareUpload(input: {
 
     const fileId = randomUUID();
     const keys = storageKeys(access.tree.id, parsed.personId, fileId);
-    const kind = kindForMime(mimeType);
-
-    await db.insert(files).values({
-      id: fileId,
-      treeId: access.tree.id,
-      personId: parsed.personId,
-      groupId: parsed.groupId ?? null,
-      storageKey: keys.original,
-      thumbKey: thumbMime ? keys.thumb : null,
-      thumbMime,
-      originalName: sanitizeFileName(parsed.fileName),
-      mimeType,
-      kind,
-      sizeBytes: parsed.sizeBytes,
-      width: parsed.width ?? null,
-      height: parsed.height ?? null,
-      takenAt: parsed.takenAt,
-      status: "uploading",
-      uploadedBy: access.user.id,
-    });
+    const thumbReservation = thumbMime
+      ? Math.min(parsed.thumbSizeBytes ?? MAX_THUMB_BYTES, MAX_THUMB_BYTES)
+      : 0;
 
     try {
-      const original = await createUploadPost(keys.original, mimeType, maxBytesFor(mimeType));
+      await db.transaction(async tx => {
+        await reserveStorage(tx, {
+          userId: access.user.id,
+          bytes: parsed.sizeBytes + thumbReservation,
+        });
+        await tx.insert(files).values({
+          id: fileId,
+          treeId: access.tree.id,
+          personId: parsed.personId,
+          groupId: parsed.groupId ?? null,
+          storageKey: keys.original,
+          thumbKey: thumbMime ? keys.thumb : null,
+          thumbMime,
+          originalName: sanitizeFileName(parsed.fileName),
+          mimeType,
+          kind,
+          sizeBytes: parsed.sizeBytes,
+          width: parsed.width ?? null,
+          height: parsed.height ?? null,
+          takenAt: parsed.takenAt,
+          status: "uploading",
+          uploadedBy: access.user.id,
+        });
+      });
+    } catch (error) {
+      if (error instanceof QuotaError) {
+        await recordRejection({
+          userId: access.user.id,
+          kind: "upload_rejected_quota",
+          treeId: access.tree.id,
+          bytes: parsed.sizeBytes + thumbReservation,
+        });
+      }
+      throw error;
+    }
+
+    try {
+      const original = await createUploadPost(keys.original, mimeType, parsed.sizeBytes);
       const thumb = thumbMime
-        ? await createUploadPost(keys.thumb, thumbMime, MAX_THUMB_BYTES)
+        ? await createUploadPost(
+            keys.thumb,
+            thumbMime,
+            parsed.thumbSizeBytes ?? MAX_THUMB_BYTES,
+          )
         : null;
       return {
         fileId,
@@ -125,6 +171,15 @@ export async function finalizeUpload(fileId: string): Promise<ActionResult<{ id:
     if (!file) throw new AppError("That upload could not be found.");
     await requireTreeMember(file.treeId, "editor");
     const updated = await finalizeFile(fileId, user.id);
+    if (file.status !== "ready") {
+      await recordUsage({
+        userId: user.id,
+        kind: "file_uploaded",
+        bytes: updated.sizeBytes + (updated.thumbSizeBytes ?? 0),
+        itemCount: 1,
+        treeId: updated.treeId,
+      });
+    }
     return { id: updated.id };
   });
 }
@@ -150,7 +205,14 @@ export async function deleteFile(input: {
     const access = await requireTreeMember(input.treeId, "editor");
     const file = await getFileById(input.fileId);
     if (!file || file.treeId !== access.tree.id) throw new AppError("That file could not be found.");
-    await deleteFileRecord(input.fileId, access.user.id);
+    const usage = await deleteFileRecord(input.fileId, access.user.id);
+    await recordUsage({
+      userId: access.user.id,
+      kind: "file_deleted",
+      bytes: usage.bytes,
+      itemCount: usage.count,
+      treeId: access.tree.id,
+    });
     return undefined;
   });
 }
@@ -219,7 +281,14 @@ export async function deleteFileGroup(groupId: string): Promise<ActionResult<und
     const group = rows[0];
     if (!group) throw new AppError("That album could not be found.");
     const access = await requireTreeMember(group.treeId, "editor");
-    await deleteFileGroupRecord(group.id, access.tree.id);
+    const usage = await deleteFileGroupRecord(group.id, access.tree.id);
+    await recordUsage({
+      userId: access.user.id,
+      kind: "file_deleted",
+      bytes: usage.bytes,
+      itemCount: usage.count,
+      treeId: access.tree.id,
+    });
     return undefined;
   });
 }

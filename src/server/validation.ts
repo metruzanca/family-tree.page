@@ -294,6 +294,7 @@ export const prepareUploadSchema = z.object({
   fileName: z.string().trim().min(1).max(255),
   mimeType: z.string().trim().min(1).max(120),
   sizeBytes: z.number().int().positive(),
+  thumbSizeBytes: z.number().int().positive().optional().nullable(),
   thumbMime: z.enum(["image/webp", "image/jpeg"]).optional().nullable(),
   width: z.number().int().positive().max(50_000).optional().nullable(),
   height: z.number().int().positive().max(50_000).optional().nullable(),

@@ -21,6 +21,7 @@ import { AppError, runAction, type ActionResult } from "../server/errors";
 import { inviteEmailSchema, inviteSchema, treeRoleSchema, treeSchema } from "../server/validation";
 import { deletePrefix, TREE_PREFIX } from "../server/storage";
 import { publicOrigin } from "../server/config";
+import { recordUsage } from "../server/usage";
 import { sendEmail } from "../server/email";
 import { inviteMessage } from "../server/email-templates";
 
@@ -104,6 +105,12 @@ export async function createTree(input: {
       });
       return tree;
     });
+    await recordUsage({
+      userId: user.id,
+      kind: "tree_created",
+      itemCount: 1,
+      treeId: result.id,
+    });
     return { id: result.id, role: "owner" as TreeRole };
   });
 }
@@ -135,6 +142,12 @@ export async function deleteTree(treeId: string): Promise<ActionResult<undefined
       console.error("Could not remove all tree objects from storage", error);
     }
     await db.delete(trees).where(eq(trees.id, treeId));
+    await recordUsage({
+      userId: access.user.id,
+      kind: "tree_deleted",
+      itemCount: 1,
+      treeId: null,
+    });
     return undefined;
   });
 }

@@ -3,7 +3,10 @@ import { and, eq } from "drizzle-orm";
 import { db } from "./db";
 import { trees, treeMembers, type Tree } from "../../drizzle/schema";
 import { requireUser, type PublicUser } from "./auth-service";
+import { AppError } from "./errors";
 import { isUuid } from "./ids";
+import { checkAccountRateLimit } from "./rate-limit";
+import { recordRejection } from "./usage";
 
 export { isUuid };
 
@@ -27,6 +30,14 @@ export async function requireTreeMember(
 ): Promise<TreeAccess> {
   if (!isUuid(treeId)) throw redirect("/trees");
   const user = await requireUser();
+  if (!checkAccountRateLimit(user.id)) {
+    await recordRejection({
+      userId: user.id,
+      kind: "rate_limited",
+      treeId: isUuid(treeId) ? treeId : null,
+    });
+    throw new AppError("Too many requests. Wait a minute and try again.", 429);
+  }
   const rows = await db
     .select({ role: treeMembers.role, tree: trees })
     .from(treeMembers)

@@ -22,6 +22,7 @@ import { getCalendarFeed as getCalendarFeedFn } from "./calendar-server";
 import {
   getEmailChangePreview as getEmailChangePreviewFn,
   getPendingEmailChange as getPendingEmailChangeFn,
+  getUsage as getUsageFn,
 } from "./account-server";
 
 export const getUser = query(getUserFn, "user");
@@ -37,6 +38,7 @@ export const verifyEmail = query(verifyEmailFn, "verify-email");
 export const getPasswordResetPreview = query(getPasswordResetPreviewFn, "password-reset-preview");
 export const getPendingEmailChange = query(getPendingEmailChangeFn, "pending-email-change");
 export const getEmailChangePreview = query(getEmailChangePreviewFn, "email-change-preview");
+export const getUsage = query(getUsageFn, "account-usage");
 
 export const login = action(loginFn, "login");
 export const register = action(registerFn, "register");

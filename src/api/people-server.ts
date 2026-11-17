@@ -38,6 +38,7 @@ import {
   type ParentEdgeRecord,
   type PartnershipRecord,
 } from "../server/relationship-rules";
+import { recordUsage, reservePersonSlot } from "../server/usage";
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -258,23 +259,33 @@ export async function createPerson(
   return runAction(async () => {
     const access = await requireTreeMember(input.treeId, "editor");
     const parsed = personSchema.parse(input);
-    const [person] = await db
-      .insert(people)
-      .values({
-        treeId: access.tree.id,
-        firstName: parsed.firstName,
-        lastName: parsed.lastName,
-        maidenName: parsed.maidenName,
-        nickname: parsed.nickname,
-        birthDate: parsed.birthDate,
-        deathDate: parsed.deathDate,
-        birthPlace: parsed.birthPlace,
-        deathPlace: parsed.deathPlace,
-        bio: parsed.bio,
-        createdBy: access.user.id,
-      })
-      .returning();
+    const person = await db.transaction(async tx => {
+      await reservePersonSlot(tx, access.user.id);
+      const [created] = await tx
+        .insert(people)
+        .values({
+          treeId: access.tree.id,
+          firstName: parsed.firstName,
+          lastName: parsed.lastName,
+          maidenName: parsed.maidenName,
+          nickname: parsed.nickname,
+          birthDate: parsed.birthDate,
+          deathDate: parsed.deathDate,
+          birthPlace: parsed.birthPlace,
+          deathPlace: parsed.deathPlace,
+          bio: parsed.bio,
+          createdBy: access.user.id,
+        })
+        .returning();
+      return created;
+    });
     await touchTree(access.tree.id);
+    await recordUsage({
+      userId: access.user.id,
+      kind: "person_created",
+      itemCount: 1,
+      treeId: access.tree.id,
+    });
     return { id: person.id };
   });
 }
@@ -324,6 +335,12 @@ export async function deletePerson(input: {
       .returning({ id: people.id });
     if (!deleted.length) throw new AppError("That person could not be found.");
     await touchTree(access.tree.id);
+    await recordUsage({
+      userId: access.user.id,
+      kind: "person_deleted",
+      itemCount: 1,
+      treeId: access.tree.id,
+    });
     return undefined;
   });
 }
@@ -518,7 +535,7 @@ export async function addRelative(input: {
       await assertPeopleInTree(access.tree.id, [parsed.otherParentId]);
     }
 
-    return db.transaction(async tx => {
+    const result = await db.transaction(async tx => {
       await lockTree(tx, access.tree.id);
 
       const anchorRows = await tx
@@ -538,6 +555,7 @@ export async function addRelative(input: {
         if (!rows.length) throw new AppError("That person could not be found.");
         relativeId = parsed.personId;
       } else {
+        await reservePersonSlot(tx, access.user.id);
         const [created] = await tx
           .insert(people)
           .values({
@@ -650,6 +668,16 @@ export async function addRelative(input: {
       await tx.update(trees).set({ updatedAt: new Date() }).where(eq(trees.id, access.tree.id));
       return { personId: relativeId, relationshipIds };
     });
+
+    if (parsed.mode === "new") {
+      await recordUsage({
+        userId: access.user.id,
+        kind: "person_created",
+        itemCount: 1,
+        treeId: access.tree.id,
+      });
+    }
+    return result;
   });
 }
 

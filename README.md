@@ -42,6 +42,9 @@ The graph is the main view. People are nodes, parent and partner relationships a
 - Nightly PostgreSQL and media backups to a second private bucket, with checksum verification and a one-command restore
 - Optional Sentry error tracking with PII scrubbing
 - Optional Umami analytics with page views and product events, enabled by environment variables
+- Privacy policy at `/privacy` and terms at `/terms`, linked from the app and the registration form
+- Per-account storage and lifetime people limits, with a usage card in account settings
+- Coarse abuse signals in Postgres with a `pnpm abuse:report` summary
 - Full-screen image lightbox with a details sidebar
 - Tag other people in a photo, with an "Also in photos" section on each tagged person's profile
 - Optional date taken on photos, prefilled from EXIF and editable as a partial or approximate date
@@ -149,8 +152,12 @@ Copy `.env.example` to `.env`. The important variables:
 | `SENTRY_ORG` / `SENTRY_PROJECT` / `SENTRY_AUTH_TOKEN` | Optional source map upload during the build |
 | `UMAMI_SCRIPT_URL` | Optional Umami script URL, for example `https://analytics.example.com/script.js` |
 | `UMAMI_WEBSITE_ID` | Optional Umami website ID that pairs with the script URL |
+| `SUPPORT_EMAIL` | Support address shown in quota errors and the usage card |
+| `ADMIN_ALERT_EMAIL` | Optional recipient for the daily abuse digest |
 
-`UMAMI_SCRIPT_URL` and `UMAMI_WEBSITE_ID` are both optional. Set both to inject the Umami script into the document; leave either blank to disable analytics. Product events are sent through `src/lib/analytics.ts` and silently no-op when the script is absent.
+`UMAMI_SCRIPT_URL` and `UMAMI_WEBSITE_ID` are both optional. Set both to inject the Umami script into the document; leave either blank to disable analytics. Product events are sent through `src/lib/analytics.ts` and silently no-op when the script is absent. See [Analytics](#analytics).
+
+`SUPPORT_EMAIL` defaults to `samuele+family-tree@zanca.dev`. It is shown when an account reaches a storage or people limit, and in the usage card in account settings.
 
 `CORS_ORIGINS` can hold extra comma-separated origins for `pnpm storage:cors`. Production does not need it: `RAILWAY_PUBLIC_DOMAIN` supplies the public origin.
 
@@ -228,6 +235,81 @@ Account settings has a Calendar subscription card. It creates one private iCal U
 5. Rotating `SESSION_SECRET` invalidates every existing subscription URL, along with sessions.
 
 The link is a bearer secret: anyone who has it can read names and birthdays from that user's trees. Treat it like a password. Calendar apps refresh subscribed feeds on their own schedule, so edits are not instant.
+
+## Privacy and GDPR
+
+The hosted instance targets family members in the EU, so the app is built around GDPR expectations. This is engineering documentation, not legal advice, and the published policy should get a legal review.
+
+- `/privacy` is the controller-facing policy and `/terms` is the service agreement. Both are public, linked from the landing footer, the auth pages, account settings, and the registration form.
+- The controller for the hosted instance is Samuele Zanca, contact `samuele+family-tree@zanca.dev`. Self-hosters are the controller for their own instance, and the policy says so.
+- Tree content often describes living relatives who never created an account. The policy has a dedicated section for that, and account holders are responsible for having a lawful basis to add it.
+- Rights are operable in the product: change email, download a zip with a JSON manifest and every original, and delete the account with password plus typed confirmation. Deletion blocks when the user is the last owner of a shared tree and removes trees where they are the only member.
+- Retention is enforced in code. The daily maintenance plugin prunes expired auth tokens, old invites, birthday email logs older than 12 months, and `usage_events` older than 90 days. Backup retention is 30 daily dumps plus one per month for 12 months.
+- Data is hosted in the US. The policy discloses the location, the providers, and the safeguards used for EU data.
+
+If you add a new data category, a new processor, or a new retention period, update `/privacy` in the same change.
+
+## Analytics
+
+Umami is optional and self-hosted. It is cookieless, and the app is configured so personal data does not reach it:
+
+- Automatic pageviews are off (`data-auto-pageview="false"`). `src/components/app/AnalyticsPageviews.tsx` sends pageviews by hand through `trackPageview`, which reduces paths to a safe label. `/trees/<id>` becomes `/app`, `/invite/<token>` becomes `/invite`, and unknown paths are dropped.
+- The document sets `data-exclude-search`, `data-exclude-hash`, `data-do-not-track`, `data-salt-rotation="daily"`, and `data-domains` from the public origin.
+- `src/lib/analytics.ts` owns the full event list and payload allowlist. Adding an event requires a type entry, and unknown payload keys are dropped at runtime. Never add names, emails, file names, person ids, or tree ids.
+- Never set `data-distinct-id` and never call `umami.identify()`.
+
+Recommended Umami server settings for the self-hosted instance:
+
+```text
+SALT_ROTATION=day
+ENABLE_CLIENT_SALT=1
+DISABLE_TELEMETRY=1
+PRIVATE_MODE=1
+SKIP_LOCATION_HEADERS=1
+TRUSTED_PROXIES=<your proxy CIDRs>
+FORCE_SSL=1
+```
+
+Leave `GEO_DATABASE_URL` unset unless you actually need city-level location, and do not enable replays or heatmaps. Umami keeps data forever by default, so add a monthly prune to its database:
+
+```sql
+DELETE FROM website_event WHERE created_at < now() - interval '12 months';
+DELETE FROM session WHERE created_at < now() - interval '12 months';
+```
+
+The privacy policy promises up to 12 months for analytics, so keep that job in place.
+
+## Storage limits and abuse monitoring
+
+Every account has a storage quota and a lifetime people quota. Defaults are 1 GiB and 500 people. Both live on `users` as `storage_quota_bytes` and `people_quota`, so you can raise one account without a deploy:
+
+```sql
+UPDATE users SET storage_quota_bytes = 10 * 1024 * 1024 * 1024 WHERE email = 'someone@example.com';
+UPDATE users SET people_quota = 2000 WHERE email = 'someone@example.com';
+```
+
+How enforcement works:
+
+1. `prepareUpload` reserves space inside a transaction protected by a per-account advisory lock. The reservation includes the declared original size plus the thumbnail, and the file row is inserted in the same transaction, so parallel prepares cannot both pass.
+2. The presigned POST is capped at the declared size with `content-length-range`, so a client cannot under-declare an upload to slip past the quota.
+3. `finalizeFile` stores the real original and thumbnail sizes. `users.people_created_count` increments inside a conditional `UPDATE`, so a create that would exceed the quota fails and the counter never decreases on delete.
+4. Uploads count against the uploader across every tree. Files you uploaded into someone else's tree keep counting after you leave it.
+5. A daily plugin removes `uploading` rows and objects older than 24 hours so abandoned prepares do not hold a reservation forever.
+
+Account settings has a Storage and limits card showing bytes used, people created, the limits, and a `mailto:` link through `SUPPORT_EMAIL`.
+
+Abuse signals live in `usage_events`, not in Umami. `pnpm abuse:report` prints per-account activity for the last 24 hours and 7 days: bytes uploaded, files uploaded, tree create/delete churn, quota rejections, rejected types, and rate-limit trips. The default warning thresholds are relative to the account quota (2x quota in 6 hours) plus absolute rules (1000 files, 20 tree create/delete cycles, 20 rejections). Set `ADMIN_ALERT_EMAIL` to receive the digest by email from the nightly job.
+
+`usage_events` holds numbers and timestamps only: no file names, no email addresses, and no content. Rows cascade away with the account and are pruned after 90 days.
+
+Run both reports from the repo:
+
+```text
+pnpm usage:report      storage used per account
+pnpm abuse:report      uploads, churn, rejections, rate limits
+```
+
+Proposed paid tiers, the cost model, and how to map a plan to the two quota columns live in `docs/storage-plans.md`. Keep pricing out of the app until a plan is actually for sale.
 
 ## Backups
 
@@ -319,6 +401,8 @@ SENTRY_ENVIRONMENT=production
 VITE_SENTRY_ENVIRONMENT=production
 UMAMI_SCRIPT_URL=<optional Umami script URL>
 UMAMI_WEBSITE_ID=<optional Umami website ID>
+SUPPORT_EMAIL=samuele+family-tree@zanca.dev
+ADMIN_ALERT_EMAIL=<optional abuse digest recipient>
 ```
 
 `railway.json` configures the build, start command, health check, and the `pnpm db:migrate` pre-deploy command. The backup service is separate and uses `railway.backup.json`; see [Backups](#backups).
@@ -346,6 +430,9 @@ pnpm db:migrate     apply migrations
 pnpm db:seed        seed the demo tree
 pnpm db:pull        copy the linked Railway Postgres into the local database
 pnpm db:check       report contradictory parent and partner relationships
+pnpm usage:report   show storage, quota, and people counts per account
+pnpm abuse:report   show upload, churn, rejection, and rate limit signals
+pnpm maintenance:run prune stale uploads, tokens, invites, and old events
 pnpm storage:cors   set bucket CORS from APP_URL and CORS_ORIGINS
 pnpm backup         dump PostgreSQL and sync media to the backup bucket
 pnpm backup:verify  check the latest dump checksum and archive
@@ -388,6 +475,8 @@ Account settings has three exits for your own data:
 - **Change email.** A confirmation link goes to the new address and a notice goes to the old one. The old address keeps working until the new one confirms. Pending changes can be cancelled from account settings.
 - **Download your data.** `GET /api/account/export` streams a zip with `family-tree-export.json` and a README. The manifest covers your profile, memberships, trees, people, relationships, groups, tags, life events, and file metadata. Add `?media=1` to include every original photo and document, or `?format=json` to download the manifest alone. Exports are rate limited to three per hour per account.
 - **Delete account.** This requires your password and a typed email confirmation. Trees where you are the only member are deleted with their storage objects. If you are the last owner of a shared tree, promote another owner or delete that tree first. Deleting your account clears the session and cascades memberships, calendar feeds, birthday logs, auth tokens, and pending email changes.
+
+Account settings also shows storage and people usage against your limits, with a link to ask for more. The published policy is at `/privacy` and the terms are at `/terms`. See [Privacy and GDPR](#privacy-and-gdpr) for the engineering side.
 
 ## Known limitations
 

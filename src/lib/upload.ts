@@ -42,6 +42,7 @@ export async function uploadPersonFile(options: UploadOptions): Promise<UploadRe
       fileName: options.file.name,
       mimeType,
       sizeBytes: options.file.size,
+      thumbSizeBytes: thumb?.blob.size ?? null,
       thumbMime: thumb?.mime ?? null,
       width: thumb?.width ?? null,
       height: thumb?.height ?? null,

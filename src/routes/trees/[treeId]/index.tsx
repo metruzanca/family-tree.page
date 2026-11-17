@@ -43,7 +43,7 @@ import { attemptAction, friendlyMessage } from "~/lib/action-result";
 import type { FuzzyDate } from "~/lib/fuzzy-date";
 import { fileNodeId, groupNodeId, type GenerationDirection } from "~/lib/graph";
 import { analyzeRelationships, type RelationshipConflict } from "~/lib/relationships";
-import { track } from "~/lib/analytics";
+import { sizeBucket, track } from "~/lib/analytics";
 import { createTreePresence } from "~/lib/presence";
 
 export const route = {
@@ -288,6 +288,7 @@ function TreePageInner() {
   async function handleUpload(files: File[]) {
     const person = selectedPerson();
     if (!person) return;
+    const totalBytes = files.reduce((sum, file) => sum + file.size, 0);
     let groupId: string | null = null;
     if (files.length > 1) {
       const albumName = `Album · ${new Intl.DateTimeFormat(undefined, {
@@ -339,7 +340,11 @@ function TreePageInner() {
     }
     await revalidate([getTreeGraph.key, getTreeOverview.key, getMyTrees.key]);
     if (uploaded) {
-      track("media_uploaded", { count: uploaded, album: Boolean(groupId) });
+      track("media_uploaded", {
+        count: uploaded,
+        album: Boolean(groupId),
+        size_bucket: sizeBucket(totalBytes),
+      });
       toast.show(
         groupId
           ? `${uploaded} files added to an album.`

@@ -82,9 +82,18 @@ export function AuthLayout(props: {
           <div class="mt-6 text-sm text-muted-foreground">{props.footer}</div>
         </div>
 
-        <p class="text-center text-[0.7rem] text-muted-foreground">
-          Your family data stays private to the people you invite.
-        </p>
+        <div class="mt-5 space-y-1 text-center text-[0.7rem] leading-relaxed text-muted-foreground">
+          <p>Your family data stays private to the people you invite.</p>
+          <p>
+            <A href="/privacy" class="underline decoration-border underline-offset-2 transition hover:text-foreground">
+              Privacy Policy
+            </A>
+            <span class="px-1.5">and</span>
+            <A href="/terms" class="underline decoration-border underline-offset-2 transition hover:text-foreground">
+              Terms of Service
+            </A>
+          </p>
+        </div>
       </section>
     </main>
   );

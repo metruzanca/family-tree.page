@@ -27,6 +27,12 @@ import {
 } from "../server/email-templates";
 import { publicOrigin } from "../server/config";
 import { deletePrefix, TREE_PREFIX } from "../server/storage";
+import { getAccountUsage, type AccountUsage } from "../server/usage";
+
+export async function getUsage(): Promise<AccountUsage> {
+  const current = await requireUser();
+  return getAccountUsage(current.id);
+}
 
 export type PendingEmailChange = {
   newEmail: string;

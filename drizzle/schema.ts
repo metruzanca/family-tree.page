@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import type { FuzzyDate } from "../src/lib/fuzzy-date";
 import {
+  bigint,
   boolean,
   check,
   date,
@@ -57,6 +58,18 @@ export const birthdayEmailKind = pgEnum("birthday_email_kind", [
   "day_before",
   "day_of",
 ]);
+export const usageEventKind = pgEnum("usage_event_kind", [
+  "file_uploaded",
+  "file_deleted",
+  "tree_created",
+  "tree_deleted",
+  "person_created",
+  "person_deleted",
+  "upload_rejected_quota",
+  "upload_rejected_type",
+  "upload_rejected_size",
+  "rate_limited",
+]);
 
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -72,6 +85,13 @@ export const users = pgTable("users", {
     .notNull()
     .default(false),
   notifyBirthdayDayOf: boolean("notify_birthday_day_of").notNull().default(true),
+  /** Bytes of originals and thumbnails this account may store. */
+  storageQuotaBytes: bigint("storage_quota_bytes", { mode: "number" })
+    .notNull()
+    .default(1073741824),
+  /** Lifetime people this account may create. Raise per account for larger users. */
+  peopleQuota: integer("people_quota").notNull().default(500),
+  peopleCreatedCount: integer("people_created_count").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -329,6 +349,7 @@ export const files = pgTable(
     mimeType: text("mime_type").notNull(),
     kind: fileKind("kind").notNull().default("other"),
     sizeBytes: integer("size_bytes").notNull().default(0),
+    thumbSizeBytes: integer("thumb_size_bytes"),
     width: integer("width"),
     height: integer("height"),
     takenAt: jsonb("taken_at").$type<FuzzyDate>(),
@@ -397,6 +418,40 @@ export const fileTags = pgTable(
   ],
 );
 
+/**
+ * Append-only counters used for quotas and abuse detection.
+ *
+ * The table deliberately holds no file names, no email addresses, and no
+ * content. It is pruned after 90 days.
+ */
+export const usageEvents = pgTable(
+  "usage_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    kind: usageEventKind("kind").notNull(),
+    bytes: bigint("bytes", { mode: "number" }).notNull().default(0),
+    itemCount: integer("item_count").notNull().default(0),
+    treeId: uuid("tree_id").references(() => trees.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  t => [
+    index("usage_events_user_created_idx").on(t.userId, t.createdAt),
+    index("usage_events_kind_created_idx").on(t.kind, t.createdAt),
+  ],
+);
+
+/**
+ * Claim markers for scheduled jobs that must not repeat after a restart or on
+ * a second replica. The abuse digest inserts or updates its row atomically.
+ */
+export const jobRuns = pgTable("job_runs", {
+  name: text("name").primaryKey(),
+  lastRunAt: timestamp("last_run_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export type User = typeof users.$inferSelect;
 export type CalendarFeed = typeof calendarFeeds.$inferSelect;
 export type AuthToken = typeof authTokens.$inferSelect;
@@ -410,3 +465,4 @@ export type Partnership = typeof partnerships.$inferSelect;
 export type FileGroup = typeof fileGroups.$inferSelect;
 export type StoredFile = typeof files.$inferSelect;
 export type FileTag = typeof fileTags.$inferSelect;
+export type UsageEvent = typeof usageEvents.$inferSelect;

@@ -316,6 +316,12 @@ export function LandingPage() {
               <a href={repoUrl} target="_blank" rel="noreferrer" class="transition hover:text-foreground">
                 GitHub
               </a>
+              <A href="/privacy" class="transition hover:text-foreground">
+                Privacy
+              </A>
+              <A href="/terms" class="transition hover:text-foreground">
+                Terms
+              </A>
               <A href="/login" class="transition hover:text-foreground">
                 Sign in
               </A>

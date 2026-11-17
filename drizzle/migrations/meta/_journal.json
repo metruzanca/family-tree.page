@@ -57,6 +57,20 @@
       "when": 1794861737043,
       "tag": "0007_gray_sumo",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1794862229999,
+      "tag": "0008_abnormal_invaders",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1794863384535,
+      "tag": "0009_organic_juggernaut",
+      "breakpoints": true
     }
   ]
 }
