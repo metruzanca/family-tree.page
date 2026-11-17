@@ -82,6 +82,25 @@ export function PersonPanel(props: PersonPanelProps) {
     ),
   );
   const mediaCount = () => groups().length + files().length;
+  const avatarFile = createMemo(() => {
+    const fileId = props.person.avatarFileId;
+    if (!fileId) return null;
+    return (
+      props.data.files.find(file => file.id === fileId && file.kind === "image") ?? null
+    );
+  });
+  const avatar = () => (
+    <Avatar
+      name={props.person.displayName}
+      fileId={props.person.avatarFileId}
+      thumbUrl={
+        props.thumbUrlFor && props.person.avatarFileId
+          ? props.thumbUrlFor(props.person.avatarFileId!)
+          : undefined
+      }
+      size={58}
+    />
+  );
   const events = createMemo(() =>
     props.data.events
       .filter(event => event.personId === props.person.id)
@@ -149,16 +168,18 @@ export function PersonPanel(props: PersonPanelProps) {
       </div>
 
       <div class="flex items-start gap-3 px-5 pb-4 pt-2 sm:pt-5" data-testid="person-panel-header">
-        <Avatar
-          name={props.person.displayName}
-          fileId={props.person.avatarFileId}
-          thumbUrl={
-            props.thumbUrlFor && props.person.avatarFileId
-              ? props.thumbUrlFor(props.person.avatarFileId!)
-              : undefined
-          }
-          size={58}
-        />
+        <Show when={avatarFile()} fallback={avatar()}>
+          <button
+            type="button"
+            class="shrink-0 cursor-zoom-in rounded-full transition hover:opacity-90 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-card"
+            title="Open portrait"
+            aria-label={`Open portrait of ${props.person.displayName}`}
+            data-testid="person-panel-avatar"
+            onClick={() => props.onSelectFile(avatarFile()!)}
+          >
+            {avatar()}
+          </button>
+        </Show>
         <div class="min-w-0 flex-1">
           <h2 class="truncate font-display text-2xl leading-tight tracking-tight">
             {props.person.displayName}
