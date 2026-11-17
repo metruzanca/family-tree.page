@@ -388,7 +388,7 @@ BACKUP_S3_FORCE_PATH_STYLE=false
 ```
 
 4. Disable the HTTP health check and keep the restart policy at `NEVER`.
-5. Enable Postgres point-in-time recovery as the first line of defense between dumps.
+5. Enable Postgres point-in-time recovery as the first line of defense between dumps. Railway currently offers this only on Pro workspaces.
 
 The backup bucket is private, but the dumps are not encrypted by the app. Both buckets live in the same provider and region, so a Railway account or regional failure loses both. The upgrade path is an external S3-compatible target, `age` encryption, and object versioning.
 

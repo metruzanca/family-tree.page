@@ -81,7 +81,9 @@ Result: redirect to the landing page, zero matching users, and zero matching tre
 These require dashboard or provider access and are not covered by local checks.
 
 - [ ] Enable Railway Postgres point-in-time recovery.
-- [ ] Create the Railway cron service from `railway.backup.json` after the branch is pushed.
+  Blocked: Railway reports that point-in-time recovery is only available for Pro workspaces.
+- [x] Create the Railway cron service from `railway.backup.json` after the branch is pushed.
+  Provisioned as `roots-backup` on `0 3 * * *`. The first manual run wrote a 70 KB dump and copied 48 media objects (44 MB).
 - [ ] Add an external uptime monitor on `/api/health`.
 
 ## Test data cleanup
