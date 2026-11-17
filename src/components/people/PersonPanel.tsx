@@ -11,7 +11,6 @@ import {
   Trash2,
   Upload,
   UserCheck,
-  UserPlus,
   X,
 } from "lucide-solid";
 import type {
@@ -184,7 +183,10 @@ export function PersonPanel(props: PersonPanelProps) {
       </div>
 
       <Show when={!props.readOnly}>
-        <div class="flex items-center gap-2 overflow-x-auto border-y border-border px-5 py-2.5 no-scrollbar">
+        <div
+          class="flex flex-wrap items-center gap-2 border-y border-border px-5 py-2.5"
+          data-testid="person-panel-actions"
+        >
           <Show
             when={props.isViewer}
             fallback={
@@ -204,47 +206,38 @@ export function PersonPanel(props: PersonPanelProps) {
               This is you
             </span>
           </Show>
-        <Show when={editable()}>
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={props.onEdit}
-            data-testid="person-panel-edit"
-          >
-            <Pencil size={13} />
-            Edit
-          </Button>
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={props.onAddRelative}
-            data-testid="person-panel-add-relative"
-          >
-            <UserPlus size={13} />
-            Add relative
-          </Button>
-          <FileUploadButton
-            multiple
-            onFiles={props.onUpload}
-            disabled={props.uploading}
-            class={buttonVariants({ variant: "secondary", size: "sm" })}
-            testId="person-panel-upload"
-          >
-            <Upload size={13} />
-            {props.uploading ? "Uploading…" : "Add files"}
-          </FileUploadButton>
-        </Show>
-        <Show when={editable()}>
-          <IconButton
-            label="Delete person"
-            class="ml-auto text-destructive"
-            onClick={props.onDelete}
-            data-testid="person-panel-delete"
-          >
-            <Trash2 size={16} />
-          </IconButton>
-        </Show>
-      </div>
+          <Show when={editable()}>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={props.onEdit}
+              data-testid="person-panel-edit"
+            >
+              <Pencil size={13} />
+              Edit
+            </Button>
+            <FileUploadButton
+              multiple
+              onFiles={props.onUpload}
+              disabled={props.uploading}
+              class={buttonVariants({ variant: "secondary", size: "sm" })}
+              testId="person-panel-upload"
+            >
+              <Upload size={13} />
+              {props.uploading ? "Uploading…" : "Add files"}
+            </FileUploadButton>
+          </Show>
+          <Show when={editable()}>
+            <IconButton
+              label="Delete person"
+              class="ml-auto text-destructive"
+              onClick={props.onDelete}
+              data-testid="person-panel-delete"
+            >
+              <Trash2 size={16} />
+            </IconButton>
+          </Show>
+        </div>
       </Show>
 
       <Show when={props.uploading}>
