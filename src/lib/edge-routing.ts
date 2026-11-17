@@ -1,495 +1,817 @@
+import type { GraphLink, GraphModel, GraphNode } from "./graph";
+import { nodeIdOf, nodeRadius } from "./graph";
 import {
-  fileCardSize,
-  nodeRadius,
-  type GenerationDirection,
-  type GraphLink,
-  type GraphNode,
-} from "./graph";
+  bracketLaneY,
+  childLaneY,
+  freeJunctionX,
+  LANE_STEP,
+  median,
+  parentLaneY,
+  type FamilyPlan,
+  type GraphLayout,
+  type GutterPlan,
+  type Point,
+} from "./graph-layout";
 
-export type EdgePoint = { x: number; y: number };
+export type { Point as EdgePoint };
 
-export type EdgeStroke = {
-  kind: GraphLink["kind"];
-  parentType?: GraphLink["parentType"];
-  points: EdgePoint[];
-  arrow: boolean;
-  sourceId: string;
-  targetId: string;
-};
-
-export type EdgeConnector = {
+export type EdgeSegment = {
   id: string;
+  lineId: string;
+  kind: "parent" | "partner" | "exception";
+  a: Point;
+  b: Point;
+  /** Semantic endpoints, used for hover and selection highlighting. */
+  nodeIds: string[];
   linkIds: string[];
-  strokes: EdgeStroke[];
-  trunk?: EdgePoint[];
+  parentType?: GraphLink["parentType"];
+  arrow?: boolean;
 };
 
-const LANE_STEP = 9;
-const EDGE_CLEARANCE = 8;
-/** Keep horizontal connector runs clear of the name label under each person. */
-const LABEL_CLEARANCE = 22;
-const TRUNK_X_CLEARANCE = 8;
+const CORRIDOR_GAP = 46;
+const STUB_OFFSET = 7;
 
-function nodeIdOf(endpoint: string | GraphNode) {
-  return typeof endpoint === "string" ? endpoint : endpoint.id;
-}
+type FamilyLinks = {
+  byParent: Map<string, string[]>;
+  byChild: Map<string, string[]>;
+  parentTypeByChild: Map<string, GraphLink["parentType"]>;
+};
 
-function nodeCenter(node: GraphNode): EdgePoint {
-  return { x: node.x ?? 0, y: node.y ?? 0 };
-}
-
-/** Point on the node outline in the direction of another point. */
-export function anchorToward(node: GraphNode, x: number, y: number): EdgePoint {
-  const center = nodeCenter(node);
-  const dx = x - center.x;
-  const dy = y - center.y;
-  if (node.kind === "union") {
-    const length = Math.abs(dx) + Math.abs(dy);
-    if (!length) return center;
-    const scale = 6 / length;
-    return { x: center.x + dx * scale, y: center.y + dy * scale };
-  }
-  if (node.kind === "person") {
-    const length = Math.hypot(dx, dy);
-    if (!length) return center;
-    const radius = nodeRadius(node) + 1;
-    return {
-      x: center.x + (dx / length) * radius,
-      y: center.y + (dy / length) * radius,
-    };
-  }
-  const card = fileCardSize(node);
-  const halfWidth = card.width / 2 + 1;
-  const halfHeight = card.height / 2 + 1;
-  if (!dx && !dy) return { x: center.x, y: center.y - halfHeight };
-  const scale = 1 / Math.max(Math.abs(dx) / halfWidth, Math.abs(dy) / halfHeight);
-  return { x: center.x + dx * scale, y: center.y + dy * scale };
-}
-
-function anchorSide(node: GraphNode, side: "top" | "bottom"): EdgePoint {
-  const center = nodeCenter(node);
-  if (node.kind === "person") {
-    const radius = nodeRadius(node) + 1;
-    return { x: center.x, y: center.y + (side === "top" ? -radius : radius) };
-  }
-  if (node.kind === "union") {
-    return { x: center.x, y: center.y + (side === "top" ? -6 : 6) };
-  }
-  const card = fileCardSize(node);
-  return { x: center.x, y: center.y + (side === "top" ? -card.height / 2 : card.height / 2) };
-}
-
-function directionSign(direction: GenerationDirection) {
-  return direction === "oldest-top" ? 1 : -1;
-}
-
-/**
- * Allocates horizontal runs so two link segments may share a lane only when
- * their x ranges do not overlap. That is what makes overlapping edge pixels
- * impossible rather than merely unlikely.
- */
-class LanePool {
-  private lanes = new Map<number, Array<[number, number]>>();
-
-  take(
-    startY: number,
-    towardY: number,
-    minX: number,
-    maxX: number,
-  ): number | null {
-    const dir = Math.sign(towardY - startY) || 1;
-    const limit = towardY;
-    for (let attempt = 0; attempt < 80; attempt += 1) {
-      const y = startY + dir * attempt * LANE_STEP;
-      if (dir > 0 ? y > limit : y < limit) break;
-      if (this.claim(y, minX, maxX)) return y;
+export function routeEdges(
+  model: GraphModel,
+  layout: GraphLayout,
+): EdgeSegment[] {
+  const segments: EdgeSegment[] = [];
+  const add = (segment: EdgeSegment) => {
+    if (Math.hypot(segment.b.x - segment.a.x, segment.b.y - segment.a.y) >= 0.5) {
+      segments.push(segment);
     }
-    return null;
-  }
+  };
 
-  private claim(y: number, minX: number, maxX: number) {
-    const key = Math.round(y * 2) / 2;
-    const left = Math.min(minX, maxX);
-    const right = Math.max(minX, maxX);
-    const intervals = this.lanes.get(key) ?? [];
-    for (const [start, end] of intervals) {
-      if (left < end && right > start) return false;
-    }
-    intervals.push([left, right]);
-    this.lanes.set(key, intervals);
-    return true;
-  }
+  const positionOf = (id: string) => layout.personPositions.get(id);
+  const nodeOf = (id: string) => model.byId.get(id);
+
+  const extraUsed = new Map<number, number>();
+  const takeExtraLane = (key: number) => {
+    const next = extraUsed.get(key) ?? 0;
+    extraUsed.set(key, next + 1);
+    return next;
+  };
+  const exceptionalParentUsed = new Map<number, number>();
+  const takeExceptionalParentLane = (key: number) => {
+    const next = exceptionalParentUsed.get(key) ?? 0;
+    exceptionalParentUsed.set(key, next + 1);
+    return next;
+  };
+  const exceptionalChildUsed = new Map<number, number>();
+  const takeExceptionalChildLane = (key: number) => {
+    const next = exceptionalChildUsed.get(key) ?? 0;
+    exceptionalChildUsed.set(key, next + 1);
+    return next;
+  };
+  const exceptionalChildOffsets = new Map<string, number>();
+  const takeStubOffset = (childId: string) => {
+    const index = exceptionalChildOffsets.get(childId) ?? 0;
+    exceptionalChildOffsets.set(childId, index + 1);
+    const magnitude = STUB_OFFSET * (1 + Math.floor(index / 2));
+    return index % 2 === 0 ? magnitude : -magnitude;
+  };
+
+  const linksByFamily = buildFamilyLinks(model, layout);
+  routeFamilies(layout, linksByFamily, add, positionOf, nodeOf);
+  routePartners(
+    model,
+    layout,
+    add,
+    positionOf,
+    nodeOf,
+    takeExtraLane,
+    takeStubOffset,
+  );
+  routeExceptional(
+    layout,
+    add,
+    positionOf,
+    nodeOf,
+    takeExtraLane,
+    takeExceptionalParentLane,
+    takeExceptionalChildLane,
+    takeStubOffset,
+    extraUsed,
+  );
+
+  return segments;
 }
 
-/**
- * Builds the drawable connector for every family. Each union becomes one
- * orthogonal tree: parent arms merge into a single vertical trunk, then child
- * arms split off on their own lanes. Rendering the junction once means sibling
- * edges never paint over each other.
- */
-export function buildConnectors(
-  nodes: GraphNode[],
-  links: GraphLink[],
-  direction: GenerationDirection,
-): EdgeConnector[] {
-  const byId = new Map(nodes.map(node => [node.id, node]));
-  const sign = directionSign(direction);
-  const lanes = new LanePool();
-  const connectors: EdgeConnector[] = [];
-  const unionGroups = new Map<
-    string,
-    { parentLinks: GraphLink[]; childLinks: GraphLink[] }
-  >();
-  const directGroups = new Map<string, GraphLink[]>();
+function pushTo(map: Map<string, string[]>, key: string, value: string) {
+  const list = map.get(key) ?? [];
+  list.push(value);
+  map.set(key, list);
+}
 
-  for (const link of links) {
-    if (link.kind === "union") {
-      const group = unionGroups.get(nodeIdOf(link.target)) ?? {
-        parentLinks: [],
-        childLinks: [],
+function buildFamilyLinks(
+  model: GraphModel,
+  layout: GraphLayout,
+): Map<string, FamilyLinks> {
+  const familyByCluster = new Map(layout.families.map(family => [family.id, family]));
+  const result = new Map<string, FamilyLinks>();
+  for (const link of model.links) {
+    if (link.kind !== "parent") continue;
+    const parentId = nodeIdOf(link.source);
+    const childId = nodeIdOf(link.target);
+    const cluster = layout.clusterOf.get(parentId);
+    const family = cluster ? familyByCluster.get(cluster.id) : undefined;
+    if (!family || !family.childIds.includes(childId)) continue;
+    let entry = result.get(family.id);
+    if (!entry) {
+      entry = {
+        byParent: new Map(),
+        byChild: new Map(),
+        parentTypeByChild: new Map(),
       };
-      group.parentLinks.push(link);
-      unionGroups.set(nodeIdOf(link.target), group);
-      continue;
+      result.set(family.id, entry);
     }
-    if (link.kind === "parent" && link.viaUnion) {
-      const group = unionGroups.get(nodeIdOf(link.source)) ?? {
-        parentLinks: [],
-        childLinks: [],
-      };
-      group.childLinks.push(link);
-      unionGroups.set(nodeIdOf(link.source), group);
-      continue;
-    }
-    if (link.kind === "parent") {
-      const parentId = nodeIdOf(link.source);
-      const group = directGroups.get(parentId) ?? [];
-      group.push(link);
-      directGroups.set(parentId, group);
+    pushTo(entry.byParent, parentId, link.id);
+    pushTo(entry.byChild, childId, link.id);
+    if (link.parentType && link.parentType !== "biological") {
+      entry.parentTypeByChild.set(childId, link.parentType);
+    } else if (!entry.parentTypeByChild.has(childId)) {
+      entry.parentTypeByChild.set(childId, "biological");
     }
   }
+  return result;
+}
 
-  for (const [unionId, group] of unionGroups) {
-    const union = byId.get(unionId);
-    if (!union) continue;
-    const junction = nodeCenter(union);
-    const strokes: EdgeStroke[] = [];
-    const trunkYs: number[] = [junction.y];
-    const linkIds: string[] = [];
+function routeFamilies(
+  layout: GraphLayout,
+  linksByFamily: Map<string, FamilyLinks>,
+  add: (segment: EdgeSegment) => void,
+  positionOf: (id: string) => Point | undefined,
+  nodeOf: (id: string) => GraphNode | undefined,
+) {
+  for (const family of layout.families) {
+    const gutter = layout.gutters.get(family.parentLevel);
+    if (!gutter) continue;
+    routeFamily(
+      family,
+      gutter,
+      add,
+      positionOf,
+      nodeOf,
+      linksByFamily.get(family.id),
+    );
+  }
+}
 
-    for (const link of group.parentLinks) {
-      linkIds.push(link.id);
-      const parent = byId.get(nodeIdOf(link.source));
-      if (!parent) continue;
-      const lane = parentLane(lanes, parent, junction, sign);
-      if (lane == null) {
-        strokes.push({
-          kind: "union",
-          points: [anchorToward(parent, junction.x, junction.y), junction],
-          arrow: false,
-          sourceId: parent.id,
-          targetId: union.id,
-        });
-        continue;
-      }
-      trunkYs.push(lane);
-      strokes.push({
-        kind: "union",
-        points: [
-          anchorSide(parent, sign > 0 ? "bottom" : "top"),
-          { x: parent.x ?? 0, y: lane },
-          { x: junction.x, y: lane },
-        ],
-        arrow: false,
-        sourceId: parent.id,
-        targetId: union.id,
-      });
-    }
+function routeFamily(
+  family: FamilyPlan,
+  gutter: GutterPlan,
+  add: (segment: EdgeSegment) => void,
+  positionOf: (id: string) => Point | undefined,
+  nodeOf: (id: string) => GraphNode | undefined,
+  links: FamilyLinks | undefined,
+) {
+  const down = gutter.down;
+  const junction = family.junctionX;
+  const trunkNodeIds = [...family.parentIds, ...family.childIds];
+  const trunkLinkIds = [
+    ...new Set([
+      ...family.parentIds.flatMap(id => links?.byParent.get(id) ?? []),
+      ...family.childIds.flatMap(id => links?.byChild.get(id) ?? []),
+    ]),
+  ];
 
-    for (const link of group.childLinks) {
-      linkIds.push(link.id);
-      const child = byId.get(nodeIdOf(link.target));
-      if (!child) continue;
-      const lane = childLane(lanes, child, junction, sign);
-      if (lane == null) {
-        strokes.push({
-          kind: "parent",
-          parentType: link.parentType,
-          points: [junction, anchorToward(child, junction.x, junction.y)],
-          arrow: true,
-          sourceId: union.id,
-          targetId: child.id,
-        });
-        continue;
-      }
-      trunkYs.push(lane);
-      strokes.push({
-        kind: "parent",
-        parentType: link.parentType,
-        points: [
-          { x: junction.x, y: lane },
-          { x: child.x ?? 0, y: lane },
-          anchorSide(child, sign > 0 ? "top" : "bottom"),
-        ],
-        arrow: true,
-        sourceId: union.id,
-        targetId: child.id,
-      });
-    }
-
-    const top = Math.min(...trunkYs);
-    const bottom = Math.max(...trunkYs);
-    connectors.push({
-      id: unionId,
+  for (const parentId of family.parentIds) {
+    const node = nodeOf(parentId);
+    const position = positionOf(parentId);
+    if (!node || !position) continue;
+    const lane = family.parentLanes.get(parentId);
+    if (lane == null) continue;
+    const lineId = `family:${family.id}:parent:${parentId}`;
+    const nodeIds = [parentId, ...family.childIds];
+    const linkIds = links?.byParent.get(parentId) ?? [];
+    const laneY = parentLaneY(gutter, lane);
+    add({
+      id: `${lineId}:stub`,
+      lineId,
+      kind: "parent",
+      a: personEdgePoint(position, node, down, 0),
+      b: { x: position.x, y: laneY },
+      nodeIds,
       linkIds,
-      strokes,
-      trunk:
-        bottom - top > 0.5
-          ? [
-              { x: junction.x, y: top },
-              { x: junction.x, y: bottom },
-            ]
-          : undefined,
     });
-  }
-
-  const personColumns = nodes
-    .filter(node => node.kind !== "union")
-    .map(node => node.x ?? 0);
-  const virtualColumns: number[] = [];
-  for (const [parentId, group] of directGroups) {
-    const parent = byId.get(parentId);
-    if (!parent) continue;
-    const children = group
-      .map(link => ({ link, child: byId.get(nodeIdOf(link.target)) }))
-      .filter(
-        (entry): entry is { link: GraphLink; child: GraphNode } =>
-          Boolean(entry.child),
-      );
-    if (!children.length) continue;
-
-    if (children.length === 1) {
-      const { link, child } = children[0];
-      const parentCenter = nodeCenter(parent);
-      const childCenter = nodeCenter(child);
-      const lane = lanes.take(
-        parentCenter.y +
-          sign * (nodeRadius(parent) + EDGE_CLEARANCE + LABEL_CLEARANCE),
-        childCenter.y,
-        parentCenter.x,
-        childCenter.x,
-      );
-      if (lane == null) {
-        connectors.push({
-          id: `parent:${link.id}`,
-          linkIds: [link.id],
-          strokes: [
-            {
-              kind: "parent",
-              parentType: link.parentType,
-              points: [
-                anchorToward(parent, childCenter.x, childCenter.y),
-                anchorToward(child, parentCenter.x, parentCenter.y),
-              ],
-              arrow: true,
-              sourceId: parent.id,
-              targetId: child.id,
-            },
-          ],
-        });
-        continue;
-      }
-      connectors.push({
-        id: `parent:${link.id}`,
-        linkIds: [link.id],
-        strokes: [
-          {
-            kind: "parent",
-            parentType: link.parentType,
-            points: [
-              anchorSide(parent, sign > 0 ? "bottom" : "top"),
-              { x: parentCenter.x, y: lane },
-              { x: childCenter.x, y: lane },
-              anchorSide(child, sign > 0 ? "top" : "bottom"),
-            ],
-            arrow: true,
-            sourceId: parent.id,
-            targetId: child.id,
-          },
-        ],
-      });
-      continue;
-    }
-
-    // One parent with several children needs the same shared trunk as a
-    // couple, otherwise every child edge would paint the parent's drop again.
-    const parentCenter = nodeCenter(parent);
-    const childXs = children.map(entry => entry.child.x ?? 0);
-    let junctionX = (Math.min(...childXs) + Math.max(...childXs)) / 2;
-    for (let attempt = 0; attempt < 40; attempt += 1) {
-      const onColumn =
-        personColumns.some(column => Math.abs(column - junctionX) < 3) ||
-        virtualColumns.some(column => Math.abs(column - junctionX) < 8);
-      if (!onColumn) break;
-      const step = Math.floor(attempt / 2) + 1;
-      junctionX += 6 * step * (attempt % 2 === 0 ? 1 : -1);
-    }
-    virtualColumns.push(junctionX);
-    const childRowY = children[0].child.y ?? parentCenter.y + sign * 190;
-    const junction: EdgePoint = {
-      x: junctionX,
-      y: (parentCenter.y + childRowY) / 2,
-    };
-    const laneYs: number[] = [junction.y];
-    const strokes: EdgeStroke[] = [];
-
-    const parentY = parentLane(lanes, parent, junction, sign);
-    if (parentY == null) {
-      strokes.push({
-        kind: "union",
-        points: [anchorToward(parent, junction.x, junction.y), junction],
-        arrow: false,
-        sourceId: parent.id,
-        targetId: parent.id,
-      });
-    } else {
-      laneYs.push(parentY);
-      strokes.push({
-        kind: "union",
-        points: [
-          anchorSide(parent, sign > 0 ? "bottom" : "top"),
-          { x: parentCenter.x, y: parentY },
-          { x: junction.x, y: parentY },
-        ],
-        arrow: false,
-        sourceId: parent.id,
-        targetId: parent.id,
-      });
-    }
-
-    for (const { link, child } of children) {
-      const childY = childLane(lanes, child, junction, sign);
-      if (childY == null) {
-        strokes.push({
-          kind: "parent",
-          parentType: link.parentType,
-          points: [junction, anchorToward(child, junction.x, junction.y)],
-          arrow: true,
-          sourceId: parent.id,
-          targetId: child.id,
-        });
-        continue;
-      }
-      laneYs.push(childY);
-      strokes.push({
+    if (Math.abs(position.x - junction) > 0.5) {
+      add({
+        id: `${lineId}:arm`,
+        lineId,
         kind: "parent",
-        parentType: link.parentType,
-        points: [
-          { x: junction.x, y: childY },
-          { x: child.x ?? 0, y: childY },
-          anchorSide(child, sign > 0 ? "top" : "bottom"),
-        ],
-        arrow: true,
-        sourceId: parent.id,
-        targetId: child.id,
+        a: { x: position.x, y: laneY },
+        b: { x: junction, y: laneY },
+        nodeIds,
+        linkIds,
       });
     }
-
-    const top = Math.min(...laneYs);
-    const bottom = Math.max(...laneYs);
-    connectors.push({
-      id: `parent:${parent.id}`,
-      linkIds: group.map(link => link.id),
-      strokes,
-      trunk:
-        bottom - top > 0.5
-          ? [
-              { x: junction.x, y: top },
-              { x: junction.x, y: bottom },
-            ]
-          : undefined,
-    });
   }
 
-  for (const link of links) {
-    if (link.kind === "partner") {
-      const source = byId.get(nodeIdOf(link.source));
-      const target = byId.get(nodeIdOf(link.target));
-      if (!source || !target) continue;
-      const sourceCenter = nodeCenter(source);
-      const targetCenter = nodeCenter(target);
-      connectors.push({
-        id: link.id,
+  const absorbedChild =
+    family.childIds.find(childId => {
+      const position = positionOf(childId);
+      return position ? Math.abs(position.x - junction) < 0.5 : false;
+    }) ?? null;
+
+  const childEdgeYs = new Map<string, number>();
+  for (const childId of family.childIds) {
+    const node = nodeOf(childId);
+    const position = positionOf(childId);
+    if (!node || !position) continue;
+    childEdgeYs.set(
+      childId,
+      personEdgePoint(position, node, (down === 1 ? -1 : 1) as 1 | -1, 0).y,
+    );
+  }
+
+  const deepestLaneY = parentLaneY(gutter, family.maxLane);
+  const absorbedY = absorbedChild ? childEdgeYs.get(absorbedChild) : undefined;
+  const trunkEndY =
+    absorbedY == null
+      ? deepestLaneY
+      : down > 0
+        ? Math.max(deepestLaneY, absorbedY)
+        : Math.min(deepestLaneY, absorbedY);
+  add({
+    id: `family:${family.id}:trunk`,
+    lineId: `family:${family.id}:trunk`,
+    kind: "parent",
+    a: { x: junction, y: parentLaneY(gutter, 0) },
+    b: { x: junction, y: trunkEndY },
+    nodeIds: trunkNodeIds,
+    linkIds: trunkLinkIds,
+  });
+
+  for (const childId of family.childIds) {
+    if (childId === absorbedChild) continue;
+    const node = nodeOf(childId);
+    const position = positionOf(childId);
+    if (!node || !position) continue;
+    const lane = family.childLanes.get(childId);
+    if (lane == null) continue;
+    const laneY = parentLaneY(gutter, lane);
+    const parentType = links?.parentTypeByChild.get(childId) ?? "biological";
+    const lineId = `family:${family.id}:child:${childId}`;
+    const nodeIds = [childId, ...family.parentIds];
+    const linkIds = links?.byChild.get(childId) ?? [];
+    add({
+      id: `${lineId}:arm`,
+      lineId,
+      kind: "parent",
+      a: { x: junction, y: laneY },
+      b: { x: position.x, y: laneY },
+      nodeIds,
+      linkIds,
+      parentType,
+    });
+    add({
+      id: `${lineId}:drop`,
+      lineId,
+      kind: "parent",
+      a: { x: position.x, y: laneY },
+      b: { x: position.x, y: childEdgeYs.get(childId) ?? laneY },
+      nodeIds,
+      linkIds,
+      parentType,
+      arrow: true,
+    });
+  }
+}
+
+function personEdgePoint(
+  position: Point,
+  node: GraphNode,
+  direction: 1 | -1,
+  xOffset: number,
+): Point {
+  const radius = nodeRadius(node);
+  const dx = Math.min(Math.abs(xOffset), Math.max(0, radius - 0.5));
+  const dy = Math.sqrt(Math.max(1, radius * radius - dx * dx));
+  return { x: position.x + xOffset, y: position.y + direction * dy };
+}
+
+function bracketSide(layout: GraphLayout) {
+  const down: 1 | -1 = layout.direction === "oldest-top" ? 1 : -1;
+  return (down === 1 ? -1 : 1) as 1 | -1;
+}
+
+function bracketGutterKey(layout: GraphLayout, level: number) {
+  const index = layout.levels.indexOf(level);
+  if (index < 0) return null;
+  const lower = layout.levels[index - 1];
+  if (lower != null) return Math.min(level, lower);
+  const higher = layout.levels[index + 1];
+  if (higher != null) return Math.min(level, higher);
+  return null;
+}
+
+function gutterDirection(
+  layout: GraphLayout,
+  level: number,
+  gutterKey: number,
+): 1 | -1 {
+  const down: 1 | -1 = layout.direction === "oldest-top" ? 1 : -1;
+  return gutterKey < level ? ((down === 1 ? -1 : 1) as 1 | -1) : down;
+}
+
+function routePartners(
+  model: GraphModel,
+  layout: GraphLayout,
+  add: (segment: EdgeSegment) => void,
+  positionOf: (id: string) => Point | undefined,
+  nodeOf: (id: string) => GraphNode | undefined,
+  takeExtraLane: (key: number) => number,
+  takeStubOffset: (id: string) => number,
+) {
+  const partnerLinks = model.links
+    .filter(link => link.kind === "partner")
+    .sort((a, b) => a.id.localeCompare(b.id));
+
+  for (const link of partnerLinks) {
+    const sourceId = nodeIdOf(link.source);
+    const targetId = nodeIdOf(link.target);
+    const source = nodeOf(sourceId);
+    const target = nodeOf(targetId);
+    const sourcePosition = positionOf(sourceId);
+    const targetPosition = positionOf(targetId);
+    if (!source || !target || !sourcePosition || !targetPosition) continue;
+    const lineId = `partner:${link.id}`;
+    const nodeIds = [sourceId, targetId];
+
+    const sourceCluster = layout.clusterOf.get(sourceId);
+    const targetCluster = layout.clusterOf.get(targetId);
+    const sameCluster = sourceCluster && sourceCluster === targetCluster;
+    const sourceIndex = sourceCluster?.memberIds.indexOf(sourceId) ?? -1;
+    const targetIndex = sourceCluster?.memberIds.indexOf(targetId) ?? -1;
+    const adjacent =
+      sameCluster &&
+      sourceIndex >= 0 &&
+      targetIndex >= 0 &&
+      Math.abs(sourceIndex - targetIndex) === 1;
+
+    if (adjacent) {
+      const leftFirst = sourcePosition.x <= targetPosition.x;
+      const left = leftFirst ? source : target;
+      const right = leftFirst ? target : source;
+      const leftPosition = leftFirst ? sourcePosition : targetPosition;
+      const rightPosition = leftFirst ? targetPosition : sourcePosition;
+      add({
+        id: `${lineId}:straight`,
+        lineId,
+        kind: "partner",
+        a: { x: leftPosition.x + nodeRadius(left), y: leftPosition.y },
+        b: { x: rightPosition.x - nodeRadius(right), y: rightPosition.y },
+        nodeIds,
         linkIds: [link.id],
-        strokes: [
-          {
-            kind: "partner",
-            points: [
-              anchorToward(source, targetCenter.x, targetCenter.y),
-              anchorToward(target, sourceCenter.x, sourceCenter.y),
-            ],
-            arrow: false,
-            sourceId: source.id,
-            targetId: target.id,
-          },
-        ],
       });
       continue;
     }
-    if (link.kind === "media") {
-      const source = byId.get(nodeIdOf(link.source));
-      const target = byId.get(nodeIdOf(link.target));
-      if (!source || !target) continue;
-      const sourceCenter = nodeCenter(source);
-      const targetCenter = nodeCenter(target);
-      connectors.push({
-        id: link.id,
+
+    if (Math.abs(sourcePosition.y - targetPosition.y) > 0.5) {
+      const a = personEdgePoint(
+        sourcePosition,
+        source,
+        targetPosition.y >= sourcePosition.y ? 1 : -1,
+        0,
+      );
+      const b = personEdgePoint(
+        targetPosition,
+        target,
+        sourcePosition.y >= targetPosition.y ? 1 : -1,
+        0,
+      );
+      add({
+        id: `${lineId}:direct`,
+        lineId,
+        kind: "partner",
+        a,
+        b,
+        nodeIds,
         linkIds: [link.id],
-        strokes: [
-          {
-            kind: "media",
-            points: [
-              anchorToward(source, targetCenter.x, targetCenter.y),
-              anchorToward(target, sourceCenter.x, sourceCenter.y),
-            ],
-            arrow: false,
-            sourceId: source.id,
-            targetId: target.id,
-          },
-        ],
       });
+      continue;
     }
+
+    const gutterKey = bracketGutterKey(layout, source.level);
+    const visualDirection =
+      gutterKey == null
+        ? bracketSide(layout)
+        : gutterDirection(layout, source.level, gutterKey);
+    const lane = takeExtraLane(gutterKey ?? -1);
+    const radius = Math.max(nodeRadius(source), nodeRadius(target));
+    const laneY = bracketLaneY(
+      sourcePosition.y,
+      radius,
+      visualDirection,
+      lane,
+    );
+    const sourceOffset = takeStubOffset(sourceId);
+    const targetOffset = takeStubOffset(targetId);
+    const sourceEdge = personEdgePoint(
+      sourcePosition,
+      source,
+      visualDirection,
+      sourceOffset,
+    );
+    const targetEdge = personEdgePoint(
+      targetPosition,
+      target,
+      visualDirection,
+      targetOffset,
+    );
+    add({
+      id: `${lineId}:a`,
+      lineId,
+      kind: "partner",
+      a: sourceEdge,
+      b: { x: sourceEdge.x, y: laneY },
+      nodeIds,
+      linkIds: [link.id],
+    });
+    add({
+      id: `${lineId}:run`,
+      lineId,
+      kind: "partner",
+      a: { x: sourceEdge.x, y: laneY },
+      b: { x: targetEdge.x, y: laneY },
+      nodeIds,
+      linkIds: [link.id],
+    });
+    add({
+      id: `${lineId}:b`,
+      lineId,
+      kind: "partner",
+      a: { x: targetEdge.x, y: laneY },
+      b: targetEdge,
+      nodeIds,
+      linkIds: [link.id],
+    });
+  }
+}
+
+function routeExceptional(
+  layout: GraphLayout,
+  add: (segment: EdgeSegment) => void,
+  positionOf: (id: string) => Point | undefined,
+  nodeOf: (id: string) => GraphNode | undefined,
+  takeExtraLane: (key: number) => number,
+  takeExceptionalParentLane: (key: number) => number,
+  takeExceptionalChildLane: (key: number) => number,
+  takeStubOffset: (childId: string) => number,
+  extraUsed: Map<number, number>,
+) {
+  const sorted = [...layout.exceptional].sort((a, b) =>
+    a.linkId.localeCompare(b.linkId),
+  );
+  const sameRow = sorted.filter(edge => edge.direction === "same-row");
+  const gutterEdges = sorted.filter(edge => edge.direction === "gutter");
+  const corridors = sorted.filter(edge => edge.direction === "corridor");
+  let corridorIndex = 0;
+
+  for (const edge of sameRow) {
+    const parent = nodeOf(edge.parentId);
+    const child = nodeOf(edge.childId);
+    const parentPosition = positionOf(edge.parentId);
+    const childPosition = positionOf(edge.childId);
+    if (!parent || !child || !parentPosition || !childPosition) continue;
+    const lineId = `exception:${edge.linkId}`;
+    const nodeIds = [edge.parentId, edge.childId];
+    const gutterKey = edge.parentGutterKey ?? bracketGutterKey(layout, parent.level);
+    if (gutterKey == null) {
+      add({
+        id: `${lineId}:direct`,
+        lineId,
+        kind: "exception",
+        a: personEdgePoint(
+          parentPosition,
+          parent,
+          childPosition.y >= parentPosition.y ? 1 : -1,
+          0,
+        ),
+        b: personEdgePoint(
+          childPosition,
+          child,
+          parentPosition.y >= childPosition.y ? 1 : -1,
+          0,
+        ),
+        nodeIds,
+        linkIds: [edge.linkId],
+        parentType: edge.parentType,
+        arrow: true,
+      });
+      continue;
+    }
+    const lane = takeExtraLane(gutterKey);
+    const visualDirection = gutterDirection(layout, parent.level, gutterKey);
+    const radius = Math.max(nodeRadius(parent), nodeRadius(child));
+    const laneY = bracketLaneY(parentPosition.y, radius, visualDirection, lane);
+    const sourceOffset = takeStubOffset(edge.parentId);
+    const targetOffset = takeStubOffset(edge.childId);
+    const sourceEdge = personEdgePoint(
+      parentPosition,
+      parent,
+      visualDirection,
+      sourceOffset,
+    );
+    const targetEdge = personEdgePoint(
+      childPosition,
+      child,
+      visualDirection,
+      targetOffset,
+    );
+    add({
+      id: `${lineId}:a`,
+      lineId,
+      kind: "exception",
+      a: sourceEdge,
+      b: { x: sourceEdge.x, y: laneY },
+      nodeIds,
+      linkIds: [edge.linkId],
+      parentType: edge.parentType,
+    });
+    add({
+      id: `${lineId}:run`,
+      lineId,
+      kind: "exception",
+      a: { x: sourceEdge.x, y: laneY },
+      b: { x: targetEdge.x, y: laneY },
+      nodeIds,
+      linkIds: [edge.linkId],
+      parentType: edge.parentType,
+    });
+    add({
+      id: `${lineId}:b`,
+      lineId,
+      kind: "exception",
+      a: { x: targetEdge.x, y: laneY },
+      b: targetEdge,
+      nodeIds,
+      linkIds: [edge.linkId],
+      parentType: edge.parentType,
+      arrow: true,
+    });
   }
 
-  return connectors;
-}
+  const gutterGroups = new Map<string, typeof gutterEdges>();
+  for (const edge of gutterEdges) {
+    const clusterId = layout.clusterOf.get(edge.parentId)?.id ?? edge.parentId;
+    const key = `${clusterId}|${edge.childId}`;
+    const list = gutterGroups.get(key) ?? [];
+    list.push(edge);
+    gutterGroups.set(key, list);
+  }
 
-function parentLane(
-  lanes: LanePool,
-  parent: GraphNode,
-  junction: EdgePoint,
-  sign: number,
-) {
-  const center = nodeCenter(parent);
-  const start =
-    center.y +
-    sign * (nodeRadius(parent) + EDGE_CLEARANCE + LABEL_CLEARANCE);
-  const minX = Math.min(center.x, junction.x) - TRUNK_X_CLEARANCE;
-  const maxX = Math.max(center.x, junction.x) + TRUNK_X_CLEARANCE;
-  return lanes.take(start, junction.y, minX, maxX);
-}
+  for (const [groupKey, group] of gutterGroups) {
+    const child = nodeOf(group[0].childId);
+    const childPosition = positionOf(group[0].childId);
+    const gutterKey = group[0].parentGutterKey;
+    if (!child || !childPosition || gutterKey == null) continue;
+    const gutter = layout.gutters.get(gutterKey);
+    if (!gutter) continue;
 
-function childLane(
-  lanes: LanePool,
-  child: GraphNode,
-  junction: EdgePoint,
-  sign: number,
-) {
-  const center = nodeCenter(child);
-  const start =
-    center.y -
-    sign * (nodeRadius(child) + EDGE_CLEARANCE + LABEL_CLEARANCE);
-  const minX = Math.min(center.x, junction.x) - TRUNK_X_CLEARANCE;
-  const maxX = Math.max(center.x, junction.x) + TRUNK_X_CLEARANCE;
-  return lanes.take(start, junction.y, minX, maxX);
+    const parents = group
+      .map(entry => {
+        const node = nodeOf(entry.parentId);
+        const position = positionOf(entry.parentId);
+        return node && position
+          ? { entry, node, position }
+          : null;
+      })
+      .filter(
+        (
+          value,
+        ): value is {
+          entry: (typeof group)[number];
+          node: GraphNode;
+          position: Point;
+        } => Boolean(value),
+      )
+      .sort(
+        (a, b) =>
+          a.position.x - b.position.x ||
+          a.entry.parentId.localeCompare(b.entry.parentId),
+      );
+    if (!parents.length) continue;
+
+    const parentXs = parents.map(value => value.position.x);
+    const childOffset = takeStubOffset(group[0].childId);
+    const targetX = childPosition.x + childOffset;
+    const junctionX = freeJunctionX(
+      median(parentXs),
+      [...parentXs, targetX],
+      [],
+    );
+    const left = parents
+      .filter(value => value.position.x < junctionX - 0.5)
+      .sort(
+        (a, b) =>
+          Math.abs(a.position.x - junctionX) -
+          Math.abs(b.position.x - junctionX),
+      );
+    const right = parents
+      .filter(value => value.position.x > junctionX + 0.5)
+      .sort(
+        (a, b) =>
+          Math.abs(a.position.x - junctionX) -
+          Math.abs(b.position.x - junctionX),
+      );
+    const center = parents.filter(
+      value => Math.abs(value.position.x - junctionX) <= 0.5,
+    );
+    const parentLaneCount = Math.max(1, left.length, right.length);
+    const laneCount = 1 + parentLaneCount;
+    let baseLane = 0;
+    for (let index = 0; index < laneCount; index += 1) {
+      const lane = gutter.normalParentLanes + takeExceptionalParentLane(gutterKey);
+      if (index === 0) baseLane = lane;
+    }
+    const runLane = parentLaneY(gutter, baseLane);
+    const trunkEnd = parentLaneY(gutter, baseLane + parentLaneCount);
+    const towardChild: 1 | -1 =
+      childPosition.y >= parents[0].position.y ? 1 : -1;
+    const targetEdge = personEdgePoint(
+      childPosition,
+      child,
+      (towardChild === 1 ? -1 : 1) as 1 | -1,
+      childOffset,
+    );
+    const lineId = `exception-group:${groupKey}`;
+    const linkIds = group.map(entry => entry.linkId);
+    const nodeIds = [...parents.map(value => value.entry.parentId), group[0].childId];
+    const parentType =
+      group.find(entry => entry.parentType && entry.parentType !== "biological")
+        ?.parentType ?? "biological";
+
+    const laneFor = (value: (typeof parents)[number]) => {
+      const side = value.position.x < junctionX - 0.5 ? left : right;
+      const index = side.indexOf(value);
+      return baseLane + 1 + Math.max(0, index);
+    };
+
+    for (const value of parents) {
+      const lane = center.includes(value) ? baseLane + 1 : laneFor(value);
+      const laneY = parentLaneY(gutter, lane);
+      const parentOffset = takeStubOffset(value.entry.parentId);
+      const start = personEdgePoint(
+        value.position,
+        value.node,
+        towardChild,
+        parentOffset,
+      );
+      add({
+        id: `${lineId}:${value.entry.parentId}:stub`,
+        lineId,
+        kind: "exception",
+        a: start,
+        b: { x: value.position.x + parentOffset, y: laneY },
+        nodeIds,
+        linkIds,
+        parentType,
+      });
+      if (Math.abs(value.position.x + parentOffset - junctionX) > 0.5) {
+        add({
+          id: `${lineId}:${value.entry.parentId}:arm`,
+          lineId,
+          kind: "exception",
+          a: { x: value.position.x + parentOffset, y: laneY },
+          b: { x: junctionX, y: laneY },
+          nodeIds,
+          linkIds,
+          parentType,
+        });
+      }
+    }
+
+    add({
+      id: `${lineId}:trunk`,
+      lineId,
+      kind: "exception",
+      a: { x: junctionX, y: runLane },
+      b: { x: junctionX, y: trunkEnd },
+      nodeIds,
+      linkIds,
+      parentType,
+    });
+    add({
+      id: `${lineId}:run`,
+      lineId,
+      kind: "exception",
+      a: { x: junctionX, y: runLane },
+      b: { x: targetX, y: runLane },
+      nodeIds,
+      linkIds,
+      parentType,
+    });
+    add({
+      id: `${lineId}:drop`,
+      lineId,
+      kind: "exception",
+      a: { x: targetX, y: runLane },
+      b: targetEdge,
+      nodeIds,
+      linkIds,
+      parentType,
+      arrow: true,
+    });
+  }
+
+  for (const edge of corridors) {
+    const parent = nodeOf(edge.parentId);
+    const child = nodeOf(edge.childId);
+    const parentPosition = positionOf(edge.parentId);
+    const childPosition = positionOf(edge.childId);
+    if (!parent || !child || !parentPosition || !childPosition) continue;
+    if (edge.parentGutterKey == null || edge.childGutterKey == null) continue;
+    const parentGutter = layout.gutters.get(edge.parentGutterKey);
+    const childGutter = layout.gutters.get(edge.childGutterKey);
+    if (!parentGutter || !childGutter) continue;
+
+    const lineId = `exception:${edge.linkId}`;
+    const nodeIds = [edge.parentId, edge.childId];
+    const parentLane =
+      parentGutter.normalParentLanes +
+      takeExceptionalParentLane(edge.parentGutterKey);
+    const parentLaneYValue = parentLaneY(parentGutter, parentLane);
+    const childLane =
+      (extraUsed.get(edge.childGutterKey) ?? 0) +
+      takeExceptionalChildLane(edge.childGutterKey);
+    const childLaneYValue = childLaneY(childGutter, childLane);
+    const corridorX =
+      layout.networkBounds.maxX + CORRIDOR_GAP * (corridorIndex + 1);
+    corridorIndex += 1;
+
+    const towardChild: 1 | -1 =
+      childPosition.y >= parentPosition.y ? 1 : -1;
+    const childOffset = takeStubOffset(edge.childId);
+    const parentOffset = takeStubOffset(edge.parentId);
+    const sourceEdge = personEdgePoint(
+      parentPosition,
+      parent,
+      towardChild,
+      parentOffset,
+    );
+    add({
+      id: `${lineId}:a`,
+      lineId,
+      kind: "exception",
+      a: sourceEdge,
+      b: { x: sourceEdge.x, y: parentLaneYValue },
+      nodeIds,
+      linkIds: [edge.linkId],
+      parentType: edge.parentType,
+    });
+    add({
+      id: `${lineId}:toCorridor`,
+      lineId,
+      kind: "exception",
+      a: { x: sourceEdge.x, y: parentLaneYValue },
+      b: { x: corridorX, y: parentLaneYValue },
+      nodeIds,
+      linkIds: [edge.linkId],
+      parentType: edge.parentType,
+    });
+    add({
+      id: `${lineId}:corridor`,
+      lineId,
+      kind: "exception",
+      a: { x: corridorX, y: parentLaneYValue },
+      b: { x: corridorX, y: childLaneYValue },
+      nodeIds,
+      linkIds: [edge.linkId],
+      parentType: edge.parentType,
+    });
+    add({
+      id: `${lineId}:fromCorridor`,
+      lineId,
+      kind: "exception",
+      a: { x: corridorX, y: childLaneYValue },
+      b: { x: childPosition.x + childOffset, y: childLaneYValue },
+      nodeIds,
+      linkIds: [edge.linkId],
+      parentType: edge.parentType,
+    });
+    const targetEdge = personEdgePoint(
+      childPosition,
+      child,
+      (towardChild === 1 ? -1 : 1) as 1 | -1,
+      childOffset,
+    );
+    add({
+      id: `${lineId}:b`,
+      lineId,
+      kind: "exception",
+      a: { x: targetEdge.x, y: childLaneYValue },
+      b: targetEdge,
+      nodeIds,
+      linkIds: [edge.linkId],
+      parentType: edge.parentType,
+      arrow: true,
+    });
+  }
 }

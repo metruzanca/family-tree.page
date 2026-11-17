@@ -1,4 +1,11 @@
-import { createEffect, createMemo, createSignal, onCleanup, onMount, Show } from "solid-js";
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  onCleanup,
+  onMount,
+  Show,
+} from "solid-js";
 import type { TreeGraph } from "~/api/people-server";
 import type { TreeRole } from "~/server/guards";
 import type { PresencePeer } from "~/lib/presence-protocol";
@@ -17,10 +24,12 @@ import {
   type GraphNode,
 } from "~/lib/graph";
 import {
-  buildConnectors,
-  type EdgeConnector,
-  type EdgePoint,
-  type EdgeStroke,
+  layoutGraph,
+  type GraphLayout,
+} from "~/lib/graph-layout";
+import {
+  routeEdges,
+  type EdgeSegment,
 } from "~/lib/edge-routing";
 
 export type GraphHandle = {
@@ -50,8 +59,6 @@ type GraphViewProps = {
   fitPadding?: number;
   /** Optional shorter label for a node, used by the landing demo to show first names. */
   nodeLabel?: (node: GraphNode) => string;
-  /** Optional deterministic positions. When set, the simulation is skipped and the graph is drawn as authored. */
-  fixedLayout?: (node: GraphNode) => { x: number; y: number } | null;
   onSelect: (id: string | null) => void;
   onFileSelect: (fileId: string) => void;
   onGroupSelect: (groupId: string) => void;
@@ -71,38 +78,41 @@ export function GraphView(props: GraphViewProps) {
   let backgroundStart = { x: 0, y: 0 };
   let pointer = { x: 0, y: 0 };
   let suppressClickUntil = 0;
+
   const [model, setModel] = createSignal<GraphModel>(
-    buildGraphModel(
-      props.data,
-      props.showMedia,
-      props.generationDirection,
-      props.visible,
-    ),
+    buildGraphModel(props.data, props.showMedia, props.visible),
   );
-  const [connectors, setConnectors] = createSignal<EdgeConnector[]>([]);
+  const [layout, setLayout] = createSignal<GraphLayout>(
+    layoutGraph(model(), props.generationDirection),
+  );
+  const [segments, setSegments] = createSignal<EdgeSegment[]>(
+    routeEdges(model(), layout()),
+  );
   const [hovered, setHovered] = createSignal<string | null>(null);
   const [ready, setReady] = createSignal(false);
   const [paintVersion, setPaintVersion] = createSignal(0);
+  const mediaNodes = createMemo(() =>
+    model()
+      .nodes.filter(node => node.kind !== "person")
+      .sort((a, b) => a.id.localeCompare(b.id)),
+  );
   const images = new Map<string, HTMLImageElement>();
   let disposeGraph: (() => void) | undefined;
   let disposed = false;
 
-  // Register synchronously so the cleanup survives the async import below.
   onCleanup(() => {
     disposed = true;
     disposeGraph?.();
   });
 
-  const activeId = createMemo(() => hovered() ?? props.selectedId);
   const active = createMemo(() => {
-    const id = activeId();
+    const id = hovered() ?? props.selectedId;
     if (!id) return null;
-    const set = neighborsOf(model().semanticLinks, id);
-    for (const node of model().nodes) {
-      if (node.kind !== "union") continue;
-      const connectsActiveParent = node.parentIds?.some(parentId => set.has(parentId));
-      const connectsActiveChild = node.childIds?.some(childId => set.has(childId));
-      if (connectsActiveParent && connectsActiveChild) set.add(node.id);
+    const node = model().byId.get(id);
+    const anchor = node?.ownerId ?? id;
+    const set = neighborsOf(model().links, anchor);
+    for (const peer of model().nodes) {
+      if (peer.ownerId === anchor) set.add(peer.id);
     }
     return set;
   });
@@ -112,8 +122,6 @@ export function GraphView(props: GraphViewProps) {
     bg: "#111410",
     edge: "#66735f",
     partner: "#b97c63",
-    media: "#8d846c",
-    parentStep: "#88937d",
   };
 
   function refreshPaint() {
@@ -122,22 +130,14 @@ export function GraphView(props: GraphViewProps) {
     graph.nodeCanvasObject(drawNode);
   }
 
-  function applyFixedLayout(target: GraphModel) {
-    if (!props.fixedLayout) return;
+  function applyPositions(target: GraphModel, targetLayout: GraphLayout) {
     for (const node of target.nodes) {
-      const position = props.fixedLayout(node);
-      if (!position) continue;
-      node.x = position.x;
-      node.y = position.y;
+      const position = targetLayout.positions.get(node.id);
+      node.x = position?.x ?? 0;
+      node.y = position?.y ?? 0;
       node.vx = 0;
       node.vy = 0;
     }
-  }
-
-  function rebuildConnectors(target: GraphModel) {
-    setConnectors(
-      buildConnectors(target.nodes, target.links, props.generationDirection),
-    );
   }
 
   function hitTestNode(clientX: number, clientY: number): GraphNode | null {
@@ -148,19 +148,21 @@ export function GraphView(props: GraphViewProps) {
     const nodes = graph.graphData().nodes as GraphNode[];
     for (let index = nodes.length - 1; index >= 0; index -= 1) {
       const node = nodes[index];
-      if (node.kind === "union") continue;
+      if (node.kind !== "person") continue;
       if (node.x == null || node.y == null) continue;
       const radius = nodeRadius(node) + 14 / zoom;
-      if (node.kind === "person") {
-        if (Math.hypot(point.x - node.x, point.y - node.y) <= radius) return node;
-      } else {
-        const card = fileCardSize(node);
-        if (
-          Math.abs(point.x - node.x) <= card.width / 2 + 14 / zoom &&
-          Math.abs(point.y - node.y) <= card.height / 2 + 14 / zoom
-        ) {
-          return node;
-        }
+      if (Math.hypot(point.x - node.x, point.y - node.y) <= radius) return node;
+    }
+    for (let index = nodes.length - 1; index >= 0; index -= 1) {
+      const node = nodes[index];
+      if (node.kind === "person") continue;
+      if (node.x == null || node.y == null) continue;
+      const card = fileCardSize(node);
+      if (
+        Math.abs(point.x - node.x) <= card.width / 2 + 14 / zoom &&
+        Math.abs(point.y - node.y) <= card.height / 2 + 14 / zoom
+      ) {
+        return node;
       }
     }
     return null;
@@ -318,7 +320,11 @@ export function GraphView(props: GraphViewProps) {
     }
   }
 
-  function drawNode(node: GraphNode, context: CanvasRenderingContext2D, globalScale: number) {
+  function drawPerson(
+    node: GraphNode,
+    context: CanvasRenderingContext2D,
+    globalScale: number,
+  ) {
     const radius = nodeRadius(node);
     const isActive = !active() || active()!.has(node.id);
     const isSelected = node.id === props.selectedId;
@@ -326,101 +332,113 @@ export function GraphView(props: GraphViewProps) {
     context.save();
     context.globalAlpha = isActive ? 1 : 0.16;
 
-    if (node.kind === "union") {
-      const radius = 6;
-      const x = node.x ?? 0;
-      const y = node.y ?? 0;
+    if (isSelected || isHovered) {
       context.beginPath();
-      context.moveTo(x, y - radius);
-      context.lineTo(x + radius, y);
-      context.lineTo(x, y + radius);
-      context.lineTo(x - radius, y);
-      context.closePath();
-      context.fillStyle = "#8fa98f";
+      context.arc(node.x ?? 0, node.y ?? 0, radius + 6 / globalScale, 0, Math.PI * 2);
+      context.fillStyle = isSelected ? "rgba(196,154,69,0.22)" : "rgba(243,238,227,0.12)";
       context.fill();
-      context.lineWidth = 1.1 / globalScale;
-      context.strokeStyle = "rgba(17,20,16,0.9)";
-      context.stroke();
-      context.restore();
-      return;
     }
 
-    if (node.kind === "person") {
-      if (isSelected || isHovered) {
-        context.beginPath();
-        context.arc(node.x ?? 0, node.y ?? 0, radius + 6 / globalScale, 0, Math.PI * 2);
-        context.fillStyle = isSelected ? "rgba(196,154,69,0.22)" : "rgba(243,238,227,0.12)";
-        context.fill();
-      }
+    context.beginPath();
+    context.arc(node.x ?? 0, node.y ?? 0, radius, 0, Math.PI * 2);
+    context.closePath();
+    context.fillStyle = "#1b2118";
+    context.fill();
 
+    const url = avatarUrl(node.person?.avatarFileId);
+    const image = url ? imageFor(url) : null;
+    if (image?.complete && image.naturalWidth > 0) {
+      context.save();
+      context.clip();
+      drawImageCropped(
+        context,
+        image,
+        (node.x ?? 0) - radius,
+        (node.y ?? 0) - radius,
+        radius * 2,
+        radius * 2,
+      );
+      context.restore();
+    } else {
       context.beginPath();
       context.arc(node.x ?? 0, node.y ?? 0, radius, 0, Math.PI * 2);
-      context.closePath();
-      context.fillStyle = "#1b2118";
+      context.fillStyle = branchColor(node.person?.lastName || node.person?.firstName || node.name);
       context.fill();
+      context.fillStyle = "#131810";
+      context.font = `600 ${Math.max(7, radius * 0.8)}px ui-sans-serif, system-ui, sans-serif`;
+      context.textAlign = "center";
+      context.textBaseline = "middle";
+      context.fillText(initialsOf(node.name), node.x ?? 0, (node.y ?? 0) + 0.5);
+    }
 
-      const url = avatarUrl(node.person?.avatarFileId);
-      const image = url ? imageFor(url) : null;
-      if (image?.complete && image.naturalWidth > 0) {
-        context.save();
-        context.clip();
-        drawImageCropped(
-          context,
-          image,
-          (node.x ?? 0) - radius,
-          (node.y ?? 0) - radius,
-          radius * 2,
-          radius * 2,
-        );
-        context.restore();
-      } else {
+    context.beginPath();
+    context.arc(node.x ?? 0, node.y ?? 0, radius, 0, Math.PI * 2);
+    context.lineWidth = (isSelected ? 2.6 : isHovered ? 2 : 1.1) / globalScale;
+    context.strokeStyle = isSelected ? "#e3bb68" : isHovered ? "#f3eee3" : "#0b0e0a";
+    context.stroke();
+
+    const showLabel = isSelected || isHovered || globalScale > 0.88;
+    if (showLabel) {
+      const fontSize = 11.5 / globalScale;
+      context.font = `600 ${fontSize}px ui-sans-serif, system-ui, sans-serif`;
+      context.textAlign = "center";
+      context.textBaseline = "top";
+      const label = props.nodeLabel ? props.nodeLabel(node) : node.name;
+      const labelY = (node.y ?? 0) + radius + 5 / globalScale;
+      context.lineWidth = 3.2 / globalScale;
+      context.strokeStyle = "rgba(17,20,16,0.92)";
+      context.strokeText(label, node.x ?? 0, labelY);
+      context.fillStyle = colors.ink;
+      context.fillText(label, node.x ?? 0, labelY);
+
+      const years = node.person
+        ? formatFuzzyYearRange(node.person.birthDate, node.person.deathDate)
+        : "";
+      if (years && globalScale > 1.35) {
+        const small = 9.5 / globalScale;
+        context.font = `400 ${small}px ui-sans-serif, system-ui, sans-serif`;
+        context.fillStyle = "rgba(243,238,227,0.62)";
+        context.fillText(years, node.x ?? 0, labelY + 13.5 / globalScale);
+      }
+    }
+
+    const viewers = props.presence?.filter(
+      peer => peer.nodeId === node.id && peer.peerId !== props.selfPeerId,
+    );
+    if (viewers?.length) {
+      const x = node.x ?? 0;
+      const y = node.y ?? 0;
+      viewers.slice(0, 4).forEach((peer, index) => {
+        const gap = (5 + index * 3.5) / globalScale;
         context.beginPath();
-        context.arc(node.x ?? 0, node.y ?? 0, radius, 0, Math.PI * 2);
-        context.fillStyle = branchColor(node.person?.lastName || node.person?.firstName || node.name);
-        context.fill();
-        context.fillStyle = "#131810";
-        context.font = `600 ${Math.max(7, radius * 0.8)}px ui-sans-serif, system-ui, sans-serif`;
-        context.textAlign = "center";
-        context.textBaseline = "middle";
-        context.fillText(initialsOf(node.name), node.x ?? 0, (node.y ?? 0) + 0.5);
-      }
+        context.arc(x, y, radius + gap, 0, Math.PI * 2);
+        context.lineWidth = 2.2 / globalScale;
+        context.strokeStyle = presenceColor(peer.userId);
+        context.stroke();
+      });
+    }
 
-      context.beginPath();
-      context.arc(node.x ?? 0, node.y ?? 0, radius, 0, Math.PI * 2);
-      context.lineWidth = (isSelected ? 2.6 : isHovered ? 2 : 1.1) / globalScale;
-      context.strokeStyle = isSelected ? "#e3bb68" : isHovered ? "#f3eee3" : "#0b0e0a";
-      context.stroke();
+    context.restore();
+  }
 
-      const showLabel = isSelected || isHovered || globalScale > 0.88;
-      if (showLabel) {
-        const fontSize = 11.5 / globalScale;
-        context.font = `600 ${fontSize}px ui-sans-serif, system-ui, sans-serif`;
-        context.textAlign = "center";
-        context.textBaseline = "top";
-        const label = props.nodeLabel ? props.nodeLabel(node) : node.name;
-        const labelY = (node.y ?? 0) + radius + 5 / globalScale;
-        context.lineWidth = 3.2 / globalScale;
-        context.strokeStyle = "rgba(17,20,16,0.92)";
-        context.strokeText(label, node.x ?? 0, labelY);
-        context.fillStyle = colors.ink;
-        context.fillText(label, node.x ?? 0, labelY);
+  function drawMediaCard(
+    node: GraphNode,
+    context: CanvasRenderingContext2D,
+    globalScale: number,
+  ) {
+    const isSelected = node.id === props.selectedId;
+    const isHovered = node.id === hovered();
+    const isActive = !active() || (node.ownerId ? active()!.has(node.ownerId) : false);
+    context.save();
+    context.globalAlpha = isActive ? 1 : 0.12;
 
-        const years = node.person
-          ? formatFuzzyYearRange(node.person.birthDate, node.person.deathDate)
-          : "";
-        if (years && globalScale > 1.35) {
-          const small = 9.5 / globalScale;
-          context.font = `400 ${small}px ui-sans-serif, system-ui, sans-serif`;
-          context.fillStyle = "rgba(243,238,227,0.62)";
-          context.fillText(years, node.x ?? 0, labelY + 13.5 / globalScale);
-        }
-      }
-    } else if (node.kind === "file") {
-      const card = fileCardSize(node);
-      const width = card.width;
-      const height = card.height;
-      const x = (node.x ?? 0) - width / 2;
-      const y = (node.y ?? 0) - height / 2;
+    const card = fileCardSize(node);
+    const width = card.width;
+    const height = card.height;
+    const x = (node.x ?? 0) - width / 2;
+    const y = (node.y ?? 0) - height / 2;
+
+    if (node.kind === "file") {
       const url = node.file?.thumbUrl ? node.file.thumbUrl : null;
       const image = url ? imageFor(url) : null;
       const hasImage = Boolean(image?.complete && image.naturalWidth > 0);
@@ -470,14 +488,7 @@ export function GraphView(props: GraphViewProps) {
         context.fillText(node.name, node.x ?? 0, labelY);
       }
     } else if (node.kind === "group") {
-      const card = fileCardSize(node);
-      const width = card.width;
-      const height = card.height;
-      const x = (node.x ?? 0) - width / 2;
-      const y = (node.y ?? 0) - height / 2;
-      const coverUrl = node.group?.coverFileId
-        ? avatarUrl(node.group.coverFileId)
-        : null;
+      const coverUrl = node.group?.coverFileId ? avatarUrl(node.group.coverFileId) : null;
       const image = coverUrl ? imageFor(coverUrl) : null;
       const hasCover = Boolean(image?.complete && image.naturalWidth > 0);
 
@@ -558,25 +569,20 @@ export function GraphView(props: GraphViewProps) {
       peer => peer.nodeId === node.id && peer.peerId !== props.selfPeerId,
     );
     if (viewers?.length) {
-      const x = node.x ?? 0;
-      const y = node.y ?? 0;
+      const xCenter = node.x ?? 0;
+      const yCenter = node.y ?? 0;
       viewers.slice(0, 4).forEach((peer, index) => {
         const gap = (5 + index * 3.5) / globalScale;
+        const halfWidth = width / 2 + gap;
+        const halfHeight = height / 2 + gap;
         context.beginPath();
-        if (node.kind === "person") {
-          context.arc(x, y, radius + gap, 0, Math.PI * 2);
-        } else {
-          const card = fileCardSize(node);
-          const halfWidth = card.width / 2 + gap;
-          const halfHeight = card.height / 2 + gap;
-          context.roundRect(
-            x - halfWidth,
-            y - halfHeight,
-            halfWidth * 2,
-            halfHeight * 2,
-            (6 + index * 2) / globalScale,
-          );
-        }
+        context.roundRect(
+          xCenter - halfWidth,
+          yCenter - halfHeight,
+          halfWidth * 2,
+          halfHeight * 2,
+          (6 + index * 2) / globalScale,
+        );
         context.lineWidth = 2.2 / globalScale;
         context.strokeStyle = presenceColor(peer.userId);
         context.stroke();
@@ -586,28 +592,33 @@ export function GraphView(props: GraphViewProps) {
     context.restore();
   }
 
-  function strokeStyle(stroke: EdgeStroke) {
-    switch (stroke.kind) {
-      case "partner":
-        return { color: colors.partner, width: 1.25, dash: [4, 5] };
-      case "media":
-        return { color: colors.media, width: 0.8, dash: [2, 5] };
-      case "union":
-        return { color: "#7f8d75", width: 0.9, dash: null };
-      default:
-        return {
-          color: colors.edge,
-          width: 1.25,
-          dash:
-            stroke.parentType && stroke.parentType !== "biological"
-              ? [6, 5]
-              : null,
-        };
-    }
+  function drawNode(
+    node: GraphNode,
+    context: CanvasRenderingContext2D,
+    globalScale: number,
+  ) {
+    if (node.kind !== "person") return;
+    drawPerson(node, context, globalScale);
   }
 
-  function strokeActive(stroke: EdgeStroke, set: Set<string> | null) {
-    return !set || (set.has(stroke.sourceId) && set.has(stroke.targetId));
+  function strokeStyle(segment: EdgeSegment) {
+    if (segment.kind === "partner") {
+      return { color: colors.partner, width: 1.25, dash: [4, 5] };
+    }
+    if (segment.kind === "exception") {
+      return {
+        color: colors.edge,
+        width: 1.1,
+        dash:
+          segment.parentType && segment.parentType !== "biological" ? [6, 5] : null,
+      };
+    }
+    return {
+      color: colors.edge,
+      width: 1.25,
+      dash:
+        segment.parentType && segment.parentType !== "biological" ? [6, 5] : null,
+    };
   }
 
   function drawRoutesLayer(
@@ -615,55 +626,69 @@ export function GraphView(props: GraphViewProps) {
     globalScale: number,
   ) {
     const set = active();
-    for (const connector of connectors()) {
-      const anyActive = connector.strokes.some(stroke => strokeActive(stroke, set));
-      if (connector.trunk) {
-        context.save();
-        context.globalAlpha = anyActive ? 1 : 0.08;
-        context.strokeStyle = colors.edge;
-        context.lineWidth = 1.25 / globalScale;
-        context.setLineDash([]);
-        traceRounded(context, connector.trunk, 5 / globalScale);
-        context.stroke();
-        context.restore();
+    for (const segment of segments()) {
+      const activeSegment = !set || segment.nodeIds.some(id => set.has(id));
+      const style = strokeStyle(segment);
+      context.save();
+      context.globalAlpha = activeSegment ? 1 : 0.08;
+      context.strokeStyle = style.color;
+      context.lineWidth = style.width / globalScale;
+      context.lineCap = "round";
+      context.lineJoin = "round";
+      context.setLineDash(style.dash ?? []);
+      context.beginPath();
+      context.moveTo(segment.a.x, segment.a.y);
+      context.lineTo(segment.b.x, segment.b.y);
+      context.stroke();
+      context.setLineDash([]);
+      if (segment.arrow) {
+        drawArrow(
+          context,
+          segment.b,
+          segment.a,
+          5 / globalScale,
+          style.color,
+        );
       }
-      for (const stroke of connector.strokes) {
-        drawStroke(context, globalScale, stroke, set);
-      }
+      context.restore();
     }
   }
 
-  function drawStroke(
+  function drawMediaLayer(
     context: CanvasRenderingContext2D,
     globalScale: number,
-    stroke: EdgeStroke,
-    set: Set<string> | null,
   ) {
-    if (stroke.points.length < 2) return;
-    const style = strokeStyle(stroke);
-    const activeStroke = strokeActive(stroke, set);
-    context.save();
-    context.globalAlpha = activeStroke ? 1 : 0.08;
-    context.strokeStyle = style.color;
-    context.lineWidth = style.width / globalScale;
-    context.lineCap = "round";
-    context.lineJoin = "round";
-    context.setLineDash(style.dash ?? []);
-    traceRounded(context, stroke.points, 5 / globalScale);
-    context.stroke();
-    context.setLineDash([]);
-    if (stroke.arrow) {
-      const last = stroke.points[stroke.points.length - 1];
-      const previous = stroke.points[stroke.points.length - 2];
-      drawArrow(context, last, previous, 5 / globalScale, colors.parentStep);
+    if (!graph) return;
+    const width = context.canvas.clientWidth;
+    const height = context.canvas.clientHeight;
+    for (const node of mediaNodes()) {
+      const card = fileCardSize(node);
+      const screen = graph.graph2ScreenCoords(node.x ?? 0, node.y ?? 0);
+      const margin = 40 + Math.max(card.width, card.height);
+      if (
+        screen.x < -margin ||
+        screen.x > width + margin ||
+        screen.y < -margin ||
+        screen.y > height + margin
+      ) {
+        continue;
+      }
+      drawMediaCard(node, context, globalScale);
     }
-    context.restore();
+  }
+
+  function drawBackground(
+    context: CanvasRenderingContext2D,
+    globalScale: number,
+  ) {
+    drawMediaLayer(context, globalScale);
+    drawRoutesLayer(context, globalScale);
   }
 
   function drawArrow(
     context: CanvasRenderingContext2D,
-    tip: EdgePoint,
-    previous: EdgePoint,
+    tip: { x: number; y: number },
+    previous: { x: number; y: number },
     size: number,
     color: string,
   ) {
@@ -692,7 +717,25 @@ export function GraphView(props: GraphViewProps) {
   }
 
   function fit() {
-    graph.zoomToFit(0, props.fitPadding ?? 110);
+    graph.zoomToFit(
+      0,
+      props.fitPadding ?? 110,
+      (node: GraphNode) => node.kind === "person",
+    );
+  }
+
+  function scheduleFit() {
+    requestAnimationFrame(() => {
+      if (!graph || !needsFit) return;
+      needsFit = false;
+      fit();
+    });
+  }
+
+  function syncGraph(target: GraphModel, targetLayout: GraphLayout) {
+    if (!graph) return;
+    applyPositions(target, targetLayout);
+    graph.graphData({ nodes: target.nodes, links: [] });
   }
 
   onMount(async () => {
@@ -704,12 +747,10 @@ export function GraphView(props: GraphViewProps) {
       .height(container.clientHeight || window.innerHeight)
       .backgroundColor(colors.bg)
       .nodeId("id")
-      .nodeVal((node: GraphNode) => node.val)
       .nodeCanvasObject(drawNode)
-      .onRenderFramePre(drawRoutesLayer)
+      .onRenderFramePre(drawBackground)
       .onRenderFramePost(drawPresenceTagsLayer)
       .nodeLabel("")
-      .linkVisibility(() => false)
       .onEngineStop(() => {
         if (import.meta.env.DEV) (window as any).__familyTreeStoppedAt = Date.now();
         updateHoverAt(pointer.x, pointer.y);
@@ -726,9 +767,7 @@ export function GraphView(props: GraphViewProps) {
       .enablePointerInteraction(false)
       .autoPauseRedraw(true);
 
-    applyFixedLayout(model());
-    rebuildConnectors(model());
-    graph.graphData({ nodes: model().nodes, links: model().links });
+    syncGraph(model(), layout());
     if (import.meta.env.DEV) {
       (window as any).__familyTreeGraph = graph;
       (window as any).__familyTreeNodes = () =>
@@ -746,6 +785,7 @@ export function GraphView(props: GraphViewProps) {
       focus: focusNode,
       zoomBy: factor => graph.zoom(graph.zoom() * factor, 300),
     });
+    scheduleFit();
 
     resizeObserver = new ResizeObserver(entries => {
       const rect = entries[0]?.contentRect;
@@ -863,13 +903,17 @@ export function GraphView(props: GraphViewProps) {
     const direction = props.generationDirection;
     const directionChanged = direction !== previousDirection;
     previousDirection = direction;
-    const next = buildGraphModel(props.data, props.showMedia, direction, props.visible);
-    applyFixedLayout(next);
-    rebuildConnectors(next);
-    setModel(next);
-    if (!graph) return;
-    graph.graphData({ nodes: next.nodes, links: next.links });
-    if (directionChanged) needsFit = true;
+    const nextModel = buildGraphModel(props.data, props.showMedia, props.visible);
+    const nextLayout = layoutGraph(nextModel, direction);
+    const nextSegments = routeEdges(nextModel, nextLayout);
+    setModel(nextModel);
+    setLayout(nextLayout);
+    setSegments(nextSegments);
+    syncGraph(nextModel, nextLayout);
+    if (directionChanged) {
+      needsFit = true;
+      scheduleFit();
+    }
   });
 
   createEffect(() => {
@@ -879,7 +923,8 @@ export function GraphView(props: GraphViewProps) {
     props.presence;
     props.selfPeerId;
     model();
-    connectors();
+    layout();
+    segments();
     if (graph) graph.nodeCanvasObject(drawNode);
   });
 
@@ -929,30 +974,4 @@ function drawImageCropped(
     sy = (sourceHeight - cropHeight) / 2;
   }
   context.drawImage(image, sx, sy, cropWidth, cropHeight, x, y, width, height);
-}
-
-/** Rounded orthogonal polyline, the family-tree connector shape. */
-function traceRounded(
-  context: CanvasRenderingContext2D,
-  points: EdgePoint[],
-  radius: number,
-) {
-  if (!points.length) return;
-  context.beginPath();
-  context.moveTo(points[0].x, points[0].y);
-  if (points.length === 2) {
-    context.lineTo(points[1].x, points[1].y);
-    return;
-  }
-  for (let index = 1; index < points.length - 1; index += 1) {
-    const previous = points[index - 1];
-    const current = points[index];
-    const next = points[index + 1];
-    const inLength = Math.hypot(current.x - previous.x, current.y - previous.y);
-    const outLength = Math.hypot(next.x - current.x, next.y - current.y);
-    const corner = Math.min(radius, inLength / 2, outLength / 2);
-    context.arcTo(current.x, current.y, next.x, next.y, corner);
-  }
-  const last = points[points.length - 1];
-  context.lineTo(last.x, last.y);
 }

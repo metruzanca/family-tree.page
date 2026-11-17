@@ -5,7 +5,6 @@ import type {
   GraphRelationship,
   TreeGraph,
 } from "~/api/people-server";
-import type { GraphNode } from "~/lib/graph";
 import { exactDateFromISO } from "~/lib/fuzzy-date";
 
 /**
@@ -354,51 +353,3 @@ export const demoAlbum = {
   name: "Couch gags",
   files: ["file:couch-1", "file:couch-2", "file:couch-3"].map(id => demoMediaById[id]),
 };
-
-/**
- * The landing hero uses a fixed, hand-authored layout instead of the force
- * simulation. Three generations with a few siblings are easier to read when the
- * positions are chosen by hand, and a fixed layout renders faster.
- */
-const demoPositions: Record<string, { x: number; y: number }> = {
-  abraham: { x: -150, y: -210 },
-  mona: { x: -40, y: -210 },
-  clancy: { x: 120, y: -210 },
-  jackie: { x: 230, y: -210 },
-
-  homer: { x: -90, y: 0 },
-  marge: { x: 25, y: 0 },
-  selma: { x: 140, y: 0 },
-  patty: { x: 230, y: 0 },
-
-  bart: { x: -110, y: 210 },
-  lisa: { x: -15, y: 210 },
-  maggie: { x: 80, y: 210 },
-
-  "file:file:house": { x: -140, y: 340 },
-  "file:file:school": { x: -30, y: 340 },
-  "file:file:notebook": { x: 80, y: 340 },
-  "group:group:couch": { x: 200, y: 340 },
-};
-
-export function demoLayout(node: GraphNode) {
-  if (node.kind === "union") {
-    const parents = (node.parentIds ?? [])
-      .map(id => demoPositions[id])
-      .filter((position): position is { x: number; y: number } => Boolean(position));
-    const children = (node.childIds ?? [])
-      .map(id => demoPositions[id])
-      .filter((position): position is { x: number; y: number } => Boolean(position));
-    if (!parents.length || !children.length) return null;
-    const childXs = children.map(position => position.x);
-    const parentY = parents.reduce((sum, position) => sum + position.y, 0) / parents.length;
-    const childY = children.reduce((sum, position) => sum + position.y, 0) / children.length;
-    return {
-      // Centre the junction over its children so the child lines fan evenly, then
-      // sit it halfway between the two rows so no branch has to overshoot.
-      x: (Math.min(...childXs) + Math.max(...childXs)) / 2,
-      y: (parentY + childY) / 2,
-    };
-  }
-  return demoPositions[node.id] ?? null;
-}

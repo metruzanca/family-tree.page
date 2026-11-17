@@ -1,17 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   buildGraphModel,
-  clampToGenerationBand,
-  COMPONENT_GAP,
   computeGenerations,
+  dedupeRelationships,
   fileCardSize,
-  generationRowY,
+  fileNodeId,
+  groupNodeId,
   mediaAspect,
   nodeRadius,
-  packComponents,
-  partnerGroups,
-  personComponents,
-  type GraphModel,
   type GraphNode,
 } from "./graph";
 import type { GraphPerson, GraphRelationship, TreeGraph } from "../api/people-server";
@@ -55,6 +51,22 @@ function partner(id: string, source: string, target: string): GraphRelationship 
   };
 }
 
+function treeWith(
+  people: GraphPerson[],
+  relationships: GraphRelationship[],
+): TreeGraph {
+  return {
+    tree: { id: "tree", name: "Test", description: null },
+    role: "owner",
+    viewerPersonId: null,
+    people,
+    relationships,
+    files: [],
+    groups: [],
+    events: [],
+  };
+}
+
 describe("computeGenerations", () => {
   it("pushes children below parents and keeps partners on the same row", () => {
     const people = ["g", "m", "l", "d", "s"].map(id => person(id));
@@ -82,38 +94,21 @@ describe("computeGenerations", () => {
   });
 });
 
-describe("generation bands", () => {
-  it("puts older generations above newer ones by default", () => {
-    expect(generationRowY(0, "oldest-top")).toBeLessThan(generationRowY(1, "oldest-top"));
-    expect(generationRowY(0, "oldest-bottom")).toBeGreaterThan(
-      generationRowY(1, "oldest-bottom"),
+describe("relationship deduplication", () => {
+  it("keeps one link for a repeated parent or partner pair", () => {
+    const data = treeWith(
+      ["a", "b", "c"].map(id => person(id)),
+      [
+        parent("r1", "a", "c"),
+        parent("r2", "a", "c"),
+        partner("p1", "a", "b"),
+        partner("p2", "b", "a"),
+      ],
     );
-  });
-
-  it("only clamps a node when it leaves its generation band", () => {
-    const level = 1;
-    const row = generationRowY(level, "oldest-top");
-    expect(clampToGenerationBand(row + 20, level, "oldest-top")).toBe(row + 20);
-    expect(clampToGenerationBand(row + 200, level, "oldest-top")).toBe(row + 58);
-    expect(clampToGenerationBand(row - 200, level, "oldest-top")).toBe(row - 58);
-  });
-});
-
-describe("partnerGroups", () => {
-  it("groups direct and chained partners so their rows can be aligned", () => {
-    const groups = partnerGroups([
-      partner("p1", "a", "b"),
-      partner("p2", "b", "c"),
-      partner("p3", "d", "e"),
-      parent("c1", "a", "f"),
-    ]);
-    expect(groups).toHaveLength(2);
-    expect(groups.map(group => group.sort())).toEqual(
-      expect.arrayContaining([
-        ["a", "b", "c"],
-        ["d", "e"],
-      ]),
-    );
+    const model = buildGraphModel(data, false);
+    expect(model.links.filter(link => link.kind === "parent")).toHaveLength(1);
+    expect(model.links.filter(link => link.kind === "partner")).toHaveLength(1);
+    expect(dedupeRelationships(data.relationships)).toHaveLength(2);
   });
 });
 
@@ -164,17 +159,19 @@ describe("buildGraphModel", () => {
     events: [],
   };
 
-  it("adds non-avatar files when media is visible", () => {
-    const model = buildGraphModel(data, true, "oldest-top");
-    expect(model.nodes.map(node => node.id)).toContain("file:doc");
-    expect(model.nodes.map(node => node.id)).not.toContain("file:avatar");
-    expect(model.links.some(link => link.kind === "media")).toBe(true);
+  it("adds non-avatar files and keeps them with their owner", () => {
+    const model = buildGraphModel(data, true);
+    expect(model.nodes.map(node => node.id)).toContain(fileNodeId("doc"));
+    expect(model.nodes.map(node => node.id)).not.toContain(fileNodeId("avatar"));
+    expect(model.mediaByOwner.get("b")?.map(node => node.id)).toEqual([
+      fileNodeId("doc"),
+    ]);
   });
 
   it("drops media nodes when media is hidden", () => {
-    const model = buildGraphModel(data, false, "oldest-top");
+    const model = buildGraphModel(data, false);
     expect(model.nodes.map(node => node.id)).toEqual(["a", "b"]);
-    expect(model.links.some(link => link.kind === "media")).toBe(false);
+    expect(model.mediaByOwner.size).toBe(0);
   });
 
   it("renders one stack node for an uploaded album", () => {
@@ -210,222 +207,65 @@ describe("buildGraphModel", () => {
         },
       ],
     };
-    const model = buildGraphModel(albumData, true, "oldest-top");
+    const model = buildGraphModel(albumData, true);
     const groupNodes = model.nodes.filter(node => node.kind === "group");
     expect(groupNodes).toHaveLength(1);
     expect(groupNodes[0].group?.name).toBe("Summer");
     expect(model.nodes.filter(node => node.kind === "file")).toHaveLength(0);
-    expect(model.links.filter(link => link.kind === "media")).toHaveLength(1);
+    expect(groupNodes[0].ownerId).toBe("b");
+    expect(groupNodes[0].id).toBe(groupNodeId("album-1"));
   });
 
-  it("keeps single-parent links direct", () => {
-    const model = buildGraphModel(data, false, "oldest-top");
-    expect(model.nodes.some(node => node.kind === "union")).toBe(false);
-    expect(model.links.filter(link => link.kind === "parent")).toHaveLength(1);
-    expect(model.links.find(link => link.kind === "parent")?.viaUnion).toBeUndefined();
-  });
-
-  it("shares one junction for siblings with the same two parents", () => {
-    const familyPeople = [person("a"), person("b"), person("c"), person("d")];
-    const familyRelationships = [
-      partner("p1", "a", "b"),
-      parent("r1", "a", "c"),
-      parent("r2", "b", "c"),
-      parent("r3", "a", "d"),
-      parent("r4", "b", "d"),
-    ];
-    const model = buildGraphModel(
-      {
-        tree: { id: "family", name: "Family", description: null },
-        role: "owner",
-        viewerPersonId: null,
-        people: familyPeople,
-        relationships: familyRelationships,
-        files: [],
-        groups: [],
-        events: [],
-      },
-      false,
-      "oldest-top",
+  it("keeps parent and partner links but creates no union nodes", () => {
+    const familyData = treeWith(
+      ["a", "b", "c", "d"].map(id => person(id)),
+      [
+        partner("p1", "a", "b"),
+        parent("r1", "a", "c"),
+        parent("r2", "b", "c"),
+        parent("r3", "a", "d"),
+        parent("r4", "b", "d"),
+      ],
     );
-
-    const unions = model.nodes.filter(node => node.kind === "union");
-    expect(unions).toHaveLength(1);
-    expect(unions[0].memberIds?.sort()).toEqual(["a", "b", "c", "d"]);
-    expect(model.links.filter(link => link.kind === "union")).toHaveLength(2);
-    expect(
-      model.links.filter(link => link.kind === "parent" && link.viaUnion),
-    ).toHaveLength(2);
-    expect(
-      model.links.filter(link => link.kind === "parent" && !link.viaUnion),
-    ).toHaveLength(0);
+    const model = buildGraphModel(familyData, false);
+    expect(model.nodes.every(node => node.kind !== ("union" as never))).toBe(true);
+    expect(model.links.filter(link => link.kind === "partner")).toHaveLength(1);
+    expect(model.links.filter(link => link.kind === "parent")).toHaveLength(4);
   });
 });
-
-function treeWith(
-  people: GraphPerson[],
-  relationships: GraphRelationship[],
-): TreeGraph {
-  return {
-    tree: { id: "tree", name: "Test", description: null },
-    role: "owner",
-    viewerPersonId: null,
-    people,
-    relationships,
-    files: [],
-    groups: [],
-    events: [],
-  };
-}
-
-function nodeX(model: GraphModel, id: string) {
-  const node = model.nodes.find(candidate => candidate.id === id);
-  if (!node || node.x == null) throw new Error(`missing node ${id}`);
-  return node.x;
-}
-
-describe("disconnected components", () => {
-  const data = treeWith(
-    ["a", "b", "c", "d"].map(id => person(id)),
-    [parent("r1", "a", "b"), parent("r2", "c", "d")],
-  );
-
-  it("merges related people and keeps strangers in their own component", () => {
-    const people = ["a", "b", "c", "loner"].map(id => person(id));
-    const relationships = [partner("p1", "a", "b"), parent("r1", "b", "c")];
-    const { components, byPerson } = personComponents(
-      people,
-      relationships,
-      computeGenerations(people, relationships),
-    );
-    expect(components).toHaveLength(2);
-    expect(byPerson.get("c")).toBe(byPerson.get("a"));
-    expect(byPerson.get("loner")).not.toBe(byPerson.get("a"));
-  });
-
-  it("gives each disconnected family its own horizontal band", () => {
-    const model = buildGraphModel(data, false, "oldest-top");
-    expect(model.components).toHaveLength(2);
-    const [first, second] = model.components;
-    expect(first.centerX + first.width / 2 + COMPONENT_GAP).toBeLessThanOrEqual(
-      second.centerX - second.width / 2,
-    );
-    for (const component of model.components) {
-      for (const personId of component.personIds) {
-        expect(Math.abs(nodeX(model, personId) - component.centerX)).toBeLessThanOrEqual(
-          component.width / 2,
-        );
-      }
-    }
-  });
-
-  it("places a newly added stranger away from the existing tree", () => {
-    const model = buildGraphModel(
-      treeWith([person("a"), person("b"), person("newcomer")], [parent("r1", "a", "b")]),
-      false,
-      "oldest-top",
-    );
-    expect(nodeX(model, "newcomer")).toBeGreaterThan(
-      Math.max(nodeX(model, "a"), nodeX(model, "b")),
-    );
-    expect(model.byNode.get("newcomer")?.personIds).toEqual(["newcomer"]);
-  });
-
-  it("does not move people when media visibility or direction changes", () => {
-    const withMedia = buildGraphModel(data, true, "oldest-top");
-    const withoutMedia = buildGraphModel(data, false, "oldest-top");
-    const flipped = buildGraphModel(data, false, "oldest-bottom");
-    expect(nodeX(withMedia, "a")).toBe(nodeX(withoutMedia, "a"));
-    expect(nodeX(flipped, "a")).toBe(nodeX(withoutMedia, "a"));
-  });
-
-  it("keeps media nodes in their owner's component", () => {
-    const model = buildGraphModel(
-      {
-        ...treeWith([person("a"), person("b")], [parent("r1", "a", "b")]),
-        files: [
-          {
-            id: "doc",
-            personId: "b",
-            groupId: null,
-            name: "letter.pdf",
-            mimeType: "application/pdf",
-            kind: "document",
-            thumbUrl: null,
-            width: null,
-            height: null,
-            sizeBytes: 2000,
-            takenAt: null,
-            taggedPersonIds: [],
-            createdAt: new Date(),
-            isAvatar: false,
-          },
-        ],
-      },
-      true,
-      "oldest-top",
-    );
-    expect(model.byNode.get("file:doc")).toBe(model.byNode.get("b"));
-  });
-
-  it("pushes overlapping bands apart without changing rows", () => {
-    const model = buildGraphModel(data, false, "oldest-top");
-    const rows = new Map(model.nodes.map(node => [node.id, node.y]));
-    for (const node of model.nodes) node.x = 0;
-
-    packComponents(model.nodes, model.components, model.byNode);
-
-    const spans = model.components
-      .map(component => {
-        const nodes = model.nodes.filter(node => model.byNode.get(node.id) === component);
-        return {
-          min: Math.min(...nodes.map(node => (node.x ?? 0) - nodeRadius(node))),
-          max: Math.max(...nodes.map(node => (node.x ?? 0) + nodeRadius(node))),
-        };
-      })
-      .sort((a, b) => a.min - b.min);
-    expect(spans[0].max + COMPONENT_GAP).toBeLessThanOrEqual(spans[1].min);
-    for (const node of model.nodes) expect(node.y).toBe(rows.get(node.id));
-
-    const packed = model.nodes.map(node => node.x);
-    packComponents(model.nodes, model.components, model.byNode);
-    expect(model.nodes.map(node => node.x)).toEqual(packed);
-  });
-});
-
-function fileNode(
-  width: number | null,
-  height: number | null,
-  kind: "image" | "document" = "image",
-): GraphNode {
-  return {
-    id: "file:one",
-    kind: "file",
-    name: "photo.jpg",
-    file: {
-      id: "one",
-      personId: "a",
-      groupId: null,
-      name: "photo.jpg",
-      mimeType: kind === "image" ? "image/jpeg" : "application/pdf",
-      kind,
-      thumbUrl: "/api/files/one/thumb",
-      width,
-      height,
-      sizeBytes: 1000,
-      takenAt: null,
-      taggedPersonIds: [],
-      createdAt: new Date(),
-      isAvatar: false,
-    },
-    degree: 1,
-    val: 0.35,
-    level: 0,
-  };
-}
 
 describe("media card sizing", () => {
   const squareArea = 22 * 22;
+
+  function fileNode(
+    width: number | null,
+    height: number | null,
+    kind: "image" | "document" = "image",
+  ): GraphNode {
+    return {
+      id: "file:one",
+      kind: "file",
+      name: "photo.jpg",
+      file: {
+        id: "one",
+        personId: "a",
+        groupId: null,
+        name: "photo.jpg",
+        mimeType: kind === "image" ? "image/jpeg" : "application/pdf",
+        kind,
+        thumbUrl: "/api/files/one/thumb",
+        width,
+        height,
+        sizeBytes: 1000,
+        takenAt: null,
+        taggedPersonIds: [],
+        createdAt: new Date(),
+        isAvatar: false,
+      },
+      degree: 1,
+      level: 0,
+    };
+  }
 
   it("keeps a square photo square", () => {
     const card = fileCardSize(fileNode(800, 800));
@@ -491,7 +331,6 @@ describe("media card sizing", () => {
         createdAt: new Date(),
       },
       degree: 1,
-      val: 0.7,
       level: 0,
     };
     const card = fileCardSize(group);
@@ -513,30 +352,11 @@ describe("focused graph model", () => {
     const model = buildGraphModel(
       treeWith(people, relationships),
       false,
-      "oldest-top",
       new Set(["a", "b"]),
     );
     expect(model.nodes.map(node => node.id).sort()).toEqual(["a", "b"]);
     expect(model.links).toHaveLength(1);
     expect(model.links[0].id).toBe("r1");
-  });
-
-  it("keeps generation rows from the whole tree", () => {
-    const model = buildGraphModel(
-      treeWith(people, relationships),
-      false,
-      "oldest-top",
-      new Set(["c", "d"]),
-    );
-    const full = buildGraphModel(treeWith(people, relationships), false, "oldest-top");
-    const c = model.nodes.find(node => node.id === "c")!;
-    const d = model.nodes.find(node => node.id === "d")!;
-    expect(c.level).toBe(2);
-    expect(d.level).toBe(3);
-    expect(c.y).toBe(full.nodes.find(node => node.id === "c")!.y);
-    expect(d.y).toBe(full.nodes.find(node => node.id === "d")!.y);
-    expect(Math.abs(c.y! - generationRowY(2, "oldest-top"))).toBeLessThan(60);
-    expect(Math.abs(d.y! - generationRowY(3, "oldest-top"))).toBeLessThan(60);
   });
 
   it("drops media whose owner is hidden", () => {
@@ -559,43 +379,10 @@ describe("focused graph model", () => {
         isAvatar: false,
       },
     ];
-    const narrowed = buildGraphModel(data, true, "oldest-top", new Set(["a", "b"]));
-    expect(narrowed.nodes.some(node => node.id === "file:doc")).toBe(false);
+    const narrowed = buildGraphModel(data, true, new Set(["a", "b"]));
+    expect(narrowed.nodes.some(node => node.id === fileNodeId("doc"))).toBe(false);
 
-    const full = buildGraphModel(data, true, "oldest-top");
-    expect(full.nodes.some(node => node.id === "file:doc")).toBe(true);
-  });
-
-  it("only includes visible children in a shared parent junction", () => {
-    const family = [person("a"), person("b"), person("c"), person("d")];
-    const data = treeWith(family, [
-      partner("p1", "a", "b"),
-      parent("r1", "a", "c"),
-      parent("r2", "b", "c"),
-      parent("r3", "a", "d"),
-      parent("r4", "b", "d"),
-    ]);
-    const model = buildGraphModel(
-      data,
-      false,
-      "oldest-top",
-      new Set(["a", "b", "c"]),
-    );
-    const unions = model.nodes.filter(node => node.kind === "union");
-    expect(unions).toHaveLength(1);
-    expect(unions[0].childIds).toEqual(["c"]);
-  });
-
-  it("matches the unfiltered model when everyone is visible", () => {
-    const full = buildGraphModel(treeWith(people, relationships), false, "oldest-top");
-    const same = buildGraphModel(
-      treeWith(people, relationships),
-      false,
-      "oldest-top",
-      new Set(people.map(person => person.id)),
-    );
-    expect(same.nodes.map(node => [node.id, node.level, node.x, node.y])).toEqual(
-      full.nodes.map(node => [node.id, node.level, node.x, node.y]),
-    );
+    const full = buildGraphModel(data, true);
+    expect(full.nodes.some(node => node.id === fileNodeId("doc"))).toBe(true);
   });
 });

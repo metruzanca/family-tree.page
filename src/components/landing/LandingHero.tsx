@@ -18,7 +18,6 @@ import { LandingLightbox } from "./LandingLightbox";
 import { LandingPersonCard } from "./LandingPersonCard";
 import {
   demoAlbum,
-  demoLayout,
   demoMediaById,
   demoPeople,
   demoPersonAvatar,
@@ -172,7 +171,6 @@ export function LandingHero() {
                 class="landing-graph !h-full"
                 thumbUrlFor={demoThumbUrl}
                 fitPadding={isNarrow ? 8 : 64}
-                fixedLayout={demoLayout}
                 nodeLabel={node =>
                   node.kind === "person" ? node.person?.firstName ?? node.name : node.name
                 }
