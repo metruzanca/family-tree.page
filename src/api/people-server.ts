@@ -35,6 +35,19 @@ import {
 } from "../server/validation";
 import { deletePrefix, TREE_PREFIX } from "../server/storage";
 import {
+  logActivity,
+  peopleNames,
+  personChanges,
+  personEventChanges,
+  personName,
+} from "../server/activity";
+import { personEventKindLabel } from "../lib/person-events";
+import { notifyTreeChanged } from "../server/presence";
+import {
+  findDuplicateCandidates,
+  type DuplicateCandidate,
+} from "../lib/duplicates";
+import {
   assertRelationshipInvariants,
   dedupeParentEdges,
   type ParentEdgeRecord,
@@ -131,6 +144,32 @@ export type TreeGraph = {
 export function personDisplayName(person: Pick<Person, "firstName" | "lastName" | "nickname">) {
   const full = `${person.firstName} ${person.lastName}`.trim();
   return full || person.nickname || "Unnamed person";
+}
+
+export async function findPossibleDuplicates(input: {
+  treeId: string;
+  firstName: string;
+  lastName?: string | null;
+  maidenName?: string | null;
+  nickname?: string | null;
+  birthDate?: FuzzyDate | null;
+  deathDate?: FuzzyDate | null;
+  excludePersonId?: string | null;
+}): Promise<ActionResult<DuplicateCandidate[]>> {
+  return runAction("people.findPossibleDuplicates", async () => {
+    const access = await requireTreeMember(input.treeId, "editor");
+    const rows = await db
+      .select()
+      .from(people)
+      .where(eq(people.treeId, access.tree.id));
+    const candidates = rows.map(row => ({
+      ...row,
+      displayName: personDisplayName(row),
+    }));
+    return findDuplicateCandidates(input, candidates, {
+      excludePersonId: input.excludePersonId,
+    });
+  });
 }
 
 export async function getTreeGraph(treeId: string): Promise<TreeGraph> {
@@ -310,11 +349,28 @@ function toGraphFile(file: StoredFile, taggedPersonIds: string[]): GraphFile {
 }
 
 export async function createPerson(
-  input: { treeId: string } & PersonInput,
+  input: { treeId: string; allowDuplicate?: boolean } & PersonInput,
 ): Promise<ActionResult<{ id: string }>> {
   return runAction("people.createPerson", async () => {
     const access = await requireTreeMember(input.treeId, "editor");
     const parsed = personSchema.parse(input);
+
+    if (!input.allowDuplicate) {
+      const rows = await db
+        .select()
+        .from(people)
+        .where(eq(people.treeId, access.tree.id));
+      const candidates = findDuplicateCandidates(
+        parsed,
+        rows.map(row => ({ ...row, displayName: personDisplayName(row) })),
+      );
+      if (candidates.length) {
+        throw new AppError(
+          "A similar person is already in this tree. Confirm to add them anyway.",
+        );
+      }
+    }
+
     const person = await db.transaction(async tx => {
       await reservePersonSlot(tx, access.user.id);
       const [created] = await tx
@@ -333,6 +389,15 @@ export async function createPerson(
           createdBy: access.user.id,
         })
         .returning();
+      await logActivity(tx, {
+        treeId: access.tree.id,
+        actor: access.user,
+        action: "person.created",
+        entityType: "person",
+        entityId: created.id,
+        personId: created.id,
+        summary: `Added ${personName(created)}`,
+      });
       return created;
     });
     await touchTree(access.tree.id);
@@ -352,23 +417,46 @@ export async function updatePerson(
   return runAction("people.updatePerson", async () => {
     const access = await requireTreeMember(input.treeId, "editor");
     const parsed = personUpdateSchema.parse(input);
-    const updated = await db
-      .update(people)
-      .set({
-        firstName: parsed.firstName,
-        lastName: parsed.lastName,
-        maidenName: parsed.maidenName,
-        nickname: parsed.nickname,
-        birthDate: parsed.birthDate,
-        deathDate: parsed.deathDate,
-        birthPlace: parsed.birthPlace,
-        deathPlace: parsed.deathPlace,
-        bio: parsed.bio,
-        updatedAt: new Date(),
-      })
-      .where(and(eq(people.id, input.personId), eq(people.treeId, access.tree.id)))
-      .returning({ id: people.id });
-    if (!updated.length) throw new AppError("That person could not be found.");
+    await db.transaction(async tx => {
+      const [before] = await tx
+        .select()
+        .from(people)
+        .where(and(eq(people.id, input.personId), eq(people.treeId, access.tree.id)))
+        .limit(1);
+      if (!before) throw new AppError("That person could not be found.");
+
+      const [updated] = await tx
+        .update(people)
+        .set({
+          firstName: parsed.firstName,
+          lastName: parsed.lastName,
+          maidenName: parsed.maidenName,
+          nickname: parsed.nickname,
+          birthDate: parsed.birthDate,
+          deathDate: parsed.deathDate,
+          birthPlace: parsed.birthPlace,
+          deathPlace: parsed.deathPlace,
+          bio: parsed.bio,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(people.id, input.personId), eq(people.treeId, access.tree.id)))
+        .returning();
+      if (!updated) throw new AppError("That person could not be found.");
+
+      const changes = personChanges(before, parsed);
+      if (changes.length) {
+        await logActivity(tx, {
+          treeId: access.tree.id,
+          actor: access.user,
+          action: "person.updated",
+          entityType: "person",
+          entityId: updated.id,
+          personId: updated.id,
+          summary: `Updated ${personName(updated)}`,
+          changes,
+        });
+      }
+    });
     await touchTree(access.tree.id);
     return undefined;
   });
@@ -380,6 +468,13 @@ export async function deletePerson(input: {
 }): Promise<ActionResult<undefined>> {
   return runAction("people.deletePerson", async () => {
     const access = await requireTreeMember(input.treeId, "editor");
+    const [person] = await db
+      .select()
+      .from(people)
+      .where(and(eq(people.id, input.personId), eq(people.treeId, access.tree.id)))
+      .limit(1);
+    if (!person) throw new AppError("That person could not be found.");
+
     try {
       await deletePrefix(`${TREE_PREFIX}/${input.treeId}/people/${input.personId}/`);
     } catch (error) {
@@ -389,11 +484,23 @@ export async function deletePerson(input: {
         error,
       });
     }
-    const deleted = await db
-      .delete(people)
-      .where(and(eq(people.id, input.personId), eq(people.treeId, access.tree.id)))
-      .returning({ id: people.id });
-    if (!deleted.length) throw new AppError("That person could not be found.");
+
+    await db.transaction(async tx => {
+      const deleted = await tx
+        .delete(people)
+        .where(and(eq(people.id, input.personId), eq(people.treeId, access.tree.id)))
+        .returning({ id: people.id });
+      if (!deleted.length) throw new AppError("That person could not be found.");
+      await logActivity(tx, {
+        treeId: access.tree.id,
+        actor: access.user,
+        action: "person.deleted",
+        entityType: "person",
+        entityId: person.id,
+        personId: person.id,
+        summary: `Deleted ${personName(person)}`,
+      });
+    });
     await touchTree(access.tree.id);
     await recordUsage({
       userId: access.user.id,
@@ -445,6 +552,21 @@ export async function createParentChild(input: {
           parentType: parsed.parentType,
         })
         .returning();
+      const names = await peopleNames(tx, access.tree.id, [
+        parsed.parentId,
+        parsed.childId,
+      ]);
+      await logActivity(tx, {
+        treeId: access.tree.id,
+        actor: access.user,
+        action: "relationship.created",
+        entityType: "relationship",
+        entityId: relationship.id,
+        personId: parsed.childId,
+        summary: `Connected ${names.get(parsed.parentId) ?? "someone"} as a parent of ${
+          names.get(parsed.childId) ?? "someone"
+        }`,
+      });
       await tx.update(trees).set({ updatedAt: new Date() }).where(eq(trees.id, access.tree.id));
       return { id: relationship.id };
     });
@@ -457,13 +579,39 @@ export async function deleteParentChild(input: {
 }): Promise<ActionResult<undefined>> {
   return runAction("people.deleteParentChild", async () => {
     const access = await requireTreeMember(input.treeId, "editor");
-    const deleted = await db
-      .delete(parentChild)
+    const [relationship] = await db
+      .select()
+      .from(parentChild)
       .where(
         and(eq(parentChild.id, input.relationshipId), eq(parentChild.treeId, access.tree.id)),
       )
-      .returning({ id: parentChild.id });
-    if (!deleted.length) throw new AppError("That relationship could not be found.");
+      .limit(1);
+    if (!relationship) throw new AppError("That relationship could not be found.");
+
+    const names = await peopleNames(db, access.tree.id, [
+      relationship.parentId,
+      relationship.childId,
+    ]);
+    await db.transaction(async tx => {
+      const deleted = await tx
+        .delete(parentChild)
+        .where(
+          and(eq(parentChild.id, input.relationshipId), eq(parentChild.treeId, access.tree.id)),
+        )
+        .returning({ id: parentChild.id });
+      if (!deleted.length) throw new AppError("That relationship could not be found.");
+      await logActivity(tx, {
+        treeId: access.tree.id,
+        actor: access.user,
+        action: "relationship.removed",
+        entityType: "relationship",
+        entityId: relationship.id,
+        personId: relationship.childId,
+        summary: `Removed the parent link between ${
+          names.get(relationship.parentId) ?? "someone"
+        } and ${names.get(relationship.childId) ?? "someone"}`,
+      });
+    });
     await touchTree(access.tree.id);
     return undefined;
   });
@@ -515,6 +663,17 @@ export async function createPartnership(input: {
           endDate: parsed.endDate,
         })
         .returning();
+      const names = await peopleNames(tx, access.tree.id, [personAId, personBId]);
+      await logActivity(tx, {
+        treeId: access.tree.id,
+        actor: access.user,
+        action: "relationship.created",
+        entityType: "relationship",
+        entityId: relationship.id,
+        summary: `Connected ${names.get(personAId) ?? "someone"} and ${
+          names.get(personBId) ?? "someone"
+        } as partners`,
+      });
       await tx.update(trees).set({ updatedAt: new Date() }).where(eq(trees.id, access.tree.id));
       return { id: relationship.id };
     });
@@ -555,16 +714,44 @@ export async function deletePartnership(input: {
 }): Promise<ActionResult<undefined>> {
   return runAction("people.deletePartnership", async () => {
     const access = await requireTreeMember(input.treeId, "editor");
-    const deleted = await db
-      .delete(partnerships)
+    const [relationship] = await db
+      .select()
+      .from(partnerships)
       .where(
         and(
           eq(partnerships.id, input.relationshipId),
           eq(partnerships.treeId, access.tree.id),
         ),
       )
-      .returning({ id: partnerships.id });
-    if (!deleted.length) throw new AppError("That relationship could not be found.");
+      .limit(1);
+    if (!relationship) throw new AppError("That relationship could not be found.");
+
+    const names = await peopleNames(db, access.tree.id, [
+      relationship.personAId,
+      relationship.personBId,
+    ]);
+    await db.transaction(async tx => {
+      const deleted = await tx
+        .delete(partnerships)
+        .where(
+          and(
+            eq(partnerships.id, input.relationshipId),
+            eq(partnerships.treeId, access.tree.id),
+          ),
+        )
+        .returning({ id: partnerships.id });
+      if (!deleted.length) throw new AppError("That relationship could not be found.");
+      await logActivity(tx, {
+        treeId: access.tree.id,
+        actor: access.user,
+        action: "relationship.removed",
+        entityType: "relationship",
+        entityId: relationship.id,
+        summary: `Removed the partnership between ${
+          names.get(relationship.personAId) ?? "someone"
+        } and ${names.get(relationship.personBId) ?? "someone"}`,
+      });
+    });
     await touchTree(access.tree.id);
     return undefined;
   });
@@ -580,10 +767,27 @@ export async function addRelative(input: {
   otherParentId?: string;
   parentType?: "biological" | "adoptive" | "foster" | "step" | "unknown";
   status?: "married" | "partnered" | "divorced" | "separated" | "widowed" | "unknown";
+  allowDuplicate?: boolean;
 }): Promise<ActionResult<{ personId: string; relationshipIds: string[] }>> {
   return runAction("people.addRelative", async () => {
     const access = await requireTreeMember(input.treeId, "editor");
     const parsed = addRelativeSchema.parse(input);
+
+    if (parsed.mode === "new" && !parsed.allowDuplicate) {
+      const rows = await db
+        .select()
+        .from(people)
+        .where(eq(people.treeId, access.tree.id));
+      const candidates = findDuplicateCandidates(
+        parsed.person,
+        rows.map(row => ({ ...row, displayName: personDisplayName(row) })),
+      );
+      if (candidates.length) {
+        throw new AppError(
+          "A similar person is already in this tree. Confirm to add them anyway.",
+        );
+      }
+    }
 
     if (parsed.otherParentId && parsed.relation !== "child") {
       throw new AppError("Choose another parent only when adding a child.");
@@ -725,6 +929,52 @@ export async function addRelative(input: {
         }
       }
 
+      const names = await peopleNames(
+        tx,
+        access.tree.id,
+        [parsed.anchorPersonId, relativeId, parsed.otherParentId].filter(
+          (id): id is string => Boolean(id),
+        ),
+      );
+      const anchorName = names.get(parsed.anchorPersonId) ?? "someone";
+      const relativeName = names.get(relativeId) ?? "someone";
+
+      if (parsed.mode === "new") {
+        await logActivity(tx, {
+          treeId: access.tree.id,
+          actor: access.user,
+          action: "person.created",
+          entityType: "person",
+          entityId: relativeId,
+          personId: relativeId,
+          summary: `Added ${relativeName}`,
+        });
+      }
+
+      const verb = parsed.mode === "new" ? "Added" : "Connected";
+      let summary: string;
+      if (parsed.relation === "partner") {
+        summary = `Connected ${relativeName} and ${anchorName} as partners`;
+      } else if (parsed.relation === "parent") {
+        summary = `${verb} ${relativeName} as a parent of ${anchorName}`;
+      } else {
+        const otherName = parsed.otherParentId
+          ? names.get(parsed.otherParentId)
+          : null;
+        summary = `${verb} ${relativeName} as a child of ${anchorName}${
+          otherName ? ` and ${otherName}` : ""
+        }`;
+      }
+      await logActivity(tx, {
+        treeId: access.tree.id,
+        actor: access.user,
+        action: "relationship.created",
+        entityType: "relationship",
+        entityId: relationshipIds[0] ?? null,
+        personId: relativeId,
+        summary,
+      });
+
       await tx.update(trees).set({ updatedAt: new Date() }).where(eq(trees.id, access.tree.id));
       return { personId: relativeId, relationshipIds };
     });
@@ -749,19 +999,36 @@ export async function createPersonEvent(
     const parsed = personEventSchema.parse(input);
     await assertPeopleInTree(access.tree.id, [parsed.personId]);
 
-    const [event] = await db
-      .insert(personEvents)
-      .values({
+    const event = await db.transaction(async tx => {
+      const [created] = await tx
+        .insert(personEvents)
+        .values({
+          treeId: access.tree.id,
+          personId: parsed.personId,
+          kind: parsed.kind,
+          title: parsed.title,
+          place: parsed.place,
+          date: parsed.date,
+          description: parsed.description,
+          createdBy: access.user.id,
+        })
+        .returning();
+      const names = await peopleNames(tx, access.tree.id, [parsed.personId]);
+      const label =
+        parsed.kind === "other"
+          ? (parsed.title ?? "an event")
+          : personEventKindLabel(parsed.kind);
+      await logActivity(tx, {
         treeId: access.tree.id,
+        actor: access.user,
+        action: "event.created",
+        entityType: "event",
+        entityId: created.id,
         personId: parsed.personId,
-        kind: parsed.kind,
-        title: parsed.title,
-        place: parsed.place,
-        date: parsed.date,
-        description: parsed.description,
-        createdBy: access.user.id,
-      })
-      .returning({ id: personEvents.id });
+        summary: `Added ${label} for ${names.get(parsed.personId) ?? "someone"}`,
+      });
+      return created;
+    });
 
     await touchTree(access.tree.id);
     return { id: event.id };
@@ -774,24 +1041,57 @@ export async function updatePersonEvent(
   return runAction("people.updatePersonEvent", async () => {
     const access = await requireTreeMember(input.treeId, "editor");
     const parsed = personEventUpdateSchema.parse(input);
-    const updated = await db
-      .update(personEvents)
-      .set({
-        kind: parsed.kind,
-        title: parsed.title,
-        place: parsed.place,
-        date: parsed.date,
-        description: parsed.description,
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(personEvents.id, parsed.eventId),
-          eq(personEvents.treeId, access.tree.id),
-        ),
-      )
-      .returning({ id: personEvents.id });
-    if (!updated.length) throw new AppError("That event could not be found.");
+    await db.transaction(async tx => {
+      const [before] = await tx
+        .select()
+        .from(personEvents)
+        .where(
+          and(
+            eq(personEvents.id, parsed.eventId),
+            eq(personEvents.treeId, access.tree.id),
+          ),
+        )
+        .limit(1);
+      if (!before) throw new AppError("That event could not be found.");
+
+      const [updated] = await tx
+        .update(personEvents)
+        .set({
+          kind: parsed.kind,
+          title: parsed.title,
+          place: parsed.place,
+          date: parsed.date,
+          description: parsed.description,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(personEvents.id, parsed.eventId),
+            eq(personEvents.treeId, access.tree.id),
+          ),
+        )
+        .returning();
+      if (!updated) throw new AppError("That event could not be found.");
+
+      const changes = personEventChanges(before, parsed);
+      if (changes.length) {
+        const names = await peopleNames(tx, access.tree.id, [updated.personId]);
+        const label =
+          updated.kind === "other"
+            ? (updated.title ?? "an event")
+            : personEventKindLabel(updated.kind);
+        await logActivity(tx, {
+          treeId: access.tree.id,
+          actor: access.user,
+          action: "event.updated",
+          entityType: "event",
+          entityId: updated.id,
+          personId: updated.personId,
+          summary: `Updated ${label} for ${names.get(updated.personId) ?? "someone"}`,
+          changes,
+        });
+      }
+    });
     await touchTree(access.tree.id);
     return undefined;
   });
@@ -803,16 +1103,46 @@ export async function deletePersonEvent(input: {
 }): Promise<ActionResult<undefined>> {
   return runAction("people.deletePersonEvent", async () => {
     const access = await requireTreeMember(input.treeId, "editor");
-    const deleted = await db
-      .delete(personEvents)
+    const [event] = await db
+      .select()
+      .from(personEvents)
       .where(
         and(
           eq(personEvents.id, input.eventId),
           eq(personEvents.treeId, access.tree.id),
         ),
       )
-      .returning({ id: personEvents.id });
-    if (!deleted.length) throw new AppError("That event could not be found.");
+      .limit(1);
+    if (!event) throw new AppError("That event could not be found.");
+
+    const names = await peopleNames(db, access.tree.id, [event.personId]);
+    const label =
+      event.kind === "other"
+        ? (event.title ?? "an event")
+        : personEventKindLabel(event.kind);
+    await db.transaction(async tx => {
+      const deleted = await tx
+        .delete(personEvents)
+        .where(
+          and(
+            eq(personEvents.id, input.eventId),
+            eq(personEvents.treeId, access.tree.id),
+          ),
+        )
+        .returning({ id: personEvents.id });
+      if (!deleted.length) throw new AppError("That event could not be found.");
+      await logActivity(tx, {
+        treeId: access.tree.id,
+        actor: access.user,
+        action: "event.deleted",
+        entityType: "event",
+        entityId: event.id,
+        personId: event.personId,
+        summary: `Deleted ${label} for ${
+          names.get(event.personId) ?? "someone"
+        }`,
+      });
+    });
     await touchTree(access.tree.id);
     return undefined;
   });
@@ -820,6 +1150,7 @@ export async function deletePersonEvent(input: {
 
 async function touchTree(treeId: string) {
   await db.update(trees).set({ updatedAt: new Date() }).where(eq(trees.id, treeId));
+  notifyTreeChanged(treeId);
 }
 
 async function assertPeopleInTree(treeId: string, personIds: string[]) {

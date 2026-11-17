@@ -8,7 +8,8 @@ export type PresencePeer = {
 export type PresenceServerMessage =
   | { type: "presence"; peers: PresencePeer[] }
   | { type: "hello"; peerId: string }
-  | { type: "pong" };
+  | { type: "pong" }
+  | { type: "tree-changed"; at: string };
 
 export type PresenceClientMessage =
   | { type: "focus"; nodeId: string | null }

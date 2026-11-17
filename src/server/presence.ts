@@ -15,6 +15,41 @@ export type PresenceHub = {
 
 const MAX_NODE_ID_LENGTH = 80;
 
+type TreeChangeListener = (treeId: string) => void;
+
+const globalForPresence = globalThis as unknown as {
+  __familyTreeTreeChangeListeners?: Set<TreeChangeListener>;
+};
+
+function treeChangeListeners() {
+  if (!globalForPresence.__familyTreeTreeChangeListeners) {
+    globalForPresence.__familyTreeTreeChangeListeners = new Set();
+  }
+  return globalForPresence.__familyTreeTreeChangeListeners;
+}
+
+/**
+ * Registered by the Nitro WebSocket route. The global set keeps the bus shared
+ * even if the bundler produces more than one copy of this module.
+ */
+export function subscribeTreeChanges(listener: TreeChangeListener) {
+  const listeners = treeChangeListeners();
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+export function notifyTreeChanged(treeId: string) {
+  for (const listener of treeChangeListeners()) {
+    try {
+      listener(treeId);
+    } catch (error) {
+      console.error("Tree change listener failed", error);
+    }
+  }
+}
+
 export function normalizeNodeId(value: unknown): string | null {
   if (typeof value !== "string" || value.length > MAX_NODE_ID_LENGTH) return null;
   if (isUuid(value)) return value;

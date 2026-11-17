@@ -29,13 +29,15 @@ import {
   storageKeys,
 } from "../server/file-service";
 import { createUploadPost } from "../server/storage";
+import { logActivityBestEffort, peopleNames } from "../server/activity";
+import { notifyTreeChanged } from "../server/presence";
 import {
   QuotaError,
   recordRejection,
   reserveStorage,
   recordUsage,
 } from "../server/usage";
-import type { FuzzyDate } from "../lib/fuzzy-date";
+import { formatFuzzyDate, type FuzzyDate } from "../lib/fuzzy-date";
 
 export type PreparedUpload = {
   fileId: string;
@@ -172,6 +174,18 @@ export async function finalizeUpload(fileId: string): Promise<ActionResult<{ id:
     await requireTreeMember(file.treeId, "editor");
     const updated = await finalizeFile(fileId, user.id);
     if (file.status !== "ready") {
+      const names = await peopleNames(db, updated.treeId, [updated.personId]);
+      await logActivityBestEffort({
+        treeId: updated.treeId,
+        actor: user,
+        action: "file.uploaded",
+        entityType: "file",
+        entityId: updated.id,
+        personId: updated.personId,
+        summary: `Uploaded ${updated.originalName} to ${
+          names.get(updated.personId) ?? "someone"
+        }`,
+      });
       await recordUsage({
         userId: user.id,
         kind: "file_uploaded",
@@ -205,7 +219,19 @@ export async function deleteFile(input: {
     const access = await requireTreeMember(input.treeId, "editor");
     const file = await getFileById(input.fileId);
     if (!file || file.treeId !== access.tree.id) throw new AppError("That file could not be found.");
+    const names = await peopleNames(db, access.tree.id, [file.personId]);
     const usage = await deleteFileRecord(input.fileId, access.user.id);
+    await logActivityBestEffort({
+      treeId: access.tree.id,
+      actor: access.user,
+      action: "file.deleted",
+      entityType: "file",
+      entityId: file.id,
+      personId: file.personId,
+      summary: `Deleted ${file.originalName} from ${
+        names.get(file.personId) ?? "someone"
+      }`,
+    });
     await recordUsage({
       userId: access.user.id,
       kind: "file_deleted",
@@ -240,6 +266,7 @@ export async function createFileGroup(input: {
         createdBy: access.user.id,
       })
       .returning();
+    notifyTreeChanged(access.tree.id);
     return { id: group.id, name: group.name };
   });
 }
@@ -267,6 +294,16 @@ export async function renameFileGroup(input: {
       .update(trees)
       .set({ updatedAt: new Date() })
       .where(eq(trees.id, access.tree.id));
+    notifyTreeChanged(access.tree.id);
+    await logActivityBestEffort({
+      treeId: access.tree.id,
+      actor: access.user,
+      action: "group.renamed",
+      entityType: "file_group",
+      entityId: updated.id,
+      personId: group.personId,
+      summary: `Renamed album ${group.name} to ${updated.name}`,
+    });
     return { id: updated.id, name: updated.name };
   });
 }
@@ -282,6 +319,15 @@ export async function deleteFileGroup(groupId: string): Promise<ActionResult<und
     if (!group) throw new AppError("That album could not be found.");
     const access = await requireTreeMember(group.treeId, "editor");
     const usage = await deleteFileGroupRecord(group.id, access.tree.id);
+    await logActivityBestEffort({
+      treeId: access.tree.id,
+      actor: access.user,
+      action: "group.deleted",
+      entityType: "file_group",
+      entityId: group.id,
+      personId: group.personId,
+      summary: `Deleted album ${group.name}`,
+    });
     await recordUsage({
       userId: access.user.id,
       kind: "file_deleted",
@@ -306,11 +352,24 @@ export async function setAvatar(input: {
       .where(and(eq(people.id, input.personId), eq(people.treeId, access.tree.id)))
       .limit(1);
     if (!personRows.length) throw new AppError("That person could not be found.");
+    const names = await peopleNames(db, access.tree.id, [input.personId]);
     await setAvatarRecord({
       treeId: access.tree.id,
       personId: input.personId,
       fileId: input.fileId,
       userId: access.user.id,
+    });
+    notifyTreeChanged(access.tree.id);
+    await logActivityBestEffort({
+      treeId: access.tree.id,
+      actor: access.user,
+      action: "file.updated",
+      entityType: "file",
+      entityId: input.fileId,
+      personId: input.personId,
+      summary: input.fileId
+        ? `Set a portrait for ${names.get(input.personId) ?? "someone"}`
+        : `Removed the portrait for ${names.get(input.personId) ?? "someone"}`,
     });
     return undefined;
   });
@@ -326,7 +385,11 @@ export async function updateFileTags(input: {
     const parsed = fileTagsSchema.parse(input);
 
     const fileRows = await db
-      .select({ id: files.id, personId: files.personId })
+      .select({
+        id: files.id,
+        personId: files.personId,
+        originalName: files.originalName,
+      })
       .from(files)
       .where(and(eq(files.id, parsed.fileId), eq(files.treeId, access.tree.id)))
       .limit(1);
@@ -381,6 +444,17 @@ export async function updateFileTags(input: {
         .where(eq(trees.id, access.tree.id));
     });
 
+    notifyTreeChanged(access.tree.id);
+    await logActivityBestEffort({
+      treeId: access.tree.id,
+      actor: access.user,
+      action: "file.updated",
+      entityType: "file",
+      entityId: file.id,
+      personId: file.personId,
+      summary: `Updated the people tagged in ${file.originalName}`,
+    });
+
     return desired;
   });
 }
@@ -393,16 +467,33 @@ export async function updateFileTakenAt(input: {
   return runAction("files.updateFileTakenAt", async () => {
     const access = await requireTreeMember(input.treeId, "editor");
     const parsed = fileTakenAtSchema.parse(input);
-    const updated = await db
+    const [file] = await db
+      .select({ id: files.id, personId: files.personId, originalName: files.originalName })
+      .from(files)
+      .where(and(eq(files.id, parsed.fileId), eq(files.treeId, access.tree.id)))
+      .limit(1);
+    if (!file) throw new AppError("That file could not be found.");
+
+    await db
       .update(files)
       .set({ takenAt: parsed.takenAt, updatedAt: new Date() })
-      .where(and(eq(files.id, parsed.fileId), eq(files.treeId, access.tree.id)))
-      .returning({ id: files.id });
-    if (!updated.length) throw new AppError("That file could not be found.");
+      .where(and(eq(files.id, parsed.fileId), eq(files.treeId, access.tree.id)));
     await db
       .update(trees)
       .set({ updatedAt: new Date() })
       .where(eq(trees.id, access.tree.id));
+    notifyTreeChanged(access.tree.id);
+    await logActivityBestEffort({
+      treeId: access.tree.id,
+      actor: access.user,
+      action: "file.updated",
+      entityType: "file",
+      entityId: file.id,
+      personId: file.personId,
+      summary: parsed.takenAt
+        ? `Changed the date taken for ${file.originalName} to ${formatFuzzyDate(parsed.takenAt)}`
+        : `Cleared the date taken for ${file.originalName}`,
+    });
     return undefined;
   });
 }

@@ -25,6 +25,8 @@ import { publicOrigin } from "../server/config";
 import { sendEmail } from "../server/email";
 import { inviteMessage } from "../server/email-templates";
 import { recordUsage } from "../server/usage";
+import { logActivity } from "../server/activity";
+import { notifyTreeChanged } from "../server/presence";
 
 export type TreeSummary = {
   id: string;
@@ -125,10 +127,22 @@ export async function updateTree(input: {
     const access = await requireTreeMember(input.treeId, "owner");
     if (!canManage(access.role)) throw new AppError("Only owners can change tree settings.");
     const parsed = treeSchema.parse(input);
-    await db
+    const [updated] = await db
       .update(trees)
       .set({ name: parsed.name, description: parsed.description, updatedAt: new Date() })
-      .where(eq(trees.id, input.treeId));
+      .where(eq(trees.id, input.treeId))
+      .returning();
+    if (updated) {
+      await logActivity(db, {
+        treeId: access.tree.id,
+        actor: access.user,
+        action: "tree.updated",
+        entityType: "tree",
+        entityId: updated.id,
+        summary: "Updated tree settings",
+      });
+      notifyTreeChanged(access.tree.id);
+    }
     return undefined;
   });
 }
@@ -224,7 +238,7 @@ export async function updateMemberRole(input: {
   role: "owner" | "editor" | "viewer";
 }): Promise<ActionResult<undefined>> {
   return runAction("trees.updateMemberRole", async () => {
-    await requireTreeMember(input.treeId, "owner");
+    const access = await requireTreeMember(input.treeId, "owner");
     const role = treeRoleSchema.parse(input.role);
     await db.transaction(async tx => {
       const owners = await tx
@@ -242,7 +256,21 @@ export async function updateMemberRole(input: {
         )
         .returning({ userId: treeMembers.userId });
       if (!updated.length) throw new AppError("That person is not a member of this tree.");
+      const [target] = await tx
+        .select({ displayName: users.displayName })
+        .from(users)
+        .where(eq(users.id, input.userId))
+        .limit(1);
+      await logActivity(tx, {
+        treeId: access.tree.id,
+        actor: access.user,
+        action: "member.role_changed",
+        entityType: "member",
+        entityId: input.userId,
+        summary: `Changed ${target?.displayName ?? "a member"}'s role to ${role}`,
+      });
     });
+    notifyTreeChanged(input.treeId);
     return undefined;
   });
 }
@@ -252,7 +280,7 @@ export async function removeMember(input: {
   userId: string;
 }): Promise<ActionResult<undefined>> {
   return runAction("trees.removeMember", async () => {
-    await requireTreeMember(input.treeId, "owner");
+    const access = await requireTreeMember(input.treeId, "owner");
     await db.transaction(async tx => {
       const members = await tx
         .select({ userId: treeMembers.userId, role: treeMembers.role })
@@ -263,12 +291,26 @@ export async function removeMember(input: {
       if (target.role === "owner" && members.filter(member => member.role === "owner").length <= 1) {
         throw new AppError("A tree needs at least one owner.");
       }
+      const [targetUser] = await tx
+        .select({ displayName: users.displayName })
+        .from(users)
+        .where(eq(users.id, input.userId))
+        .limit(1);
       await tx
         .delete(treeMembers)
         .where(
           and(eq(treeMembers.treeId, input.treeId), eq(treeMembers.userId, input.userId)),
         );
+      await logActivity(tx, {
+        treeId: access.tree.id,
+        actor: access.user,
+        action: "member.removed",
+        entityType: "member",
+        entityId: input.userId,
+        summary: `Removed ${targetUser?.displayName ?? "a member"} from the tree`,
+      });
     });
+    notifyTreeChanged(input.treeId);
     return undefined;
   });
 }
@@ -287,7 +329,16 @@ export async function leaveTree(treeId: string): Promise<ActionResult<undefined>
       await tx
         .delete(treeMembers)
         .where(and(eq(treeMembers.treeId, treeId), eq(treeMembers.userId, access.user.id)));
+      await logActivity(tx, {
+        treeId,
+        actor: access.user,
+        action: "member.left",
+        entityType: "member",
+        entityId: access.user.id,
+        summary: `${access.user.displayName} left the tree`,
+      });
     });
+    notifyTreeChanged(treeId);
     return undefined;
   });
 }
@@ -375,6 +426,16 @@ async function issueInvite(input: {
         expiresAt,
       })
       .returning();
+    await logActivity(tx, {
+      treeId: input.treeId,
+      actor: { id: input.createdBy, displayName: input.inviterName },
+      action: "invite.created",
+      entityType: "invite",
+      entityId: created.id,
+      summary: input.email
+        ? `Invited ${input.email} as ${input.role}`
+        : `Created an invite link as ${input.role}`,
+    });
     return created;
   });
 
@@ -519,8 +580,8 @@ export async function revokeInvite(input: {
   inviteId: string;
 }): Promise<ActionResult<undefined>> {
   return runAction("trees.revokeInvite", async () => {
-    await requireTreeMember(input.treeId, "owner");
-    const updated = await db
+    const access = await requireTreeMember(input.treeId, "owner");
+    const [updated] = await db
       .update(treeInvites)
       .set({ revokedAt: new Date() })
       .where(
@@ -531,8 +592,18 @@ export async function revokeInvite(input: {
           isNull(treeInvites.acceptedAt),
         ),
       )
-      .returning({ id: treeInvites.id });
-    if (!updated.length) throw new AppError("That invite is no longer active.");
+      .returning({ id: treeInvites.id, email: treeInvites.email });
+    if (!updated) throw new AppError("That invite is no longer active.");
+    await logActivity(db, {
+      treeId: access.tree.id,
+      actor: access.user,
+      action: "invite.revoked",
+      entityType: "invite",
+      entityId: updated.id,
+      summary: updated.email
+        ? `Revoked the invite for ${updated.email}`
+        : "Revoked an invite link",
+    });
     return undefined;
   });
 }
@@ -586,7 +657,7 @@ export async function acceptInvite(token: string): Promise<ActionResult<{ treeId
     if (!token || token.length > 200) throw new AppError("That invite link is not valid.");
     const tokenHash = hashInviteToken(token);
 
-    return db.transaction(async tx => {
+    const result = await db.transaction(async tx => {
       const rows = await tx
         .select()
         .from(treeInvites)
@@ -620,8 +691,21 @@ export async function acceptInvite(token: string): Promise<ActionResult<{ treeId
         .set({ acceptedAt: new Date(), acceptedBy: user.id })
         .where(eq(treeInvites.id, invite.id));
 
+      await logActivity(tx, {
+        treeId: invite.treeId,
+        actor: user,
+        action: "invite.accepted",
+        entityType: "invite",
+        entityId: invite.id,
+        summary: existing.length
+          ? `${user.displayName} accepted an invite`
+          : `${user.displayName} joined the tree`,
+      });
+
       return { treeId: invite.treeId };
     });
+    notifyTreeChanged(result.treeId);
+    return result;
   });
 }
 

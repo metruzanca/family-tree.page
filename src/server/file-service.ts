@@ -10,6 +10,7 @@ import {
   type StoredFile,
 } from "../../drizzle/schema";
 import { AppError } from "./errors";
+import { notifyTreeChanged } from "./presence";
 import {
   deleteKeys,
   getObjectBytes,
@@ -321,4 +322,5 @@ export async function setAvatarRecord(input: {
 
 async function touchTree(treeId: string) {
   await db.update(trees).set({ updatedAt: new Date() }).where(eq(trees.id, treeId));
+  notifyTreeChanged(treeId);
 }

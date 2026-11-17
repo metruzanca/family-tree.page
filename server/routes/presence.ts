@@ -1,7 +1,11 @@
 import { log } from "../../src/server/logger";
 import { defineWebSocketHandler } from "nitro";
 import { authenticatePresence } from "../../src/server/presence-auth";
-import { normalizeNodeId, presenceHub } from "../../src/server/presence";
+import {
+  normalizeNodeId,
+  presenceHub,
+  subscribeTreeChanges,
+} from "../../src/server/presence";
 import { captureServerError } from "../../src/server/sentry";
 import type {
   PresenceServerMessage,
@@ -16,6 +20,7 @@ type PresenceContext = {
 
 const TOPIC = "presence";
 const MAX_MESSAGE_LENGTH = 512;
+const changeSubscriptions = new Map<string, () => void>();
 
 function snapshot(treeId: string): PresenceServerMessage {
   return { type: "presence", peers: presenceHub.peers(treeId) };
@@ -47,6 +52,19 @@ export default defineWebSocketHandler({
     const presence = snapshot(context.treeId);
     peer.send(presence);
     peer.publish(TOPIC, presence);
+
+    const unsubscribe = subscribeTreeChanges(treeId => {
+      if (treeId !== context.treeId) return;
+      try {
+        peer.send({
+          type: "tree-changed",
+          at: new Date().toISOString(),
+        } satisfies PresenceServerMessage);
+      } catch {
+        // The socket is closing; the close handler removes the subscription.
+      }
+    });
+    changeSubscriptions.set(peer.id, unsubscribe);
   },
 
   message(peer, message) {
@@ -79,6 +97,8 @@ export default defineWebSocketHandler({
 
   close(peer) {
     const context = peer.context as PresenceContext;
+    changeSubscriptions.get(peer.id)?.();
+    changeSubscriptions.delete(peer.id);
     presenceHub.leave(context.treeId, peer.id);
     peer.publish(TOPIC, snapshot(context.treeId));
   },

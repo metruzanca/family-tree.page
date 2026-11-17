@@ -7,10 +7,13 @@ import type {
   PresenceStatus,
 } from "./presence-protocol";
 
+export type TreeChange = { at: string; seq: number };
+
 export type TreePresence = {
   peers: () => PresencePeer[];
   status: () => PresenceStatus;
   selfPeerId: () => string | null;
+  change: () => TreeChange | null;
 };
 
 export function isPresencePeer(value: unknown): value is PresencePeer {
@@ -38,9 +41,10 @@ export function createTreePresence(options: {
   const [peers, setPeers] = createSignal<PresencePeer[]>([]);
   const [selfPeerId, setSelfPeerId] = createSignal<string | null>(null);
   const [status, setStatus] = createSignal<PresenceStatus>("connecting");
+  const [change, setChange] = createSignal<TreeChange | null>(null);
 
   if (typeof window === "undefined" || typeof WebSocket === "undefined") {
-    return { peers, status, selfPeerId };
+    return { peers, status, selfPeerId, change };
   }
 
   const endpoint = new URL("/presence", window.location.href);
@@ -79,6 +83,13 @@ export function createTreePresence(options: {
     }
     if (message.type === "presence" && Array.isArray(message.peers)) {
       setPeers(message.peers.filter(isPresencePeer));
+      return;
+    }
+    if (message.type === "tree-changed") {
+      setChange({
+        at: typeof message.at === "string" ? message.at : new Date().toISOString(),
+        seq: (change()?.seq ?? 0) + 1,
+      });
     }
   });
 
@@ -86,5 +97,5 @@ export function createTreePresence(options: {
     sendFocus(options.nodeId());
   });
 
-  return { peers, status, selfPeerId };
+  return { peers, status, selfPeerId, change };
 }

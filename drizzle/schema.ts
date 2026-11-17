@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import type { FuzzyDate } from "../src/lib/fuzzy-date";
+import type { ActivityChange } from "../src/lib/activity";
 import {
   bigint,
   boolean,
@@ -428,6 +429,34 @@ export const fileTags = pgTable(
 );
 
 /**
+ * Human-readable history of tree changes. Actor names are snapshotted so the
+ * history survives an account deletion, and entity ids are intentionally not
+ * foreign keys so a deleted person still keeps their timeline entry.
+ */
+export const treeActivity = pgTable(
+  "tree_activity",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    treeId: uuid("tree_id")
+      .notNull()
+      .references(() => trees.id, { onDelete: "cascade" }),
+    actorUserId: uuid("actor_user_id").references(() => users.id, { onDelete: "set null" }),
+    actorName: text("actor_name").notNull(),
+    action: text("action").notNull(),
+    entityType: text("entity_type").notNull(),
+    entityId: uuid("entity_id"),
+    personId: uuid("person_id"),
+    summary: text("summary").notNull(),
+    changes: jsonb("changes").$type<ActivityChange[]>(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  t => [
+    index("tree_activity_tree_created_idx").on(t.treeId, t.createdAt),
+    index("tree_activity_tree_person_created_idx").on(t.treeId, t.personId, t.createdAt),
+  ],
+);
+
+/**
  * Append-only counters used for quotas and abuse detection.
  *
  * The table deliberately holds no file names, no email addresses, and no
@@ -475,3 +504,4 @@ export type FileGroup = typeof fileGroups.$inferSelect;
 export type StoredFile = typeof files.$inferSelect;
 export type FileTag = typeof fileTags.$inferSelect;
 export type UsageEvent = typeof usageEvents.$inferSelect;
+export type TreeActivity = typeof treeActivity.$inferSelect;

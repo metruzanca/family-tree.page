@@ -3,7 +3,9 @@ import { createStore } from "solid-js/store";
 import { revalidate } from "@solidjs/router";
 import { ArrowDown, ArrowUp, Heart, Search } from "lucide-solid";
 import type { GraphPerson, GraphRelationship } from "~/api/people-server";
-import { addRelative } from "~/api/people-server";
+import { addRelative, findPossibleDuplicates } from "~/api/people-server";
+import type { DuplicateCandidate } from "~/lib/duplicates";
+import { DuplicateWarning } from "./DuplicateWarning";
 import { getMyTrees, getTreeGraph, getTreeOverview } from "~/api";
 import { Avatar } from "../ui/Avatar";
 import { Button } from "../ui/button";
@@ -62,6 +64,8 @@ export function AddRelativeDialog(props: {
   const [status, setStatus] = createSignal("partnered");
   const [pending, setPending] = createSignal(false);
   const [error, setError] = createSignal("");
+  const [duplicates, setDuplicates] = createSignal<DuplicateCandidate[]>([]);
+  const [allowDuplicate, setAllowDuplicate] = createSignal(false);
   const [form, setForm] = createStore({
     firstName: "",
     lastName: "",
@@ -126,6 +130,8 @@ export function AddRelativeDialog(props: {
         setSelectedId(null);
         setOtherParentId("none");
         setError("");
+        setDuplicates([]);
+        setAllowDuplicate(false);
         setMode("existing");
         setRelation(parentDisabled() ? "child" : "parent");
         setForm({ firstName: "", lastName: "", nickname: "", birthDate: null, deathDate: null });
@@ -137,6 +143,8 @@ export function AddRelativeDialog(props: {
     setSearch("");
     setSelectedId(null);
     setError("");
+    setDuplicates([]);
+    setAllowDuplicate(false);
     setForm({ firstName: "", lastName: "", nickname: "", birthDate: null, deathDate: null });
     requestAnimationFrame(() => {
       const target =
@@ -149,14 +157,40 @@ export function AddRelativeDialog(props: {
 
   async function submit(event: SubmitEvent) {
     event.preventDefault();
+    await save(
+      (event.submitter as HTMLButtonElement | null)?.dataset.keepOpen === "true",
+    );
+  }
+
+  async function save(keepOpen: boolean) {
     const anchor = props.anchor;
     if (!anchor || pending()) return;
-    const shouldKeepOpen =
-      (event.submitter as HTMLButtonElement | null)?.dataset.keepOpen === "true";
     if (mode() === "existing" && !selectedId()) {
       setError("Choose an existing person, or switch to New person.");
       return;
     }
+
+    if (mode() === "new" && !allowDuplicate()) {
+      setPending(true);
+      const check = await findPossibleDuplicates({
+        treeId: props.treeId,
+        firstName: form.firstName,
+        lastName: form.lastName,
+        nickname: form.nickname,
+        birthDate: form.birthDate,
+        deathDate: form.deathDate,
+      });
+      setPending(false);
+      if (!check.ok) {
+        setError(check.error);
+        return;
+      }
+      if (check.data.length) {
+        setDuplicates(check.data);
+        return;
+      }
+    }
+
     setPending(true);
     setError("");
     const result = await attemptAction(() =>
@@ -190,6 +224,7 @@ export function AddRelativeDialog(props: {
           | "separated"
           | "widowed"
           | "unknown",
+        allowDuplicate: allowDuplicate(),
       }),
     );
     setPending(false);
@@ -203,7 +238,7 @@ export function AddRelativeDialog(props: {
       mode() === "new" ? "Person added and connected." : "People connected.",
       "success",
     );
-    if (shouldKeepOpen) {
+    if (keepOpen) {
       resetForNext();
       return;
     }
@@ -443,6 +478,24 @@ export function AddRelativeDialog(props: {
           </div>
         </Show>
 
+        <Show when={duplicates().length}>
+          <DuplicateWarning
+            candidates={duplicates()}
+            pending={pending()}
+            onCancel={() => setDuplicates([])}
+            onUseExisting={candidate => {
+              setDuplicates([]);
+              setMode("existing");
+              setSelectedId(candidate.id);
+              setSearch(candidate.displayName);
+            }}
+            onCreateAnyway={() => {
+              setAllowDuplicate(true);
+              setDuplicates([]);
+              void save(false);
+            }}
+          />
+        </Show>
         <Show when={error()}>
           <p class="rounded-xl border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
             {error()}

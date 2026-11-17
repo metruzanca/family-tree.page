@@ -2,8 +2,14 @@ import { Show, createEffect, createSignal } from "solid-js";
 import { createStore } from "solid-js/store";
 import { revalidate } from "@solidjs/router";
 import type { GraphPerson } from "~/api/people-server";
-import { createPerson, updatePerson } from "~/api/people-server";
+import {
+  createPerson,
+  findPossibleDuplicates,
+  updatePerson,
+} from "~/api/people-server";
 import { getMyTrees, getTreeGraph, getTreeOverview } from "~/api";
+import type { DuplicateCandidate } from "~/lib/duplicates";
+import { DuplicateWarning } from "./DuplicateWarning";
 import { Button } from "../ui/button";
 import { Field } from "../ui/Field";
 import { Modal } from "../ui/Modal";
@@ -48,6 +54,8 @@ export function PersonFormDialog(props: {
   const [form, setForm] = createStore<PersonFormState>({ ...emptyForm });
   const [error, setError] = createSignal("");
   const [pending, setPending] = createSignal(false);
+  const [duplicates, setDuplicates] = createSignal<DuplicateCandidate[]>([]);
+  const [allowDuplicate, setAllowDuplicate] = createSignal(false);
 
   createEffect(() => {
     if (!props.open) return;
@@ -68,13 +76,17 @@ export function PersonFormDialog(props: {
         : { ...emptyForm },
     );
     setError("");
+    setDuplicates([]);
+    setAllowDuplicate(false);
   });
 
   async function submit(event: SubmitEvent) {
     event.preventDefault();
+    await save();
+  }
+
+  async function save() {
     if (pending()) return;
-    setPending(true);
-    setError("");
     const payload = {
       firstName: form.firstName,
       lastName: form.lastName,
@@ -86,10 +98,30 @@ export function PersonFormDialog(props: {
       deathPlace: form.deathPlace,
       bio: form.bio,
     };
+
+    if (!props.person && !allowDuplicate()) {
+      setPending(true);
+      const check = await findPossibleDuplicates({
+        treeId: props.treeId,
+        ...payload,
+      });
+      setPending(false);
+      if (!check.ok) {
+        setError(check.error);
+        return;
+      }
+      if (check.data.length) {
+        setDuplicates(check.data);
+        return;
+      }
+    }
+
+    setPending(true);
+    setError("");
     const result = await attemptAction(() =>
       props.person
         ? updatePerson({ treeId: props.treeId, personId: props.person.id, ...payload })
-        : createPerson({ treeId: props.treeId, ...payload }),
+        : createPerson({ treeId: props.treeId, ...payload, allowDuplicate: allowDuplicate() }),
     );
     setPending(false);
     if (!result.ok) {
@@ -212,6 +244,18 @@ export function PersonFormDialog(props: {
             maxlength={4000}
           />
         </Field>
+        <Show when={duplicates().length}>
+          <DuplicateWarning
+            candidates={duplicates()}
+            pending={pending()}
+            onCancel={() => setDuplicates([])}
+            onCreateAnyway={() => {
+              setAllowDuplicate(true);
+              setDuplicates([]);
+              void save();
+            }}
+          />
+        </Show>
         <Show when={error()}>
           <p class="rounded-xl border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
             {error()}

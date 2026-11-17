@@ -5,6 +5,11 @@ import {
   analyzeRelationships,
   type AnalyzedRelationship,
 } from "../src/lib/relationships";
+import {
+  findDuplicateCandidates,
+  type DuplicatePerson,
+} from "../src/lib/duplicates";
+import type { FuzzyDate } from "../src/lib/fuzzy-date";
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
@@ -15,8 +20,17 @@ if (!connectionString) {
 const pool = new Pool({ connectionString, max: 1 });
 try {
   const [personRows, parentRows, partnerRows] = await Promise.all([
-    pool.query<{ id: string; display_name: string }>(
-      "select id, trim(first_name || ' ' || coalesce(last_name, '')) as display_name from people",
+    pool.query<{
+      id: string;
+      display_name: string;
+      first_name: string;
+      last_name: string;
+      maiden_name: string | null;
+      nickname: string | null;
+      birth_date: FuzzyDate | null;
+      death_date: FuzzyDate | null;
+    }>(
+      "select id, trim(first_name || ' ' || coalesce(last_name, '')) as display_name, first_name, last_name, maiden_name, nickname, birth_date, death_date from people",
     ),
     pool.query<{ id: string; parent_id: string; child_id: string }>(
       "select id, parent_id, child_id from parent_child",
@@ -27,6 +41,39 @@ try {
   ]);
 
   const names = new Map(personRows.rows.map(row => [row.id, row.display_name]));
+
+  const duplicatePeople: DuplicatePerson[] = personRows.rows.map(row => ({
+    id: row.id,
+    displayName: row.display_name || "Unnamed person",
+    firstName: row.first_name,
+    lastName: row.last_name,
+    maidenName: row.maiden_name,
+    nickname: row.nickname,
+    birthDate: row.birth_date,
+    deathDate: row.death_date,
+  }));
+  const seenPairs = new Set<string>();
+  let duplicateCount = 0;
+  for (const person of duplicatePeople) {
+    const matches = findDuplicateCandidates(person, duplicatePeople, {
+      excludePersonId: person.id,
+      limit: 3,
+    });
+    for (const match of matches) {
+      const pair = [person.id, match.id].sort().join(":");
+      if (seenPairs.has(pair)) continue;
+      seenPairs.add(pair);
+      duplicateCount += 1;
+      console.log(
+        `Possible duplicate: ${person.displayName} and ${match.displayName} (${match.reasons.join(", ")})`,
+      );
+    }
+  }
+  if (duplicateCount) {
+    console.log(
+      `Possible duplicates: ${duplicateCount}. Review these before merging anyone in the app.`,
+    );
+  }
   const relationships: AnalyzedRelationship[] = [
     ...parentRows.rows.map(row => ({
       id: row.id,

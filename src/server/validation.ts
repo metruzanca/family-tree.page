@@ -263,6 +263,7 @@ export const addRelativeSchema = z.discriminatedUnion("mode", [
     otherParentId: z.string().uuid().optional(),
     parentType: parentTypeSchema.default("biological"),
     status: partnershipStatusSchema.default("partnered"),
+    allowDuplicate: z.boolean().optional(),
   }),
   z.object({
     mode: z.literal("new"),
@@ -273,6 +274,7 @@ export const addRelativeSchema = z.discriminatedUnion("mode", [
     person: personUpdateSchema,
     parentType: parentTypeSchema.default("biological"),
     status: partnershipStatusSchema.default("partnered"),
+    allowDuplicate: z.boolean().optional(),
   }),
 ]);
 

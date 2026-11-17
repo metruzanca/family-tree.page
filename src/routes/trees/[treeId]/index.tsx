@@ -5,6 +5,7 @@ import {
   createEffect,
   createMemo,
   createSignal,
+  on,
   onCleanup,
   onMount,
 } from "solid-js";
@@ -309,6 +310,76 @@ function TreePageInner() {
   const presence = createTreePresence({
     treeId: params.treeId,
     nodeId: () => selectedNodeId(),
+  });
+
+  const [pendingRefresh, setPendingRefresh] = createSignal(false);
+  let refreshTimer: ReturnType<typeof setTimeout> | undefined;
+
+  const dialogOpen = () =>
+    addPersonOpen() ||
+    editPersonOpen() ||
+    addRelativeOpen() ||
+    eventDialogOpen() ||
+    focusPersonOpen() ||
+    deletePersonOpen() ||
+    deleteFileTarget() !== null ||
+    deleteGroupTarget() !== null ||
+    deleteEventTarget() !== null;
+
+  function refreshFromRemote() {
+    if (dialogOpen()) {
+      if (!pendingRefresh()) {
+        toast.show(
+          "Another member changed this tree. It will refresh when you close this dialog.",
+          "info",
+        );
+      }
+      setPendingRefresh(true);
+      return;
+    }
+    if (refreshTimer) clearTimeout(refreshTimer);
+    refreshTimer = setTimeout(() => {
+      void revalidate([getTreeGraph.key, getTreeOverview.key]);
+    }, 300);
+  }
+
+  createEffect(
+    on(presence.change, () => refreshFromRemote(), { defer: true }),
+  );
+  createEffect(
+    on(
+      presence.status,
+      (status, previous) => {
+        if (status === "online" && previous === "offline") refreshFromRemote();
+      },
+      { defer: true },
+    ),
+  );
+  createEffect(
+    on(
+      dialogOpen,
+      open => {
+        if (!open && pendingRefresh()) {
+          setPendingRefresh(false);
+          refreshFromRemote();
+        }
+      },
+      { defer: true },
+    ),
+  );
+
+  onMount(() => {
+    const refreshOnFocus = () => refreshFromRemote();
+    const refreshOnVisible = () => {
+      if (document.visibilityState === "visible") refreshFromRemote();
+    };
+    window.addEventListener("focus", refreshOnFocus);
+    document.addEventListener("visibilitychange", refreshOnVisible);
+    onCleanup(() => {
+      window.removeEventListener("focus", refreshOnFocus);
+      document.removeEventListener("visibilitychange", refreshOnVisible);
+      if (refreshTimer) clearTimeout(refreshTimer);
+    });
   });
 
   function nodeLabel(nodeId: string | null) {

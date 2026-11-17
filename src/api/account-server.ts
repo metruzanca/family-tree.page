@@ -2,7 +2,13 @@
 
 import { and, desc, eq, gt, inArray, isNull } from "drizzle-orm";
 import { db } from "../server/db";
-import { authTokens, treeMembers, trees, users } from "../../drizzle/schema";
+import {
+  authTokens,
+  treeActivity,
+  treeMembers,
+  trees,
+  users,
+} from "../../drizzle/schema";
 import {
   checkRateLimit,
   endSession,
@@ -295,6 +301,10 @@ export async function deleteAccount(input: {
     }
 
     await db.transaction(async tx => {
+      await tx
+        .update(treeActivity)
+        .set({ actorUserId: null, actorName: "Former member" })
+        .where(eq(treeActivity.actorUserId, user.id));
       if (treesToDelete.length) {
         await tx.delete(trees).where(inArray(trees.id, treesToDelete));
       }

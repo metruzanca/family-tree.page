@@ -4,6 +4,7 @@ import {
   ArrowDownUp,
   ArrowLeft,
   CalendarDays,
+  History,
   Image as ImageIcon,
   ImageOff,
   Maximize2,
@@ -150,6 +151,9 @@ export function GraphToolbar(props: ToolbarProps) {
             <ToolButton label="Fit tree" shortcut="F" onClick={props.onFit}>
               <Maximize2 size={17} />
             </ToolButton>
+            <ToolButton label="Activity" href={`/trees/${props.treeId}/activity`}>
+              <History size={17} />
+            </ToolButton>
             <ToolButton label="Calendar" href={`/trees/${props.treeId}/calendar`}>
               <CalendarDays size={17} />
             </ToolButton>
@@ -200,6 +204,14 @@ export function GraphToolbar(props: ToolbarProps) {
                 <Maximize2 />
               </GlassItem>
               <DropdownMenuSeparator class="my-1 bg-white/10" />
+              <DropdownMenuItem
+                as={A}
+                href={`/trees/${props.treeId}/activity`}
+                class="gap-2 rounded-xl px-3 py-2 text-white/80 data-[highlighted]:bg-white/10 data-[highlighted]:text-white"
+              >
+                <History />
+                Activity
+              </DropdownMenuItem>
               <DropdownMenuItem
                 as={A}
                 href={`/trees/${props.treeId}/calendar`}

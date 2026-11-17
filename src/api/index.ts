@@ -18,6 +18,7 @@ import {
   getTreeOverview as getTreeOverviewFn,
 } from "./trees-server";
 import { getTreeGraph as getTreeGraphFn } from "./people-server";
+import { getTreeActivity as getTreeActivityFn } from "./activity-server";
 import { getCalendarFeed as getCalendarFeedFn } from "./calendar-server";
 import {
   getEmailChangePreview as getEmailChangePreviewFn,
@@ -33,6 +34,7 @@ export const getTreeMembers = query(getTreeMembersFn, "tree-members");
 export const getTreeInvites = query(getTreeInvitesFn, "tree-invites");
 export const getInvitePreview = query(getInvitePreviewFn, "invite-preview");
 export const getTreeGraph = query(getTreeGraphFn, "tree-graph");
+export const getTreeActivity = query(getTreeActivityFn, "tree-activity");
 export const getCalendarFeed = query(getCalendarFeedFn, "calendar-feed");
 export const verifyEmail = query(verifyEmailFn, "verify-email");
 export const getPasswordResetPreview = query(getPasswordResetPreviewFn, "password-reset-preview");
