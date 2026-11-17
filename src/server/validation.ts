@@ -141,6 +141,20 @@ export const inviteSchema = z.object({
 
 export const inviteEmailSchema = emailSchema;
 
+export const shareLinkSchema = z.object({
+  treeId: z.string().uuid(),
+  label: z
+    .string()
+    .trim()
+    .max(80, "That label is too long.")
+    .optional()
+    .nullable()
+    .transform(value => value || "Shared tree"),
+  livingVisibility: z.enum(["hidden", "name", "full"]).default("name"),
+  includeMedia: z.boolean().default(false),
+  expiresInDays: z.number().int().min(1).max(365).nullable().optional(),
+});
+
 export const forgotPasswordSchema = z.object({
   email: emailSchema,
 });

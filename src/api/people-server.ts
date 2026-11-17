@@ -172,8 +172,14 @@ export async function findPossibleDuplicates(input: {
   });
 }
 
-export async function getTreeGraph(treeId: string): Promise<TreeGraph> {
-  const access = await requireTreeMember(treeId);
+export type TreeGraphData = Omit<TreeGraph, "role" | "viewerPersonId">;
+
+export async function loadTreeGraph(tree: {
+  id: string;
+  name: string;
+  description: string | null;
+}): Promise<TreeGraphData> {
+  const treeId = tree.id;
   const [peopleRows, parentRows, partnerRows, fileRows, groupRows, tagRows, eventRows] =
     await Promise.all([
       db.select().from(people).where(eq(people.treeId, treeId)),
@@ -225,12 +231,10 @@ export async function getTreeGraph(treeId: string): Promise<TreeGraph> {
 
   return {
     tree: {
-      id: access.tree.id,
-      name: access.tree.name,
-      description: access.tree.description,
+      id: tree.id,
+      name: tree.name,
+      description: tree.description,
     },
-    role: access.role,
-    viewerPersonId: access.personId,
     people: peopleRows.map(person => ({
       id: person.id,
       firstName: person.firstName,
@@ -275,6 +279,16 @@ export async function getTreeGraph(treeId: string): Promise<TreeGraph> {
       description: event.description,
       createdAt: event.createdAt,
     })),
+  };
+}
+
+export async function getTreeGraph(treeId: string): Promise<TreeGraph> {
+  const access = await requireTreeMember(treeId);
+  const graph = await loadTreeGraph(access.tree);
+  return {
+    ...graph,
+    role: access.role,
+    viewerPersonId: access.personId,
   };
 }
 

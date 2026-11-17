@@ -38,6 +38,11 @@ export const partnershipStatus = pgEnum("partnership_status", [
 ]);
 export const fileKind = pgEnum("file_kind", ["image", "document", "other"]);
 export const fileStatus = pgEnum("file_status", ["uploading", "ready", "failed"]);
+export const shareLivingVisibility = pgEnum("share_living_visibility", [
+  "hidden",
+  "name",
+  "full",
+]);
 export const personEventKind = pgEnum("person_event_kind", [
   "residence",
   "occupation",
@@ -429,6 +434,33 @@ export const fileTags = pgTable(
 );
 
 /**
+ * Read-only links to a tree. Tokens are stored hashed so a database leak does
+ * not expose working URLs. Living people are hidden or reduced to names unless
+ * the owner explicitly opts into full details.
+ */
+export const treeShareLinks = pgTable(
+  "tree_share_links",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    treeId: uuid("tree_id")
+      .notNull()
+      .references(() => trees.id, { onDelete: "cascade" }),
+    tokenHash: text("token_hash").notNull().unique(),
+    label: text("label").notNull().default("Shared tree"),
+    livingVisibility: shareLivingVisibility("living_visibility")
+      .notNull()
+      .default("name"),
+    includeMedia: boolean("include_media").notNull().default(false),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    lastAccessedAt: timestamp("last_accessed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  t => [index("tree_share_links_tree_idx").on(t.treeId)],
+);
+
+/**
  * Human-readable history of tree changes. Actor names are snapshotted so the
  * history survives an account deletion, and entity ids are intentionally not
  * foreign keys so a deleted person still keeps their timeline entry.
@@ -505,3 +537,4 @@ export type StoredFile = typeof files.$inferSelect;
 export type FileTag = typeof fileTags.$inferSelect;
 export type UsageEvent = typeof usageEvents.$inferSelect;
 export type TreeActivity = typeof treeActivity.$inferSelect;
+export type TreeShareLink = typeof treeShareLinks.$inferSelect;
