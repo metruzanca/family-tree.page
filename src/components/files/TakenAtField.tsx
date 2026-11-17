@@ -47,6 +47,7 @@ export function TakenAtField(props: TakenAtFieldProps) {
           type="button"
           class="inline-flex items-center gap-1.5 rounded-lg px-1.5 py-1 text-xs text-left transition hover:bg-primary/5"
           disabled={props.pending}
+          data-testid="file-taken-at-edit"
           onClick={startEditing}
         >
           <CalendarDays size={12} class="text-muted-foreground" />
@@ -61,6 +62,7 @@ export function TakenAtField(props: TakenAtFieldProps) {
             aria-label="Clear date taken"
             title="Clear date taken"
             disabled={props.pending}
+            data-testid="file-taken-at-clear"
             onClick={() => props.onChange(null)}
           >
             <X size={12} />
@@ -78,17 +80,23 @@ export function TakenAtField(props: TakenAtFieldProps) {
         onClose={() => setOpen(false)}
         title="Date taken"
         description="Use a full date, a year or month, or an approximate range."
+        testId="file-taken-at-dialog"
         footer={
           <>
             <Show when={draft()}>
-              <Button variant="ghost" type="button" onClick={clear}>
+              <Button variant="ghost" type="button" onClick={clear} data-testid="file-taken-at-clear-draft">
                 Clear
               </Button>
             </Show>
-            <Button variant="ghost" type="button" onClick={() => setOpen(false)}>
+            <Button
+              variant="ghost"
+              type="button"
+              onClick={() => setOpen(false)}
+              data-testid="file-taken-at-cancel"
+            >
               Cancel
             </Button>
-            <Button type="button" onClick={save}>
+            <Button type="button" onClick={save} data-testid="file-taken-at-save">
               Save date
             </Button>
           </>

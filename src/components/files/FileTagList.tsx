@@ -20,7 +20,7 @@ export function FileTagList(props: FileTagListProps) {
       .filter((person): person is GraphPerson => Boolean(person));
 
   return (
-    <section>
+    <section data-testid="file-tags">
       <div class="flex items-center justify-between gap-2">
         <h3 class="field-label">People in this photo</h3>
         <Show when={props.editable}>
@@ -30,6 +30,7 @@ export function FileTagList(props: FileTagListProps) {
             type="button"
             class="h-6 px-1.5 text-[0.7rem] text-muted-foreground hover:text-foreground"
             disabled={props.pending}
+            data-testid="file-tags-edit"
             onClick={props.onEdit}
           >
             <Tag size={12} />
@@ -40,7 +41,7 @@ export function FileTagList(props: FileTagListProps) {
       <Show
         when={tagged().length}
         fallback={
-          <p class="mt-1.5 text-xs text-muted-foreground">
+          <p class="mt-1.5 text-xs text-muted-foreground" data-testid="file-tags-empty">
             {props.editable
               ? "Nobody else is tagged in this photo yet."
               : "Nobody else is tagged in this photo."}
@@ -50,7 +51,10 @@ export function FileTagList(props: FileTagListProps) {
         <ul class="mt-2 flex flex-wrap gap-1.5">
           <For each={tagged()}>
             {person => (
-              <li class="inline-flex items-center gap-1 rounded-full border border-border bg-background py-0.5 pl-0.5 pr-1.5">
+              <li
+                class="inline-flex items-center gap-1 rounded-full border border-border bg-background py-0.5 pl-0.5 pr-1.5"
+                data-testid={`file-tag-${person.id}`}
+              >
                 <Avatar name={person.displayName} fileId={person.avatarFileId} size={22} />
                 <span class="max-w-32 truncate text-xs font-medium">{person.displayName}</span>
                 <Show when={props.editable}>
@@ -60,6 +64,7 @@ export function FileTagList(props: FileTagListProps) {
                     aria-label={`Remove ${person.displayName} from this photo`}
                     title={`Remove ${person.displayName}`}
                     disabled={props.pending}
+                    data-testid={`file-tag-remove-${person.id}`}
                     onClick={() => props.onRemove(person.id)}
                   >
                     <X size={11} />

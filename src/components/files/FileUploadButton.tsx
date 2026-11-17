@@ -6,6 +6,7 @@ export function FileUploadButton(props: {
   accept?: string;
   disabled?: boolean;
   class?: string;
+  testId?: string;
   children: JSX.Element;
 }) {
   let input!: HTMLInputElement;
@@ -16,6 +17,7 @@ export function FileUploadButton(props: {
         type="button"
         class={props.class}
         disabled={props.disabled}
+        data-testid={props.testId}
         onClick={() => input.click()}
       >
         {props.children}

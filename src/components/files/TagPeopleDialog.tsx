@@ -60,6 +60,7 @@ export function TagPeopleDialog(props: TagPeopleDialogProps) {
       open={props.open}
       onClose={props.onClose}
       title="People in this photo"
+      testId="tag-people-dialog"
       description={
         props.primaryPerson
           ? `Filed under ${props.primaryPerson.displayName}. Tag everyone else who appears here.`
@@ -71,13 +72,20 @@ export function TagPeopleDialog(props: TagPeopleDialogProps) {
             {selected().length} tagged
           </span>
           <div class="flex gap-2">
-            <Button variant="ghost" size="sm" type="button" onClick={props.onClose}>
+            <Button
+              variant="ghost"
+              size="sm"
+              type="button"
+              onClick={props.onClose}
+              data-testid="tag-people-cancel"
+            >
               Cancel
             </Button>
             <Button
               size="sm"
               type="button"
               disabled={props.pending}
+              data-testid="tag-people-save"
               onClick={() => props.onSave(selected())}
             >
               <Tag size={14} />
@@ -101,13 +109,17 @@ export function TagPeopleDialog(props: TagPeopleDialogProps) {
             autofocus
             onInput={event => setQuery(event.currentTarget.value)}
             aria-label="Search people"
+            data-testid="tag-people-search"
           />
         </div>
 
         <Show
           when={candidates().length}
           fallback={
-            <p class="rounded-xl border border-dashed border-border px-3 py-8 text-center text-xs leading-relaxed text-muted-foreground">
+            <p
+              class="rounded-xl border border-dashed border-border px-3 py-8 text-center text-xs leading-relaxed text-muted-foreground"
+              data-testid="tag-people-empty"
+            >
               <Show
                 when={props.people.length > 1}
                 fallback="There is nobody else in this tree to tag yet."
@@ -129,6 +141,7 @@ export function TagPeopleDialog(props: TagPeopleDialogProps) {
                         isSelected() ? "bg-primary/10" : "hover:bg-primary/5"
                       }`}
                       aria-pressed={isSelected()}
+                      data-testid={`tag-people-person-${person.id}`}
                       onClick={() => toggle(person.id)}
                     >
                       <Avatar
@@ -175,6 +188,7 @@ export function TagPeopleDialog(props: TagPeopleDialogProps) {
                       type="button"
                       class="rounded-full p-0.5 text-muted-foreground hover:text-destructive"
                       aria-label={`Untag ${person()?.displayName ?? "person"}`}
+                      data-testid={`tag-people-untag-${personId}`}
                       onClick={() => toggle(personId)}
                     >
                       <X size={11} />

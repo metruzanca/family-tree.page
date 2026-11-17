@@ -40,15 +40,23 @@ export function FilePanel(props: FilePanelProps) {
   const isImage = () => props.file.kind === "image";
 
   return (
-    <aside class="mobile-sheet absolute inset-x-0 bottom-0 z-30 flex flex-col sm:inset-x-auto sm:bottom-4 sm:right-4 sm:top-20 sm:max-h-none sm:w-[24rem] sm:rounded-3xl sm:border sm:pb-0">
+    <aside
+      class="mobile-sheet absolute inset-x-0 bottom-0 z-30 flex flex-col sm:inset-x-auto sm:bottom-4 sm:right-4 sm:top-20 sm:max-h-none sm:w-[24rem] sm:rounded-3xl sm:border sm:pb-0"
+      data-testid="file-panel"
+    >
       <div class="flex items-center justify-between px-4 pb-1 pt-2 sm:hidden">
         <span class="mx-auto h-1 w-10 rounded-full bg-border" />
-        <IconButton label="Close" onClick={props.onClose} class="!absolute right-2 top-2">
+        <IconButton
+          label="Close"
+          onClick={props.onClose}
+          class="!absolute right-2 top-2"
+          data-testid="file-panel-close-mobile"
+        >
           <X size={17} />
         </IconButton>
       </div>
 
-      <div class="flex items-start gap-3 px-5 pb-4 pt-2 sm:pt-5">
+      <div class="flex items-start gap-3 px-5 pb-4 pt-2 sm:pt-5" data-testid="file-panel-header">
         <div class="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-2xl border border-border bg-background text-muted-foreground">
           <Show
             when={isImage() && props.file.thumbUrl}
@@ -85,7 +93,7 @@ export function FilePanel(props: FilePanelProps) {
           </div>
         </div>
         <div class="hidden sm:block">
-          <IconButton label="Close" onClick={props.onClose}>
+          <IconButton label="Close" onClick={props.onClose} data-testid="file-panel-close">
             <X size={17} />
           </IconButton>
         </div>
@@ -93,7 +101,12 @@ export function FilePanel(props: FilePanelProps) {
 
       <div class="flex flex-wrap items-center gap-2 border-y border-border px-5 py-2.5">
         <Show when={isImage()}>
-          <Button size="sm" variant="secondary" onClick={props.onPreview}>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={props.onPreview}
+            data-testid="file-panel-preview"
+          >
             View full size
           </Button>
         </Show>
@@ -101,6 +114,7 @@ export function FilePanel(props: FilePanelProps) {
           href={`/api/files/${props.file.id}/download`}
           class={buttonVariants({ variant: "secondary", size: "sm" })}
           download={props.file.name}
+          data-testid="file-panel-download"
         >
           <Download size={14} />
           Download
@@ -110,20 +124,26 @@ export function FilePanel(props: FilePanelProps) {
             size="sm"
             variant="secondary"
             onClick={() => props.onSetAvatar(props.file.isAvatar ? null : props.file.id)}
+            data-testid="file-panel-portrait"
           >
             <UserRound size={14} />
             {props.file.isAvatar ? "Remove portrait" : "Use as portrait"}
           </Button>
         </Show>
         <Show when={editable()}>
-          <IconButton label="Delete file" class="ml-auto text-destructive" onClick={props.onDelete}>
+          <IconButton
+            label="Delete file"
+            class="ml-auto text-destructive"
+            onClick={props.onDelete}
+            data-testid="file-panel-delete"
+          >
             <Trash2 size={16} />
           </IconButton>
         </Show>
       </div>
 
       <div class="scroll-thin min-h-0 flex-1 overflow-y-auto px-5 py-4">
-        <section>
+        <section data-testid="file-panel-details">
           <h3 class="field-label">Details</h3>
           <dl class="mt-2 grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
             <div>
@@ -162,7 +182,7 @@ export function FilePanel(props: FilePanelProps) {
           </dl>
         </section>
 
-        <section class="mt-6">
+        <section class="mt-6" data-testid="file-panel-attached">
           <h3 class="field-label">Attached to</h3>
           <Show
             when={props.person}
@@ -172,6 +192,7 @@ export function FilePanel(props: FilePanelProps) {
               <button
                 type="button"
                 class="mt-1.5 flex w-full items-center gap-2.5 rounded-xl px-1 py-1 text-left hover:bg-primary/5"
+                data-testid={`file-panel-person-${person().id}`}
                 onClick={() => props.onSelectPerson(person().id)}
               >
                 <Avatar

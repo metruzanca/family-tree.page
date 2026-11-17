@@ -113,12 +113,16 @@ export function MediaLightbox(props: MediaLightboxProps) {
 
   return (
     <Portal>
-      <div class="fixed inset-0 z-[60] flex flex-col bg-[#080a07] text-white sm:flex-row">
+      <div
+        class="fixed inset-0 z-[60] flex flex-col bg-[#080a07] text-white sm:flex-row"
+        data-testid="media-lightbox"
+      >
         <div class="relative flex min-h-0 flex-1 flex-col">
           <button
             type="button"
             class="absolute right-4 top-4 z-20 grid h-10 w-10 place-items-center rounded-full bg-black/50 text-white/80 transition hover:bg-black/75 hover:text-white"
             aria-label="Close lightbox"
+            data-testid="media-lightbox-close"
             onClick={props.onClose}
           >
             <X size={19} />
@@ -144,6 +148,7 @@ export function MediaLightbox(props: MediaLightboxProps) {
                         href={`/api/files/${file().id}/download`}
                         class={buttonVariants({ variant: "secondary", size: "sm" })}
                         download={file().name}
+                        data-testid="media-lightbox-download-fallback"
                       >
                         <Download size={14} />
                         Download file
@@ -167,6 +172,7 @@ export function MediaLightbox(props: MediaLightboxProps) {
                 type="button"
                 class="absolute left-3 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-black/45 text-white/75 transition hover:bg-black/70 hover:text-white sm:left-6"
                 aria-label="Previous file"
+                data-testid="media-lightbox-prev"
                 onClick={previous}
               >
                 <ChevronLeft size={22} />
@@ -175,6 +181,7 @@ export function MediaLightbox(props: MediaLightboxProps) {
                 type="button"
                 class="absolute right-3 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-black/45 text-white/75 transition hover:bg-black/70 hover:text-white sm:right-6"
                 aria-label="Next file"
+                data-testid="media-lightbox-next"
                 onClick={next}
               >
                 <ChevronRight size={22} />
@@ -194,6 +201,7 @@ export function MediaLightbox(props: MediaLightboxProps) {
                         : "border-white/15 opacity-55 hover:opacity-90"
                     }`}
                     aria-label={`Show ${file.name}`}
+                    data-testid={`media-lightbox-thumb-${file.id}`}
                     onClick={() => setIndex(fileIndex())}
                   >
                     <Show
@@ -220,7 +228,10 @@ export function MediaLightbox(props: MediaLightboxProps) {
           </Show>
         </div>
 
-        <aside class="scroll-thin max-h-[46dvh] shrink-0 overflow-y-auto border-t border-border bg-card px-5 py-4 text-foreground sm:max-h-none sm:w-[24rem] sm:border-l sm:border-t-0 sm:py-5">
+        <aside
+          class="scroll-thin max-h-[46dvh] shrink-0 overflow-y-auto border-t border-border bg-card px-5 py-4 text-foreground sm:max-h-none sm:w-[24rem] sm:border-l sm:border-t-0 sm:py-5"
+          data-testid="media-lightbox-sidebar"
+        >
           <div class="mx-auto max-w-lg">
             <div class="flex items-start gap-3">
               <span class="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-xl border border-border bg-background text-muted-foreground">
@@ -251,11 +262,13 @@ export function MediaLightbox(props: MediaLightboxProps) {
                       onInput={event => setAlbumName(event.currentTarget.value)}
                       maxlength={80}
                       aria-label="Album name"
+                      data-testid="media-lightbox-album-name"
                     />
                     <Button
                       size="sm"
                       variant="secondary"
                       disabled={!albumName().trim() || albumName().trim() === props.group?.name}
+                      data-testid="media-lightbox-album-save"
                       onClick={() => props.onRenameGroup?.(albumName().trim())}
                     >
                       Save
@@ -294,6 +307,7 @@ export function MediaLightbox(props: MediaLightboxProps) {
                     href={`/api/files/${file().id}/download`}
                     class={buttonVariants({ variant: "secondary", size: "sm" })}
                     download={file().name}
+                    data-testid="media-lightbox-download"
                   >
                     <Download size={14} />
                     Download
@@ -304,6 +318,7 @@ export function MediaLightbox(props: MediaLightboxProps) {
                 <Button
                   size="sm"
                   variant="secondary"
+                  data-testid="media-lightbox-portrait"
                   onClick={() => {
                     if (!current() || !props.person) return;
                     props.onSetAvatar(
@@ -320,6 +335,7 @@ export function MediaLightbox(props: MediaLightboxProps) {
                 <IconButton
                   label="Delete file"
                   class="ml-auto text-destructive"
+                  data-testid="media-lightbox-delete"
                   onClick={() => current() && props.onDeleteFile(current()!)}
                 >
                   <Trash2 size={16} />
@@ -329,7 +345,7 @@ export function MediaLightbox(props: MediaLightboxProps) {
 
             <Show when={current()}>
               {file => (
-                <section class="mt-5">
+                <section class="mt-5" data-testid="media-lightbox-file-details">
                   <h3 class="field-label">Current file</h3>
                   <p class="mt-1 truncate text-sm font-medium">{file().name}</p>
                   <dl class="mt-2 grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
@@ -371,7 +387,7 @@ export function MediaLightbox(props: MediaLightboxProps) {
               )}
             </Show>
 
-            <section class="mt-5">
+            <section class="mt-5" data-testid="media-lightbox-attached">
               <h3 class="field-label">Attached to</h3>
               <Show
                 when={props.person}
@@ -381,6 +397,7 @@ export function MediaLightbox(props: MediaLightboxProps) {
                   <button
                     type="button"
                     class="mt-1.5 flex w-full items-center gap-2.5 rounded-xl px-1 py-1 text-left hover:bg-primary/5"
+                    data-testid={`media-lightbox-person-${person().id}`}
                     onClick={() => props.onSelectPerson(person().id)}
                   >
                     <Avatar
@@ -421,6 +438,7 @@ export function MediaLightbox(props: MediaLightboxProps) {
                 <Button
                   variant="destructive"
                   size="sm"
+                  data-testid="media-lightbox-delete-album"
                   onClick={() => props.onDeleteGroup?.()}
                 >
                   <Trash2 size={14} />
