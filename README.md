@@ -545,7 +545,11 @@ This is a reading aid, not access control. The whole graph is still sent to ever
 - Backups live in a second Railway bucket in the same region and are not encrypted by the app. Backups run daily, so enable PostgreSQL point-in-time recovery for the gap between dumps.
 - Dates are Gregorian and structured. Seasons and free-text dates such as "spring 1918" are not represented; use an event note for those.
 - Focus is a presentation aid, not access control. The whole tree is still loaded for every member, and anyone can reveal all branches with one click.
-- No GEDCOM import/export, public share links, OCR, or face detection yet.
+- No GEDCOM import or export, printable chart export, OCR, or face detection yet. See [docs/roadmap.md](docs/roadmap.md) for the deferred work.
+
+## Roadmap
+
+GEDCOM import and export, printable charts, OCR, face detection, multi-replica presence, and a person merge flow are deferred beyond v0.1.0. See [docs/roadmap.md](docs/roadmap.md) for scope and open questions. Pre-release checks and their current status live in [docs/release-checklist.md](docs/release-checklist.md).
 
 ## License
 
