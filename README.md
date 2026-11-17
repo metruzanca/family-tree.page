@@ -26,9 +26,10 @@ The graph is the main view. People are nodes, parent and partner relationships a
 - People, parent-child relationships, and partnerships
 - Add a child with a second parent in one step, and keep the dialog open to add several children quickly
 - Force-directed layout: parent and partner edges pull families into loose clusters, so relatives stay together and edges stay short
+- Every parent set meets at a hidden family junction, so a couple and their children fan out from one point instead of crossing lines
 - A label-aware collision force keeps names readable, and disconnected branches find their own space
 - Media clusters around its owner through a short hidden spring and is drawn behind the graph, so a photo never covers a person
-- Parent edges carry an arrow, partner edges are dashed, and hovering a person dims everyone outside their immediate family
+- Partner edges are dashed, parent arms follow the relationship type, and hovering a person dims everyone outside their immediate family
 - Cycle-safe relationship analysis that stays bounded when relationships contradict each other, with an in-app warning and `pnpm db:check`
 - "This is me" links a member to their person, so the tree opens around their own branch instead of the whole family
 - Focus rings from immediate family out to first cousins, with a "Show more" chip and an Everyone option that reveals the rest of the tree in one click
