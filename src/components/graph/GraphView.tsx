@@ -1,5 +1,4 @@
 import { createEffect, createMemo, createSignal, onCleanup, onMount, Show } from "solid-js";
-import { forceCollide, forceY } from "d3-force";
 import type { TreeGraph } from "~/api/people-server";
 import type { TreeRole } from "~/server/guards";
 import type { PresencePeer } from "~/lib/presence-protocol";
@@ -9,23 +8,23 @@ import { cx } from "~/lib/utils";
 import {
   branchColor,
   buildGraphModel,
-  clampToGenerationBand,
   fileCardSize,
-  generationRowY,
   initialsOf,
   neighborsOf,
   nodeRadius,
-  packComponents,
-  partnerGroups,
   type GenerationDirection,
-  type GraphLink,
   type GraphModel,
   type GraphNode,
 } from "~/lib/graph";
+import {
+  buildConnectors,
+  type EdgeConnector,
+  type EdgePoint,
+  type EdgeStroke,
+} from "~/lib/edge-routing";
 
 export type GraphHandle = {
   fit: () => void;
-  reset: () => void;
   focus: (id: string) => void;
   zoomBy: (factor: number) => void;
 };
@@ -40,7 +39,6 @@ type GraphViewProps = {
    * always computed from the full tree, so expanding keeps rows in place.
    */
   visible?: ReadonlySet<string>;
-  layout: "generations" | "freeform";
   generationDirection: GenerationDirection;
   presence?: PresencePeer[];
   selfPeerId?: string | null;
@@ -50,9 +48,6 @@ type GraphViewProps = {
   thumbUrlFor?: (fileId: string) => string;
   /** Padding used by zoom-to-fit. The full-screen app wants more than an embed. */
   fitPadding?: number;
-  /** Warmup and cooldown ticks. The app stops immediately after warmup; an embed can relax further. */
-  warmupTicks?: number;
-  cooldownTicks?: number;
   /** Optional shorter label for a node, used by the landing demo to show first names. */
   nodeLabel?: (node: GraphNode) => string;
   /** Optional deterministic positions. When set, the simulation is skipped and the graph is drawn as authored. */
@@ -84,6 +79,7 @@ export function GraphView(props: GraphViewProps) {
       props.visible,
     ),
   );
+  const [connectors, setConnectors] = createSignal<EdgeConnector[]>([]);
   const [hovered, setHovered] = createSignal<string | null>(null);
   const [ready, setReady] = createSignal(false);
   const [paintVersion, setPaintVersion] = createSignal(0);
@@ -124,7 +120,6 @@ export function GraphView(props: GraphViewProps) {
     if (!graph) return;
     setPaintVersion(value => value + 1);
     graph.nodeCanvasObject(drawNode);
-    graph.linkColor(linkColor);
   }
 
   function applyFixedLayout(target: GraphModel) {
@@ -137,6 +132,12 @@ export function GraphView(props: GraphViewProps) {
       node.vx = 0;
       node.vy = 0;
     }
+  }
+
+  function rebuildConnectors(target: GraphModel) {
+    setConnectors(
+      buildConnectors(target.nodes, target.links, props.generationDirection),
+    );
   }
 
   function hitTestNode(clientX: number, clientY: number): GraphNode | null {
@@ -585,20 +586,102 @@ export function GraphView(props: GraphViewProps) {
     context.restore();
   }
 
-  function linkColor(link: GraphLink) {
-    const source = typeof link.source === "string" ? link.source : link.source.id;
-    const target = typeof link.target === "string" ? link.target : link.target.id;
+  function strokeStyle(stroke: EdgeStroke) {
+    switch (stroke.kind) {
+      case "partner":
+        return { color: colors.partner, width: 1.25, dash: [4, 5] };
+      case "media":
+        return { color: colors.media, width: 0.8, dash: [2, 5] };
+      case "union":
+        return { color: "#7f8d75", width: 0.9, dash: null };
+      default:
+        return {
+          color: colors.edge,
+          width: 1.25,
+          dash:
+            stroke.parentType && stroke.parentType !== "biological"
+              ? [6, 5]
+              : null,
+        };
+    }
+  }
+
+  function strokeActive(stroke: EdgeStroke, set: Set<string> | null) {
+    return !set || (set.has(stroke.sourceId) && set.has(stroke.targetId));
+  }
+
+  function drawRoutesLayer(
+    context: CanvasRenderingContext2D,
+    globalScale: number,
+  ) {
     const set = active();
-    const activeLink = !set || (set.has(source) && set.has(target));
-    const base =
-      link.kind === "partner"
-        ? colors.partner
-        : link.kind === "media"
-          ? colors.media
-          : link.kind === "union"
-            ? "#7f8d75"
-            : colors.edge;
-    return withAlpha(base, activeLink ? 1 : 0.08);
+    for (const connector of connectors()) {
+      const anyActive = connector.strokes.some(stroke => strokeActive(stroke, set));
+      if (connector.trunk) {
+        context.save();
+        context.globalAlpha = anyActive ? 1 : 0.08;
+        context.strokeStyle = colors.edge;
+        context.lineWidth = 1.25 / globalScale;
+        context.setLineDash([]);
+        traceRounded(context, connector.trunk, 5 / globalScale);
+        context.stroke();
+        context.restore();
+      }
+      for (const stroke of connector.strokes) {
+        drawStroke(context, globalScale, stroke, set);
+      }
+    }
+  }
+
+  function drawStroke(
+    context: CanvasRenderingContext2D,
+    globalScale: number,
+    stroke: EdgeStroke,
+    set: Set<string> | null,
+  ) {
+    if (stroke.points.length < 2) return;
+    const style = strokeStyle(stroke);
+    const activeStroke = strokeActive(stroke, set);
+    context.save();
+    context.globalAlpha = activeStroke ? 1 : 0.08;
+    context.strokeStyle = style.color;
+    context.lineWidth = style.width / globalScale;
+    context.lineCap = "round";
+    context.lineJoin = "round";
+    context.setLineDash(style.dash ?? []);
+    traceRounded(context, stroke.points, 5 / globalScale);
+    context.stroke();
+    context.setLineDash([]);
+    if (stroke.arrow) {
+      const last = stroke.points[stroke.points.length - 1];
+      const previous = stroke.points[stroke.points.length - 2];
+      drawArrow(context, last, previous, 5 / globalScale, colors.parentStep);
+    }
+    context.restore();
+  }
+
+  function drawArrow(
+    context: CanvasRenderingContext2D,
+    tip: EdgePoint,
+    previous: EdgePoint,
+    size: number,
+    color: string,
+  ) {
+    const angle = Math.atan2(tip.y - previous.y, tip.x - previous.x);
+    const half = size * 0.55;
+    context.beginPath();
+    context.moveTo(tip.x, tip.y);
+    context.lineTo(
+      tip.x - Math.cos(angle) * size + Math.sin(angle) * half,
+      tip.y - Math.sin(angle) * size - Math.cos(angle) * half,
+    );
+    context.lineTo(
+      tip.x - Math.cos(angle) * size - Math.sin(angle) * half,
+      tip.y - Math.sin(angle) * size + Math.cos(angle) * half,
+    );
+    context.closePath();
+    context.fillStyle = color;
+    context.fill();
   }
 
   function focusNode(id: string) {
@@ -612,187 +695,6 @@ export function GraphView(props: GraphViewProps) {
     graph.zoomToFit(0, props.fitPadding ?? 110);
   }
 
-  function reset() {
-    const fresh = buildGraphModel(
-      props.data,
-      props.showMedia,
-      props.generationDirection,
-      props.visible,
-    );
-    applyFixedLayout(fresh);
-    setModel(fresh);
-    graph?.graphData({
-      nodes: fresh.nodes,
-      links: fresh.links,
-    });
-    packComponentBands();
-    snapPartnerRows();
-    needsFit = true;
-    setTimeout(() => graph?.zoomToFit(0, props.fitPadding ?? 110), 80);
-  }
-
-  function applyLayout(mode: "generations" | "freeform") {
-    if (!graph) return;
-    const direction = props.generationDirection;
-    const linkForce = graph.d3Force("link") as any;
-    if (linkForce) {
-      linkForce.distance((link: GraphLink) =>
-        link.kind === "partner"
-          ? 165
-          : link.kind === "media"
-            ? 65
-            : link.kind === "union"
-              ? 55
-              : link.viaUnion
-                ? 105
-                : 210,
-      );
-      linkForce.strength((link: GraphLink) =>
-        link.kind === "union" ? 1 : link.viaUnion ? 0.9 : 0.82,
-      );
-    }
-    const charge = graph.d3Force("charge") as any;
-    if (charge) {
-      charge.strength((node: GraphNode) =>
-        node.kind === "union" ? -60 : node.kind === "file" ? -140 : -600,
-      );
-      charge.distanceMax(2400);
-    }
-    if (mode === "generations") {
-      graph.d3Force(
-        "generation",
-        (forceY as any)((node: GraphNode) => {
-          const row = generationRowY(node.level, direction);
-          return clampToGenerationBand(node.y ?? row, node.level, direction);
-        }).strength(0.5),
-      );
-      graph.d3Force("column", null);
-    } else {
-      graph.d3Force("generation", null);
-      graph.d3Force("column", null);
-    }
-    graph.d3Force("partnerRow", partnerRowForce());
-    graph.d3Force("unionPosition", unionPositionForce());
-    graph.d3Force(
-      "componentColumn",
-      componentColumnForce(mode === "generations" ? 0.12 : 0.05),
-    );
-    graph.d3Force(
-      "collide",
-      (forceCollide as any)((node: GraphNode) =>
-        nodeRadius(node) + (node.kind === "union" ? 18 : 28),
-      ).strength(1),
-    );
-  }
-
-  function settleLayout() {
-    if (!graph) return;
-    graph.warmupTicks(props.warmupTicks ?? 300);
-    const data = graph.graphData();
-    graph.graphData({ nodes: [...data.nodes], links: [...data.links] });
-    needsFit = true;
-    if (props.cooldownTicks) graph.d3ReheatSimulation();
-    packComponentBands();
-    snapPartnerRows();
-    fit();
-  }
-
-  function partnerRowForce() {
-    let nodes: GraphNode[] = [];
-    const force = (alpha: number) => {
-      const byId = new Map(nodes.map(node => [node.id, node]));
-      for (const link of model().links) {
-        if (link.kind !== "partner") continue;
-        const a =
-          typeof link.source === "string" ? byId.get(link.source) : (link.source as GraphNode);
-        const b =
-          typeof link.target === "string" ? byId.get(link.target) : (link.target as GraphNode);
-        if (!a || !b) continue;
-        const targetY = ((a.y ?? 0) + (b.y ?? 0)) / 2;
-        a.vy = (a.vy ?? 0) + (targetY - (a.y ?? 0)) * 0.9 * alpha;
-        b.vy = (b.vy ?? 0) + (targetY - (b.y ?? 0)) * 0.9 * alpha;
-      }
-    };
-    (force as any).initialize = (next: GraphNode[]) => {
-      nodes = next;
-    };
-    return force;
-  }
-
-  function unionPositionForce() {
-    let nodes: GraphNode[] = [];
-    const force = (alpha: number) => {
-      const byId = new Map(nodes.map(node => [node.id, node]));
-      for (const node of nodes) {
-        if (node.kind !== "union" || !node.parentIds?.length) continue;
-        const parents = node.parentIds
-          .map(id => byId.get(id))
-          .filter((parent): parent is GraphNode => Boolean(parent));
-        if (!parents.length) continue;
-        const targetX =
-          parents.reduce((sum, parent) => sum + (parent.x ?? 0), 0) / parents.length;
-        const targetY =
-          parents.reduce((sum, parent) => sum + (parent.y ?? 0), 0) / parents.length +
-          (props.generationDirection === "oldest-top" ? 95 : -95);
-        node.vx = (node.vx ?? 0) + (targetX - (node.x ?? 0)) * 0.9 * alpha;
-        node.vy = (node.vy ?? 0) + (targetY - (node.y ?? 0)) * 0.9 * alpha;
-      }
-    };
-    (force as any).initialize = (next: GraphNode[]) => {
-      nodes = next;
-    };
-    return force;
-  }
-
-  /**
-   * A gentle pull toward each disconnected component's own horizontal band.
-   * Disconnected families therefore settle side by side instead of drifting
-   * into the same space. Media and junction nodes follow their links.
-   */
-  function componentColumnForce(strength: number) {
-    let nodes: GraphNode[] = [];
-    const force = (alpha: number) => {
-      const byNode = model().byNode;
-      for (const node of nodes) {
-        if (node.kind !== "person") continue;
-        const component = byNode.get(node.id);
-        if (!component) continue;
-        node.vx = (node.vx ?? 0) + (component.centerX - (node.x ?? 0)) * strength * alpha;
-      }
-    };
-    (force as any).initialize = (next: GraphNode[]) => {
-      nodes = next;
-    };
-    return force;
-  }
-
-  function packComponentBands() {
-    if (!graph) return;
-    packComponents(graph.graphData().nodes as GraphNode[], model().components, model().byNode);
-  }
-
-  function snapPartnerRows() {
-    if (!graph) return;
-    const groups = partnerGroups(props.data.relationships);
-    if (!groups.length) return;
-    const nodes = new Map(
-      (graph.graphData().nodes as GraphNode[]).map(node => [node.id, node]),
-    );
-    for (const group of groups) {
-      const members = group
-        .map(id => nodes.get(id))
-        .filter((node): node is GraphNode => Boolean(node));
-      if (members.length < 2) continue;
-      const targetY =
-        members.reduce((sum, node) => sum + (node.y ?? 0), 0) / members.length;
-      for (const node of members) {
-        node.y = targetY;
-        node.vy = 0;
-      }
-    }
-    graph.nodeCanvasObject(drawNode);
-  }
-
   onMount(async () => {
     const { default: ForceGraph } = await import("force-graph");
     if (disposed) return;
@@ -804,44 +706,29 @@ export function GraphView(props: GraphViewProps) {
       .nodeId("id")
       .nodeVal((node: GraphNode) => node.val)
       .nodeCanvasObject(drawNode)
+      .onRenderFramePre(drawRoutesLayer)
       .onRenderFramePost(drawPresenceTagsLayer)
       .nodeLabel("")
-      .linkColor(linkColor)
-      .linkWidth((link: GraphLink) =>
-        link.kind === "media" ? 0.8 : link.kind === "union" ? 0.9 : 1.25,
-      )
-      .linkLineDash((link: GraphLink) =>
-        link.kind === "partner" ? [4, 5] : link.kind === "media" ? [2, 5] : link.parentType && link.parentType !== "biological" ? [6, 5] : null,
-      )
-      .linkDirectionalArrowLength((link: GraphLink) => (link.kind === "parent" ? 4 : 0))
-      .linkDirectionalArrowRelPos(0.92)
-      .linkDirectionalArrowColor((link: GraphLink) =>
-        link.kind === "parent" ? colors.parentStep : "rgba(0,0,0,0)",
-      )
+      .linkVisibility(() => false)
       .onEngineStop(() => {
         if (import.meta.env.DEV) (window as any).__familyTreeStoppedAt = Date.now();
-        packComponentBands();
-        snapPartnerRows();
         updateHoverAt(pointer.x, pointer.y);
         if (needsFit) {
           needsFit = false;
           fit();
         }
       })
-      .warmupTicks(props.warmupTicks ?? 300)
-      .cooldownTicks(props.cooldownTicks ?? 0)
-      .cooldownTime(props.cooldownTicks ? 15_000 : 0)
+      .warmupTicks(0)
+      .cooldownTicks(0)
       .minZoom(0.2)
       .maxZoom(4.5)
       .enableNodeDrag(false)
       .enablePointerInteraction(false)
       .autoPauseRedraw(true);
 
-    applyLayout(props.layout);
     applyFixedLayout(model());
+    rebuildConnectors(model());
     graph.graphData({ nodes: model().nodes, links: model().links });
-    if (props.cooldownTicks) graph.d3ReheatSimulation();
-    snapPartnerRows();
     if (import.meta.env.DEV) {
       (window as any).__familyTreeGraph = graph;
       (window as any).__familyTreeNodes = () =>
@@ -856,7 +743,6 @@ export function GraphView(props: GraphViewProps) {
     setReady(true);
     props.onReady?.({
       fit,
-      reset,
       focus: focusNode,
       zoomBy: factor => graph.zoom(graph.zoom() * factor, 300),
     });
@@ -978,42 +864,12 @@ export function GraphView(props: GraphViewProps) {
     const directionChanged = direction !== previousDirection;
     previousDirection = direction;
     const next = buildGraphModel(props.data, props.showMedia, direction, props.visible);
-    if (!graph) {
-      setModel(next);
-      return;
-    }
-    const previous = new Map<string, GraphNode>(
-      graph.graphData().nodes.map((node: GraphNode) => [node.id, node]),
-    );
-    if (!directionChanged) {
-      for (const node of next.nodes) {
-        const old = previous.get(node.id);
-        if (old) {
-          node.x = old.x;
-          node.y = old.y;
-          node.vx = old.vx;
-          node.vy = old.vy;
-        }
-      }
-    } else {
-      needsFit = true;
-    }
     applyFixedLayout(next);
+    rebuildConnectors(next);
     setModel(next);
+    if (!graph) return;
     graph.graphData({ nodes: next.nodes, links: next.links });
-    if (props.cooldownTicks) {
-      needsFit = true;
-      graph.d3ReheatSimulation();
-    }
-    packComponentBands();
-    snapPartnerRows();
-  });
-
-  createEffect(() => {
-    props.layout;
-    props.generationDirection;
-    applyLayout(props.layout);
-    settleLayout();
+    if (directionChanged) needsFit = true;
   });
 
   createEffect(() => {
@@ -1023,10 +879,8 @@ export function GraphView(props: GraphViewProps) {
     props.presence;
     props.selfPeerId;
     model();
-    if (graph) {
-      graph.nodeCanvasObject(drawNode);
-      graph.linkColor(linkColor);
-    }
+    connectors();
+    if (graph) graph.nodeCanvasObject(drawNode);
   });
 
   return (
@@ -1077,10 +931,28 @@ function drawImageCropped(
   context.drawImage(image, sx, sy, cropWidth, cropHeight, x, y, width, height);
 }
 
-function withAlpha(hex: string, alpha: number) {
-  const value = hex.replace("#", "");
-  const r = parseInt(value.slice(0, 2), 16);
-  const g = parseInt(value.slice(2, 4), 16);
-  const b = parseInt(value.slice(4, 6), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+/** Rounded orthogonal polyline, the family-tree connector shape. */
+function traceRounded(
+  context: CanvasRenderingContext2D,
+  points: EdgePoint[],
+  radius: number,
+) {
+  if (!points.length) return;
+  context.beginPath();
+  context.moveTo(points[0].x, points[0].y);
+  if (points.length === 2) {
+    context.lineTo(points[1].x, points[1].y);
+    return;
+  }
+  for (let index = 1; index < points.length - 1; index += 1) {
+    const previous = points[index - 1];
+    const current = points[index];
+    const next = points[index + 1];
+    const inLength = Math.hypot(current.x - previous.x, current.y - previous.y);
+    const outLength = Math.hypot(next.x - current.x, next.y - current.y);
+    const corner = Math.min(radius, inLength / 2, outLength / 2);
+    context.arcTo(current.x, current.y, next.x, next.y, corner);
+  }
+  const last = points[points.length - 1];
+  context.lineTo(last.x, last.y);
 }

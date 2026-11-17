@@ -25,7 +25,7 @@ The graph is the main view. People are nodes, parent and partner relationships a
 - Invites by copyable link or by email, with expiry and single use
 - People, parent-child relationships, and partnerships
 - Add a child with a second parent in one step, and keep the dialog open to add several children quickly
-- Generation-aware force graph with a freeform layout toggle
+- Deterministic generation layout with ordered rows and non-overlapping connectors
 - Cycle-safe generation rows that stay bounded when relationships contradict each other, with an in-app warning and `pnpm db:check`
 - Static generation bands: parents and children stay in ordered rows, with no node dragging
 - Partners are aligned on the same row and placed side by side

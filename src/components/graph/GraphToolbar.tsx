@@ -8,14 +8,11 @@ import {
   ImageOff,
   Maximize2,
   MoreHorizontal,
-  Network,
   Plus,
-  RotateCcw,
   Search,
   Settings,
   Target,
   UserRound,
-  Waves,
   ZoomIn,
   ZoomOut,
 } from "lucide-solid";
@@ -43,7 +40,6 @@ type ToolbarProps = {
   treeName: string;
   role: TreeRole;
   showMedia: boolean;
-  layout: "generations" | "freeform";
   generationDirection: GenerationDirection;
   focus: {
     personName: string | null;
@@ -60,9 +56,7 @@ type ToolbarProps = {
   };
   resolveNode: (nodeId: string | null) => string | null;
   onToggleMedia: () => void;
-  onToggleLayout: () => void;
   onFlipDirection: () => void;
-  onResetLayout: () => void;
   onSearch: () => void;
   onFit: () => void;
   onZoomIn: () => void;
@@ -138,19 +132,6 @@ export function GraphToolbar(props: ToolbarProps) {
               </Show>
             </ToolButton>
             <ToolButton
-              active={props.layout === "generations"}
-              label={
-                props.layout === "generations"
-                  ? "Switch to freeform layout"
-                  : "Switch to generation layout"
-              }
-              onClick={props.onToggleLayout}
-            >
-              <Show when={props.layout === "generations"} fallback={<Waves size={17} />}>
-                <Network size={17} />
-              </Show>
-            </ToolButton>
-            <ToolButton
               label={
                 props.generationDirection === "oldest-top"
                   ? "Oldest at top. Flip so oldest is at the bottom"
@@ -168,9 +149,6 @@ export function GraphToolbar(props: ToolbarProps) {
             </ToolButton>
             <ToolButton label="Fit tree" shortcut="F" onClick={props.onFit}>
               <Maximize2 size={17} />
-            </ToolButton>
-            <ToolButton label="Reset layout" onClick={props.onResetLayout}>
-              <RotateCcw size={17} />
             </ToolButton>
             <ToolButton label="Calendar" href={`/trees/${props.treeId}/calendar`}>
               <CalendarDays size={17} />
@@ -191,14 +169,6 @@ export function GraphToolbar(props: ToolbarProps) {
               >
                 <Show when={props.showMedia} fallback={<ImageOff />}>
                   <ImageIcon />
-                </Show>
-              </GlassItem>
-              <GlassItem
-                label={props.layout === "generations" ? "Freeform layout" : "Generation layout"}
-                onSelect={props.onToggleLayout}
-              >
-                <Show when={props.layout === "generations"} fallback={<Waves />}>
-                  <Network />
                 </Show>
               </GlassItem>
               <GlassItem label="Flip generations" onSelect={props.onFlipDirection}>
@@ -228,9 +198,6 @@ export function GraphToolbar(props: ToolbarProps) {
               </GlassItem>
               <GlassItem label="Fit tree" onSelect={props.onFit}>
                 <Maximize2 />
-              </GlassItem>
-              <GlassItem label="Reset layout" onSelect={props.onResetLayout}>
-                <RotateCcw />
               </GlassItem>
               <DropdownMenuSeparator class="my-1 bg-white/10" />
               <DropdownMenuItem

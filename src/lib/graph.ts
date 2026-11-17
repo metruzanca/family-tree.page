@@ -14,6 +14,10 @@ export const COMPONENT_GAP = 140;
 export const COMPONENT_MIN_WIDTH = 200;
 export const COMPONENT_PERSON_SPACING = 120;
 const COMPONENT_NODE_PADDING = 14;
+const PARTNER_GAP = 46;
+const UNIT_GAP = 58;
+const MEDIA_ROW_GAP = 0.85;
+const MEDIA_SPACING = 40;
 
 export type GraphNode = {
   id: string;
@@ -72,6 +76,36 @@ export function groupNodeId(groupId: string) {
   return `group:${groupId}`;
 }
 
+function relationshipKey(relationship: GraphRelationship) {
+  if (relationship.type === "partner") {
+    return `partner:${[relationship.source, relationship.target].sort().join(":")}`;
+  }
+  return `parent:${relationship.source}:${relationship.target}`;
+}
+
+/**
+ * A relationship row can be duplicated by legacy imports or replayed actions.
+ * Two links between the same pair would draw on top of each other, so the graph
+ * model always keeps a single edge per unordered pair and kind.
+ */
+export function dedupeRelationships(
+  relationships: GraphRelationship[],
+): GraphRelationship[] {
+  const seen = new Set<string>();
+  const unique: GraphRelationship[] = [];
+  for (const relationship of relationships) {
+    const key = relationshipKey(relationship);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(relationship);
+  }
+  return unique;
+}
+
+function personRadiusForDegree(degree: number) {
+  return Math.min(28, 12 + Math.sqrt(degree) * 4.2);
+}
+
 export function buildGraphModel(
   data: TreeGraph,
   showMedia: boolean,
@@ -86,12 +120,14 @@ export function buildGraphModel(
   const people = visible
     ? data.people.filter(person => visible.has(person.id))
     : data.people;
-  const relationships = visible
-    ? data.relationships.filter(
-        relationship =>
-          visible.has(relationship.source) && visible.has(relationship.target),
-      )
-    : data.relationships;
+  const relationships = dedupeRelationships(
+    visible
+      ? data.relationships.filter(
+          relationship =>
+            visible.has(relationship.source) && visible.has(relationship.target),
+        )
+      : data.relationships,
+  );
   const { components, byPerson } = personComponents(
     people,
     relationships,
@@ -103,13 +139,20 @@ export function buildGraphModel(
     degree.set(relationship.target, (degree.get(relationship.target) ?? 0) + 1);
   }
 
+  const positions = layoutPeople(
+    people,
+    relationships,
+    generations,
+    components,
+    byPerson,
+    degree,
+    direction,
+  );
+
   const nodes: GraphNode[] = [];
   for (const person of people) {
     const level = generations.get(person.id) ?? 0;
-    const component = byPerson.get(person.id);
-    const centerX = component?.centerX ?? 0;
-    const spreadX = component ? Math.max(60, component.width / 2 - 60) : 90;
-    const spot = initialSpot(person.id, level, direction, centerX, spreadX);
+    const position = positions.get(person.id);
     nodes.push({
       id: person.id,
       kind: "person",
@@ -118,8 +161,8 @@ export function buildGraphModel(
       degree: degree.get(person.id) ?? 0,
       val: 1,
       level,
-      x: spot.x,
-      y: spot.y,
+      x: position?.x ?? 0,
+      y: position?.y ?? generationRowY(level, direction),
     });
   }
 
@@ -212,14 +255,19 @@ export function buildGraphModel(
   }
 
   const byId = new Map(nodes.map(node => [node.id, node]));
+  const personColumns = nodes
+    .filter(node => node.kind === "person")
+    .map(node => node.x ?? 0);
+  const usedUnionX: number[] = [];
   for (const union of unions.values()) {
     const parentNodes = union.parentIds
       .map(id => byId.get(id))
       .filter((node): node is GraphNode => Boolean(node));
-    const averageX =
-      parentNodes.reduce((sum, node) => sum + (node.x ?? 0), 0) /
-      Math.max(1, parentNodes.length);
-    const hash = hashString(union.id);
+    const childNodes = union.childIds
+      .map(id => byId.get(id))
+      .filter((node): node is GraphNode => Boolean(node));
+    const x = unionX(parentNodes, childNodes, personColumns, usedUnionX);
+    usedUnionX.push(x);
     nodes.push({
       id: union.id,
       kind: "union",
@@ -230,8 +278,8 @@ export function buildGraphModel(
       degree: 0,
       val: 0.2,
       level: union.level,
-      x: averageX + ((hash % 40) - 20),
-      y: generationRowY(union.level, direction) + ((hash % 30) - 15),
+      x,
+      y: generationRowY(union.level, direction),
     });
 
     for (const parentId of union.parentIds) {
@@ -256,52 +304,52 @@ export function buildGraphModel(
 
   if (showMedia) {
     const byPerson = new Map(nodes.map(node => [node.id, node]));
+    const media: Array<{ id: string; ownerId: string; node: GraphNode }> = [];
     for (const group of data.groups) {
       const parent = byPerson.get(group.personId);
       if (!parent) continue;
-      const level = parent.level;
-      const offset = initialSpot(group.id, level, direction);
-      nodes.push({
+      media.push({
         id: groupNodeId(group.id),
-        kind: "group",
-        name: group.name,
-        group,
-        degree: 1,
-        val: 0.7,
-        level,
-        x: (parent.x ?? 0) + offset.x * 0.4,
-        y: (parent.y ?? 0) + offset.y * 0.4,
+        ownerId: group.personId,
+        node: {
+          id: groupNodeId(group.id),
+          kind: "group",
+          name: group.name,
+          group,
+          degree: 1,
+          val: 0.7,
+          level: parent.level,
+        },
       });
-      const link: GraphLink = {
-        id: `group-media:${group.id}`,
-        source: parent.id,
-        target: groupNodeId(group.id),
-        kind: "media",
-      };
-      links.push(link);
-      semanticLinks.push({ ...link });
     }
     for (const file of data.files) {
       if (file.isAvatar || file.groupId) continue;
       const parent = byPerson.get(file.personId);
       if (!parent) continue;
-      const level = parent.level;
-      const offset = initialSpot(file.id, level, direction);
-      nodes.push({
+      media.push({
         id: fileNodeId(file.id),
-        kind: "file",
-        name: file.name,
-        file,
-        degree: 1,
-        val: 0.35,
-        level,
-        x: (parent.x ?? 0) + offset.x * 0.35,
-        y: (parent.y ?? 0) + offset.y * 0.35,
+        ownerId: file.personId,
+        node: {
+          id: fileNodeId(file.id),
+          kind: "file",
+          name: file.name,
+          file,
+          degree: 1,
+          val: 0.35,
+          level: parent.level,
+        },
       });
+    }
+    layoutMedia(media, byPerson, generations, direction);
+    for (const item of media) nodes.push(item.node);
+    for (const item of media) {
       const link: GraphLink = {
-        id: `media:${file.id}`,
-        source: parent.id,
-        target: fileNodeId(file.id),
+        id:
+          item.node.kind === "group"
+            ? `group-media:${item.node.group!.id}`
+            : `media:${item.node.file!.id}`,
+        source: item.ownerId,
+        target: item.id,
         kind: "media",
       };
       links.push(link);
@@ -324,6 +372,365 @@ export function buildGraphModel(
   }
 
   return { nodes, links, semanticLinks, generations, components, byNode };
+}
+
+/**
+ * Chooses a junction x that sits over the children, away from every other
+ * junction, so two vertical trunks can never run along the same column.
+ */
+function unionX(
+  parents: GraphNode[],
+  children: GraphNode[],
+  personColumns: number[],
+  used: number[],
+) {
+  const childXs = children.map(node => node.x ?? 0);
+  const parentXs = parents.map(node => node.x ?? 0);
+  const childMid =
+    childXs.length > 0
+      ? (Math.min(...childXs) + Math.max(...childXs)) / 2
+      : null;
+  const parentMid =
+    parentXs.length > 0
+      ? (Math.min(...parentXs) + Math.max(...parentXs)) / 2
+      : 0;
+  let x = childMid ?? parentMid;
+  if (childXs.length) {
+    const margin = 12;
+    x = Math.max(
+      Math.min(...childXs) - margin,
+      Math.min(Math.max(...childXs) + margin, x),
+    );
+  }
+  // A junction directly over a person would make its trunk share that
+  // person's vertical column, so arms and trunk could paint over each other.
+  const columns = [...childXs, ...parentXs, ...personColumns];
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    const onColumn = columns.some(column => Math.abs(column - x) < 3);
+    const clashes = used.some(other => Math.abs(other - x) < 8);
+    if (!onColumn && !clashes) return x;
+    const step = Math.floor(attempt / 2) + 1;
+    x += 6 * step * (attempt % 2 === 0 ? 1 : -1);
+  }
+  return x;
+}
+
+type LayoutUnit = {
+  id: string;
+  level: number;
+  personIds: string[];
+  width: number;
+  index: number;
+};
+
+/**
+ * Places people in stable, ordered rows. Partner clusters stay together and a
+ * barycenter sweep orders each row by where its parents and children sit, which
+ * removes most of the crossing that a force layout produces.
+ */
+function layoutPeople(
+  people: GraphPerson[],
+  relationships: GraphRelationship[],
+  generations: Map<string, number>,
+  components: GraphComponent[],
+  byPerson: Map<string, GraphComponent>,
+  degree: Map<string, number>,
+  direction: GenerationDirection,
+) {
+  const radiusOf = (id: string) => personRadiusForDegree(degree.get(id) ?? 0);
+  const personById = new Map(people.map(person => [person.id, person]));
+  const slotWidthOf = (id: string) => {
+    const radius = radiusOf(id);
+    const label = personById.get(id)?.displayName ?? id;
+    const labelWidth = Math.min(220, label.length * 6.2 + 16);
+    return Math.max(radius * 2 + 20, labelWidth);
+  };
+  const positions = new Map<string, { x: number; y: number }>();
+  const componentLayouts = new Map<
+    GraphComponent,
+    { rows: Map<number, LayoutUnit[]>; levels: number[] }
+  >();
+
+  for (const component of components) {
+    const units = buildUnits(component, relationships, generations);
+    const unitOf = new Map<string, LayoutUnit>();
+    for (const unit of units) {
+      for (const personId of unit.personIds) unitOf.set(personId, unit);
+    }
+
+    const parentUnits = new Map<string, Set<string>>();
+    const childUnits = new Map<string, Set<string>>();
+    for (const relationship of relationships) {
+      if (relationship.type !== "parent") continue;
+      const from = unitOf.get(relationship.source);
+      const to = unitOf.get(relationship.target);
+      if (!from || !to || from.id === to.id) continue;
+      const parents = parentUnits.get(to.id) ?? new Set<string>();
+      parents.add(from.id);
+      parentUnits.set(to.id, parents);
+      const children = childUnits.get(from.id) ?? new Set<string>();
+      children.add(to.id);
+      childUnits.set(from.id, children);
+    }
+
+    const rows = new Map<number, LayoutUnit[]>();
+    for (const unit of units) {
+      const list = rows.get(unit.level) ?? [];
+      list.push(unit);
+      rows.set(unit.level, list);
+    }
+    const levels = [...rows.keys()].sort((a, b) => a - b);
+    for (const level of levels) {
+      const row = rows.get(level)!;
+      row.sort((a, b) => a.id.localeCompare(b.id));
+      row.forEach((unit, index) => {
+        unit.index = index;
+        unit.width = unitWidth(unit, slotWidthOf);
+      });
+    }
+
+    const unitById = new Map(units.map(unit => [unit.id, unit]));
+    const barycenter = (
+      unit: LayoutUnit,
+      links: Map<string, Set<string>>,
+    ) => {
+      const neighbors = links.get(unit.id);
+      if (!neighbors?.size) return null;
+      let sum = 0;
+      let count = 0;
+      for (const id of neighbors) {
+        const neighbor = unitById.get(id);
+        if (!neighbor) continue;
+        sum += neighbor.index;
+        count += 1;
+      }
+      return count ? sum / count : null;
+    };
+
+    for (let pass = 0; pass < 4; pass += 1) {
+      for (let index = 1; index < levels.length; index += 1) {
+        sortRow(rows.get(levels[index])!, unit =>
+          barycenter(unit, parentUnits),
+        );
+      }
+      for (let index = levels.length - 2; index >= 0; index -= 1) {
+        sortRow(rows.get(levels[index])!, unit =>
+          barycenter(unit, childUnits),
+        );
+      }
+    }
+
+    let width = COMPONENT_MIN_WIDTH;
+    for (const level of levels) {
+      width = Math.max(width, rowWidth(rows.get(level)!));
+    }
+    component.width = width;
+    componentLayouts.set(component, { rows, levels });
+  }
+
+  const total =
+    components.reduce((sum, component) => sum + component.width, 0) +
+    COMPONENT_GAP * Math.max(0, components.length - 1);
+  let cursor = -total / 2;
+  for (const component of components) {
+    component.centerX = cursor + component.width / 2;
+    cursor += component.width + COMPONENT_GAP;
+  }
+
+  for (const component of components) {
+    const layout = componentLayouts.get(component);
+    if (!layout) continue;
+    for (const level of layout.levels) {
+      const row = layout.rows.get(level)!;
+      const width = rowWidth(row);
+      let x = component.centerX - width / 2;
+      const y = generationRowY(level, direction);
+      for (const unit of row) {
+        let memberX = x;
+        for (const personId of unit.personIds) {
+          const slot = slotWidthOf(personId);
+          positions.set(personId, { x: memberX + slot / 2, y });
+          memberX += slot + PARTNER_GAP;
+        }
+        x += unit.width + UNIT_GAP;
+      }
+    }
+  }
+
+  // Newly added people who are not connected to anyone still belong to a
+  // component of their own, so the row loop above has already placed them.
+  for (const person of people) {
+    if (!positions.has(person.id)) {
+      const component = byPerson.get(person.id);
+      positions.set(person.id, {
+        x: component?.centerX ?? 0,
+        y: generationRowY(generations.get(person.id) ?? 0, direction),
+      });
+    }
+  }
+
+  return positions;
+}
+
+function buildUnits(
+  component: GraphComponent,
+  relationships: GraphRelationship[],
+  generations: Map<string, number>,
+): LayoutUnit[] {
+  const members = new Set(component.personIds);
+  const partners = new Map<string, string[]>();
+  for (const relationship of relationships) {
+    if (relationship.type !== "partner") continue;
+    if (!members.has(relationship.source) || !members.has(relationship.target)) {
+      continue;
+    }
+    if (relationship.source === relationship.target) continue;
+    addNeighbor(partners, relationship.source, relationship.target);
+    addNeighbor(partners, relationship.target, relationship.source);
+  }
+
+  const seen = new Set<string>();
+  const groups: string[][] = [];
+  for (const personId of [...component.personIds].sort()) {
+    if (seen.has(personId)) continue;
+    const stack = [personId];
+    const group: string[] = [];
+    seen.add(personId);
+    while (stack.length) {
+      const current = stack.pop()!;
+      group.push(current);
+      for (const next of partners.get(current) ?? []) {
+        if (seen.has(next)) continue;
+        seen.add(next);
+        stack.push(next);
+      }
+    }
+    groups.push(group);
+  }
+
+  const units: LayoutUnit[] = [];
+  for (const group of groups) {
+    const byLevel = new Map<number, string[]>();
+    for (const personId of group) {
+      const level = generations.get(personId) ?? 0;
+      const list = byLevel.get(level) ?? [];
+      list.push(personId);
+      byLevel.set(level, list);
+    }
+    for (const [level, personIds] of byLevel) {
+      const ordered = orderPartnerMembers(personIds, partners);
+      units.push({
+        id: `${level}:${ordered[0]}`,
+        level,
+        personIds: ordered,
+        width: 0,
+        index: 0,
+      });
+    }
+  }
+  return units;
+}
+
+/**
+ * Walks partnership chains so a couple, or a chain of remarriages, sits in a
+ * contiguous run and each dashed partner line stays between two neighbours.
+ */
+function orderPartnerMembers(ids: string[], partners: Map<string, string[]>) {
+  const allowed = new Set(ids);
+  const degree = new Map(
+    ids.map(id => [
+      id,
+      (partners.get(id) ?? []).filter(next => allowed.has(next)).length,
+    ]),
+  );
+  const leaves = [...ids]
+    .filter(id => (degree.get(id) ?? 0) <= 1)
+    .sort((a, b) => a.localeCompare(b));
+  const starts = leaves.length ? leaves : [...ids].sort((a, b) => a.localeCompare(b));
+  const seen = new Set<string>();
+  const ordered: string[] = [];
+  for (const start of starts) {
+    if (seen.has(start)) continue;
+    let current: string | null = start;
+    while (current && !seen.has(current)) {
+      seen.add(current);
+      ordered.push(current);
+      const next: string | undefined = (partners.get(current) ?? [])
+        .filter(id => allowed.has(id) && !seen.has(id))
+        .sort((a, b) => a.localeCompare(b))[0];
+      current = next ?? null;
+    }
+  }
+  for (const id of [...ids].sort((a, b) => a.localeCompare(b))) {
+    if (!seen.has(id)) ordered.push(id);
+  }
+  return ordered;
+}
+
+function addNeighbor(map: Map<string, string[]>, source: string, target: string) {
+  const list = map.get(source) ?? [];
+  list.push(target);
+  map.set(source, list);
+}
+
+function sortRow(
+  row: LayoutUnit[],
+  barycenter: (unit: LayoutUnit) => number | null,
+) {
+  const current = new Map(row.map(unit => [unit.id, unit.index]));
+  row.sort((a, b) => {
+    const left = barycenter(a) ?? current.get(a.id) ?? 0;
+    const right = barycenter(b) ?? current.get(b.id) ?? 0;
+    if (left !== right) return left - right;
+    return a.id.localeCompare(b.id);
+  });
+  row.forEach((unit, index) => {
+    unit.index = index;
+  });
+}
+
+function unitWidth(unit: LayoutUnit, slotWidthOf: (id: string) => number) {
+  return unit.personIds.reduce(
+    (sum, personId, index) =>
+      sum + slotWidthOf(personId) + (index > 0 ? PARTNER_GAP : 0),
+    0,
+  );
+}
+
+function rowWidth(row: LayoutUnit[]) {
+  return (
+    row.reduce((sum, unit) => sum + unit.width, 0) +
+    UNIT_GAP * Math.max(0, row.length - 1)
+  );
+}
+
+/**
+ * Media lives under the deepest visible generation, ordered by owner x. It is
+ * deliberately outside the generation rows so showing photos never moves a
+ * person.
+ */
+function layoutMedia(
+  media: Array<{ id: string; ownerId: string; node: GraphNode }>,
+  byPerson: Map<string, GraphNode>,
+  generations: Map<string, number>,
+  direction: GenerationDirection,
+) {
+  if (!media.length) return;
+  let deepest = 0;
+  for (const level of generations.values()) deepest = Math.max(deepest, level);
+  const rowY = generationRowY(deepest + MEDIA_ROW_GAP, direction);
+  media.sort((a, b) => {
+    const left = byPerson.get(a.ownerId)?.x ?? 0;
+    const right = byPerson.get(b.ownerId)?.x ?? 0;
+    if (left !== right) return left - right;
+    return a.id.localeCompare(b.id);
+  });
+  const width = media.length * MEDIA_SPACING;
+  const start = -width / 2 + MEDIA_SPACING / 2;
+  media.forEach((item, index) => {
+    item.node.x = start + index * MEDIA_SPACING;
+    item.node.y = rowY;
+  });
 }
 
 /**
@@ -413,9 +820,9 @@ function componentNodeHalfWidth(node: GraphNode) {
 }
 
 /**
- * Guarantees the bands stay apart after the simulation has run. Whole
- * components are shifted on the x axis only, so generation rows survive, and a
- * component that already has room is left untouched.
+ * Guarantees the bands stay apart after a layout has run. Whole components are
+ * shifted on the x axis only, so generation rows survive, and a component that
+ * already has room is left untouched.
  */
 export function packComponents(
   nodes: GraphNode[],
@@ -605,7 +1012,7 @@ export function nodeRadius(node: GraphNode) {
     const card = fileCardSize(node);
     return Math.max(card.width, card.height) / 2;
   }
-  return Math.min(28, 12 + Math.sqrt(node.degree) * 4.2);
+  return personRadiusForDegree(node.degree);
 }
 
 const branchPalette = [

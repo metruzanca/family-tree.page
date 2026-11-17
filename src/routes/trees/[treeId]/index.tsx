@@ -98,7 +98,6 @@ function TreePageInner() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [handle, setHandle] = createSignal<GraphHandle>();
   const [showMedia, setShowMedia] = createSignal(true);
-  const [layout, setLayout] = createSignal<"generations" | "freeform">("generations");
   const [generationDirection, setGenerationDirection] = createSignal<GenerationDirection>(
     "oldest-top",
   );
@@ -327,8 +326,7 @@ function TreePageInner() {
   }
 
   onMount(() => {
-    const storedLayout = localStorage.getItem("family-tree-layout");
-    if (storedLayout === "freeform") setLayout("freeform");
+    localStorage.removeItem("family-tree-layout");
     if (localStorage.getItem("family-tree-media") === "off") setShowMedia(false);
     if (localStorage.getItem("family-tree-generation-direction") === "oldest-bottom") {
       setGenerationDirection("oldest-bottom");
@@ -419,12 +417,6 @@ function TreePageInner() {
     const next = !showMedia();
     setShowMedia(next);
     localStorage.setItem("family-tree-media", next ? "on" : "off");
-  }
-
-  function toggleLayout() {
-    const next = layout() === "generations" ? "freeform" : "generations";
-    setLayout(next);
-    localStorage.setItem("family-tree-layout", next);
   }
 
   function flipGenerationDirection() {
@@ -685,7 +677,6 @@ function TreePageInner() {
             showMedia={showMedia()}
             visible={focus().visible}
             fitPadding={canShowMore() || showFocusPrompt() ? 190 : 110}
-            layout={layout()}
             generationDirection={generationDirection()}
             presence={presence.peers()}
             selfPeerId={presence.selfPeerId()}
@@ -733,7 +724,6 @@ function TreePageInner() {
             treeName={graph().tree.name}
             role={graph().role}
             showMedia={showMedia()}
-            layout={layout()}
             generationDirection={generationDirection()}
             focus={{
               personName: viewerPerson()?.displayName ?? null,
@@ -750,9 +740,7 @@ function TreePageInner() {
             }}
             resolveNode={nodeLabel}
             onToggleMedia={toggleMedia}
-            onToggleLayout={toggleLayout}
             onFlipDirection={flipGenerationDirection}
-            onResetLayout={() => handle()?.reset()}
             onSearch={() => setSearchOpen(true)}
             onFit={() => handle()?.fit()}
             onZoomIn={() => handle()?.zoomBy(1.25)}
@@ -857,11 +845,9 @@ function TreePageInner() {
 
           <div class="pointer-events-none absolute bottom-4 left-4 z-10 hidden items-center gap-3 rounded-full border border-white/10 bg-black/30 px-3 py-1.5 text-[0.65rem] text-white/45 backdrop-blur sm:flex">
             <span class="rounded-full bg-white/10 px-2 py-0.5 text-[0.6rem] font-semibold uppercase tracking-wide text-white/60">
-              {layout() === "generations"
-                ? generationDirection() === "oldest-top"
-                  ? "Oldest at top"
-                  : "Oldest at bottom"
-                : "Freeform"}
+              {generationDirection() === "oldest-top"
+                ? "Oldest at top"
+                : "Oldest at bottom"}
             </span>
             <span class="flex items-center gap-1.5">
               <span class="h-1.5 w-4 rounded-full bg-[#66735f]" /> Parent

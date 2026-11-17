@@ -43,7 +43,7 @@ const features = [
   {
     icon: Rows3,
     title: "Generation-aware layouts",
-    body: "Parents above children, partners on the same row, plus a freeform mode and a flip for oldest at top or bottom.",
+    body: "Parents above children, partners on the same row, and a flip for oldest at top or bottom.",
   },
   {
     icon: CalendarDays,

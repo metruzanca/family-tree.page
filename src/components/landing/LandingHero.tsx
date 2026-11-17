@@ -159,12 +159,10 @@ export function LandingHero() {
                 role="viewer"
                 selectedId={selectedPersonId()}
                 showMedia={showMedia()}
-                layout="generations"
                 generationDirection="oldest-top"
                 class="landing-graph !h-full"
                 thumbUrlFor={demoThumbUrl}
                 fitPadding={isNarrow ? 8 : 64}
-                warmupTicks={0}
                 fixedLayout={demoLayout}
                 nodeLabel={node =>
                   node.kind === "person" ? node.person?.firstName ?? node.name : node.name
