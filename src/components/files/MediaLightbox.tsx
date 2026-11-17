@@ -184,21 +184,21 @@ export function MediaLightbox(props: MediaLightboxProps) {
             <Show when={props.files.length > 1}>
               <button
                 type="button"
-                class="absolute left-3 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-black/45 text-white/75 transition hover:bg-black/70 hover:text-white sm:left-6"
+                class="absolute left-3 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-black/25 text-white/55 backdrop-blur transition hover:bg-black/45 hover:text-white/85 sm:left-6"
                 aria-label="Previous file"
                 data-testid="media-lightbox-prev"
                 onClick={previous}
               >
-                <ChevronLeft size={22} />
+                <ChevronLeft size={22} strokeWidth={1.5} />
               </button>
               <button
                 type="button"
-                class="absolute right-3 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-black/45 text-white/75 transition hover:bg-black/70 hover:text-white sm:right-6"
+                class="absolute right-3 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-black/25 text-white/55 backdrop-blur transition hover:bg-black/45 hover:text-white/85 sm:right-6"
                 aria-label="Next file"
                 data-testid="media-lightbox-next"
                 onClick={next}
               >
-                <ChevronRight size={22} />
+                <ChevronRight size={22} strokeWidth={1.5} />
               </button>
             </Show>
           </div>
