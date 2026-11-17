@@ -31,7 +31,12 @@ export type GraphLink = {
   id: string;
   source: string | GraphNode;
   target: string | GraphNode;
-  kind: "parent" | "partner";
+  /**
+   * Parent and partner links come from relationships. Media links are the
+   * spring that keeps a photo or album near the person who owns it; the graph
+   * never paints them.
+   */
+  kind: "parent" | "partner" | "media";
   parentType?: "biological" | "adoptive" | "foster" | "step" | "unknown";
   status?: string;
 };
@@ -179,6 +184,16 @@ export function buildGraphModel(
       };
       nodes.push(node);
       addMedia(mediaByOwner, file.personId, node);
+    }
+    for (const [ownerId, media] of mediaByOwner) {
+      for (const node of media) {
+        links.push({
+          id: `media:${ownerId}:${node.id}`,
+          source: ownerId,
+          target: node.id,
+          kind: "media",
+        });
+      }
     }
   }
 

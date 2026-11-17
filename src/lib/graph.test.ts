@@ -168,10 +168,21 @@ describe("buildGraphModel", () => {
     ]);
   });
 
-  it("drops media nodes when media is hidden", () => {
+  it("links every media node to its owner", () => {
+    const model = buildGraphModel(data, true);
+    const mediaLinks = model.links.filter(link => link.kind === "media");
+    expect(mediaLinks).toHaveLength(model.nodes.length - model.people.length);
+    expect(mediaLinks[0]).toMatchObject({
+      source: "b",
+      target: fileNodeId("doc"),
+    });
+  });
+
+  it("drops media nodes and their links when media is hidden", () => {
     const model = buildGraphModel(data, false);
     expect(model.nodes.map(node => node.id)).toEqual(["a", "b"]);
     expect(model.mediaByOwner.size).toBe(0);
+    expect(model.links.filter(link => link.kind === "media")).toHaveLength(0);
   });
 
   it("renders one stack node for an uploaded album", () => {
