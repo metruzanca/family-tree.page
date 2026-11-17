@@ -320,7 +320,7 @@ export async function setAvatarRecord(input: {
   });
 }
 
-async function touchTree(treeId: string) {
+export async function touchTree(treeId: string) {
   await db.update(trees).set({ updatedAt: new Date() }).where(eq(trees.id, treeId));
   notifyTreeChanged(treeId);
 }

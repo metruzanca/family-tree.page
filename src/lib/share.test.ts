@@ -38,6 +38,8 @@ function image(id: string, personId: string, groupId: string | null = null): Gra
     height: 100,
     sizeBytes: 1000,
     takenAt: null,
+    facesScannedAt: null,
+    faces: [],
     taggedPersonIds: [],
     createdAt: new Date("2020-01-01T00:00:00Z"),
     isAvatar: false,
@@ -176,5 +178,35 @@ describe("sanitizeSharedGraph", () => {
     });
 
     expect(shared.groups).toEqual([]);
+  });
+
+  it("never shares face boxes or the scan marker", () => {
+    const data = graph();
+    data.files = data.files.map(file =>
+      file.id === "dead-image"
+        ? {
+            ...file,
+            facesScannedAt: new Date("2020-01-01T00:00:00Z"),
+            faces: [
+              {
+                id: "face-1",
+                box: { x: 0.1, y: 0.1, width: 0.2, height: 0.2 },
+                personId: "dead",
+                status: "assigned" as const,
+              },
+            ],
+          }
+        : file,
+    );
+
+    const shared = sanitizeSharedGraph(data, {
+      livingVisibility: "full",
+      includeMedia: true,
+      thumbUrl: thumb,
+    });
+
+    const file = shared.files.find(candidate => candidate.id === "dead-image")!;
+    expect(file.faces).toEqual([]);
+    expect(file.facesScannedAt).toBeNull();
   });
 });

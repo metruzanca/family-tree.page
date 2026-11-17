@@ -6,6 +6,7 @@ import type { APIEvent } from "@solidjs/start/server";
 import { db } from "../../../server/db";
 import {
   calendarFeeds,
+  fileFaces,
   fileGroups,
   fileTags,
   files,
@@ -80,6 +81,7 @@ export async function GET(event: APIEvent) {
       groupRows,
       fileRows,
       tagRows,
+      faceRows,
       memberRows,
       eventRows,
     ] = await Promise.all([
@@ -89,6 +91,7 @@ export async function GET(event: APIEvent) {
       db.select().from(fileGroups).where(eq(fileGroups.treeId, tree.id)),
       db.select().from(files).where(eq(files.treeId, tree.id)),
       db.select().from(fileTags).where(eq(fileTags.treeId, tree.id)),
+      db.select().from(fileFaces).where(eq(fileFaces.treeId, tree.id)),
       db
         .select({ displayName: users.displayName, role: treeMembers.role })
         .from(treeMembers)
@@ -122,12 +125,14 @@ export async function GET(event: APIEvent) {
         width: file.width,
         height: file.height,
         takenAt: file.takenAt,
+        facesScannedAt: file.facesScannedAt,
         status: file.status,
         isAvatar: file.isAvatar,
         createdAt: file.createdAt,
         updatedAt: file.updatedAt,
       })),
       fileTags: tagRows,
+      fileFaces: faceRows,
       personEvents: eventRows,
     });
 

@@ -75,6 +75,9 @@ export function sanitizeSharedGraph(
         .map(file => ({
           ...file,
           thumbUrl: options.thumbUrl(file.id),
+          // Face boxes point at people. Shared graphs never carry them.
+          faces: [],
+          facesScannedAt: null,
           taggedPersonIds: file.taggedPersonIds.filter(
             personId =>
               visiblePersonIds.has(personId) && canShowLivingMedia(personId),

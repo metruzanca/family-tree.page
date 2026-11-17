@@ -3,6 +3,7 @@
 import { and, eq, inArray, ne } from "drizzle-orm";
 import { db } from "../server/db";
 import {
+  fileFaces,
   fileGroups,
   fileTags,
   files,
@@ -12,6 +13,7 @@ import {
   personEvents,
   treeMembers,
   trees,
+  type FaceBox,
   type ParentChild,
   type Partnership,
   type Person,
@@ -57,6 +59,13 @@ import { recordUsage, reservePersonSlot } from "../server/usage";
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
+export type GraphFace = {
+  id: string;
+  box: FaceBox;
+  personId: string | null;
+  status: "unassigned" | "assigned" | "ignored";
+};
+
 export type GraphFile = {
   id: string;
   personId: string;
@@ -69,6 +78,8 @@ export type GraphFile = {
   height: number | null;
   sizeBytes: number;
   takenAt: FuzzyDate | null;
+  facesScannedAt: Date | null;
+  faces: GraphFace[];
   taggedPersonIds: string[];
   createdAt: Date;
   isAvatar: boolean;
@@ -180,28 +191,49 @@ export async function loadTreeGraph(tree: {
   description: string | null;
 }): Promise<TreeGraphData> {
   const treeId = tree.id;
-  const [peopleRows, parentRows, partnerRows, fileRows, groupRows, tagRows, eventRows] =
-    await Promise.all([
-      db.select().from(people).where(eq(people.treeId, treeId)),
-      db.select().from(parentChild).where(eq(parentChild.treeId, treeId)),
-      db.select().from(partnerships).where(eq(partnerships.treeId, treeId)),
-      db
-        .select()
-        .from(files)
-        .where(and(eq(files.treeId, treeId), eq(files.status, "ready"))),
-      db.select().from(fileGroups).where(eq(fileGroups.treeId, treeId)),
-      db
-        .select({ fileId: fileTags.fileId, personId: fileTags.personId })
-        .from(fileTags)
-        .where(eq(fileTags.treeId, treeId)),
-      db.select().from(personEvents).where(eq(personEvents.treeId, treeId)),
-    ]);
+  const [
+    peopleRows,
+    parentRows,
+    partnerRows,
+    fileRows,
+    groupRows,
+    tagRows,
+    faceRows,
+    eventRows,
+  ] = await Promise.all([
+    db.select().from(people).where(eq(people.treeId, treeId)),
+    db.select().from(parentChild).where(eq(parentChild.treeId, treeId)),
+    db.select().from(partnerships).where(eq(partnerships.treeId, treeId)),
+    db
+      .select()
+      .from(files)
+      .where(and(eq(files.treeId, treeId), eq(files.status, "ready"))),
+    db.select().from(fileGroups).where(eq(fileGroups.treeId, treeId)),
+    db
+      .select({ fileId: fileTags.fileId, personId: fileTags.personId })
+      .from(fileTags)
+      .where(eq(fileTags.treeId, treeId)),
+    db.select().from(fileFaces).where(eq(fileFaces.treeId, treeId)),
+    db.select().from(personEvents).where(eq(personEvents.treeId, treeId)),
+  ]);
 
   const tagsByFile = new Map<string, string[]>();
   for (const tag of tagRows) {
     const list = tagsByFile.get(tag.fileId) ?? [];
     list.push(tag.personId);
     tagsByFile.set(tag.fileId, list);
+  }
+
+  const facesByFile = new Map<string, GraphFace[]>();
+  for (const face of faceRows) {
+    const list = facesByFile.get(face.fileId) ?? [];
+    list.push({
+      id: face.id,
+      box: face.box,
+      personId: face.personId,
+      status: face.status,
+    });
+    facesByFile.set(face.fileId, list);
   }
 
   const avatarByPerson = new Map<string, string>();
@@ -267,7 +299,9 @@ export async function loadTreeGraph(tree: {
         endDate: row.endDate,
       })),
     ],
-    files: fileRows.map(file => toGraphFile(file, tagsByFile.get(file.id) ?? [])),
+    files: fileRows.map(file =>
+      toGraphFile(file, tagsByFile.get(file.id) ?? [], facesByFile.get(file.id) ?? []),
+    ),
     groups: groupViews,
     events: eventRows.map(event => ({
       id: event.id,
@@ -343,7 +377,11 @@ export async function setMyPerson(input: {
   });
 }
 
-function toGraphFile(file: StoredFile, taggedPersonIds: string[]): GraphFile {
+function toGraphFile(
+  file: StoredFile,
+  taggedPersonIds: string[],
+  faces: GraphFace[],
+): GraphFile {
   return {
     id: file.id,
     personId: file.personId,
@@ -356,6 +394,8 @@ function toGraphFile(file: StoredFile, taggedPersonIds: string[]): GraphFile {
     height: file.height,
     sizeBytes: file.sizeBytes,
     takenAt: file.takenAt,
+    facesScannedAt: file.facesScannedAt,
+    faces,
     taggedPersonIds,
     createdAt: file.createdAt,
     isAvatar: file.isAvatar,
@@ -500,6 +540,16 @@ export async function deletePerson(input: {
     }
 
     await db.transaction(async tx => {
+      // A deleted person should leave their face boxes behind, unlinked.
+      await tx
+        .update(fileFaces)
+        .set({ personId: null, status: "unassigned", updatedAt: new Date() })
+        .where(
+          and(
+            eq(fileFaces.treeId, access.tree.id),
+            eq(fileFaces.personId, input.personId),
+          ),
+        );
       const deleted = await tx
         .delete(people)
         .where(and(eq(people.id, input.personId), eq(people.treeId, access.tree.id)))

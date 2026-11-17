@@ -212,6 +212,8 @@ const file = (
   height: 240,
   sizeBytes: 18_000,
   takenAt: exactDateFromISO(options.createdAt ?? null),
+  facesScannedAt: null,
+  faces: [],
   taggedPersonIds: [],
   createdAt: new Date(options.createdAt ?? "2017-05-12T00:00:00Z"),
   isAvatar: false,

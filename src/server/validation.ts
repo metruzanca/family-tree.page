@@ -333,5 +333,59 @@ export const fileTakenAtSchema = z.object({
   takenAt: optionalFuzzyDate,
 });
 
+/**
+ * Boxes are normalized to the image, so every value is a fraction. A face
+ * smaller than two percent of the image is not worth storing.
+ */
+const MIN_FACE_SIDE = 0.02;
+
+export const faceBoxSchema = z
+  .object({
+    x: z.number().min(0).max(1),
+    y: z.number().min(0).max(1),
+    width: z.number().min(MIN_FACE_SIDE).max(1),
+    height: z.number().min(MIN_FACE_SIDE).max(1),
+  })
+  .refine(box => box.x + box.width <= 1.001 && box.y + box.height <= 1.001, {
+    message: "That face box falls outside the image.",
+  });
+
+const detectedFaceSchema = z.object({
+  box: faceBoxSchema,
+  confidence: z.number().min(0).max(1).optional().nullable(),
+});
+
+export const recordFacesSchema = z.object({
+  treeId: z.string().uuid(),
+  fileId: z.string().uuid(),
+  faces: z
+    .array(detectedFaceSchema)
+    .max(25, "That is too many faces for one photo.")
+    .default([]),
+});
+
+export const faceTargetSchema = z.object({
+  treeId: z.string().uuid(),
+  fileId: z.string().uuid(),
+  faceId: z.string().uuid(),
+});
+
+export const assignFaceSchema = faceTargetSchema.extend({
+  personId: z.string().uuid(),
+});
+
+export const ignoreFaceSchema = faceTargetSchema.extend({
+  ignored: z.boolean().default(true),
+});
+
+export const addManualFaceSchema = z.object({
+  treeId: z.string().uuid(),
+  fileId: z.string().uuid(),
+  personId: z.string().uuid(),
+  box: faceBoxSchema,
+});
+
+export type RecordedFaceInput = z.infer<typeof detectedFaceSchema>;
+
 export type PersonInput = z.infer<typeof personUpdateSchema>;
 export type PersonEventInput = z.infer<typeof personEventInputSchema>;

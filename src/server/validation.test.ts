@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { exactFuzzyDate } from "../lib/fuzzy-date";
 import {
+  addManualFaceSchema,
   deleteAccountSchema,
   emailChangeSchema,
   emailSchema,
@@ -10,6 +11,7 @@ import {
   inviteEmailSchema,
   parentChildSchema,
   personSchema,
+  recordFacesSchema,
   registerSchema,
   resetPasswordSchema,
   updateNotificationSettingsSchema,
@@ -199,6 +201,65 @@ describe("validation", () => {
     ).toBe(false);
     expect(
       deleteAccountSchema.safeParse({ password: "a-current-password", confirmation: "" }).success,
+    ).toBe(false);
+  });
+
+  it("accepts detected face boxes inside the image", () => {
+    const parsed = recordFacesSchema.parse({
+      treeId: "00000000-0000-4000-8000-000000000000",
+      fileId: "00000000-0000-4000-8000-000000000001",
+      faces: [
+        {
+          box: { x: 0.1, y: 0.2, width: 0.2, height: 0.25 },
+          confidence: 0.91,
+        },
+      ],
+    });
+    expect(parsed.faces).toHaveLength(1);
+  });
+
+  it("rejects face boxes that leave the image or are too small", () => {
+    const base = {
+      treeId: "00000000-0000-4000-8000-000000000000",
+      fileId: "00000000-0000-4000-8000-000000000001",
+    };
+    expect(
+      recordFacesSchema.safeParse({
+        ...base,
+        faces: [{ box: { x: 0.9, y: 0.1, width: 0.2, height: 0.2 } }],
+      }).success,
+    ).toBe(false);
+    expect(
+      recordFacesSchema.safeParse({
+        ...base,
+        faces: [{ box: { x: 0.1, y: 0.1, width: 0.01, height: 0.01 } }],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("caps the faces stored for one photo", () => {
+    const faces = Array.from({ length: 26 }, () => ({
+      box: { x: 0, y: 0, width: 0.1, height: 0.1 },
+    }));
+    expect(
+      recordFacesSchema.safeParse({
+        treeId: "00000000-0000-4000-8000-000000000000",
+        fileId: "00000000-0000-4000-8000-000000000001",
+        faces,
+      }).success,
+    ).toBe(false);
+  });
+
+  it("requires a person when a box is drawn by hand", () => {
+    const base = {
+      treeId: "00000000-0000-4000-8000-000000000000",
+      fileId: "00000000-0000-4000-8000-000000000001",
+      personId: "00000000-0000-4000-8000-000000000002",
+      box: { x: 0.1, y: 0.1, width: 0.2, height: 0.2 },
+    };
+    expect(addManualFaceSchema.safeParse(base).success).toBe(true);
+    expect(
+      addManualFaceSchema.safeParse({ ...base, personId: "grandma" }).success,
     ).toBe(false);
   });
 });

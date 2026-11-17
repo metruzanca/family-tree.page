@@ -29,6 +29,7 @@ import {
   storageKeys,
 } from "../server/file-service";
 import { createUploadPost } from "../server/storage";
+import { unassignFacesForPeople } from "../server/face-service";
 import { logActivityBestEffort, peopleNames } from "../server/activity";
 import { notifyTreeChanged } from "../server/presence";
 import {
@@ -426,6 +427,11 @@ export async function updateFileTags(input: {
               inArray(fileTags.personId, toRemove),
             ),
           );
+        await unassignFacesForPeople(tx, {
+          treeId: access.tree.id,
+          fileId: file.id,
+          personIds: toRemove,
+        });
       }
       if (toAdd.length) {
         await tx.insert(fileTags).values(
