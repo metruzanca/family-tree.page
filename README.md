@@ -190,7 +190,18 @@ Every file is still filed under one person, which is where its graph node lives.
 
 Images also carry an optional `taken_at` date. The browser reads EXIF `DateTimeOriginal` with `exifr` during upload and uses it as the initial value; editors can change or clear it in the file panel or lightbox. This is separate from the upload date, so scanned photos can be dated to when they were actually taken, and the date can be partial or approximate.
 
-`file_tags` also has nullable `face_box` and a `source` of `manual` or `face`. Nothing writes `face` yet: the columns and the tag picker are the groundwork for face detection and a "who is this?" pass after upload.
+`file_tags` records the people in a photo with a `source` of `manual` or `face`. The tag picker links someone without a box, which is also the fallback when a face is not detected.
+
+### Faces
+
+Editors can link people to individual faces in a photo. Detection runs in the browser with MediaPipe BlazeFace, using the app's own copy of the WASM runtime and model, so photos and face data never reach a third party.
+
+- The detector runs on the 640 px thumbnail after an image upload and on demand from "Check for faces" in the lightbox. Browser support is required; unsupported browsers fall back to tagging without boxes.
+- Only the box is stored, in `file_faces`, as normalized `x`, `y`, `width`, and `height` fractions. No embedding or identity template is created, so nothing can match a face across photos.
+- An unassigned box waits for an editor to link a person. Linking writes a `file_tags` row with `source = face`, so profiles, "Also in photos", activity, and exports keep working.
+- If the detector misses a face, "Add a face" draws a box and links a person in one step. The photo owner is already linked by ownership, so no duplicate tag is created.
+- "Not a face" keeps the box but hides it and protects it from re-scans. Removing a person from the tag list unassigns their face and keeps the box. Re-scanning matches boxes by overlap, so links and ignored faces survive.
+- Share links and the demo never include face boxes or the scan marker. Deleting a person unassigns their faces; deleting a photo or tree removes them.
 
 ## How dates work
 
@@ -580,11 +591,11 @@ This is a reading aid, not access control. The whole graph is still sent to ever
 - Backups live in a second Railway bucket in the same region and are not encrypted by the app. Backups run daily, so enable PostgreSQL point-in-time recovery for the gap between dumps.
 - Dates are Gregorian and structured. Seasons and free-text dates such as "spring 1918" are not represented; use an event note for those.
 - Focus is a presentation aid, not access control. The whole tree is still loaded for every member, and anyone can reveal all branches with one click.
-- No GEDCOM import or export, printable chart export, OCR, or face detection yet. See [docs/roadmap.md](docs/roadmap.md) for the deferred work.
+- No GEDCOM import or export, printable chart export, OCR, or face recognition yet. Face detection and manual linking ship, but names are never suggested. See [docs/roadmap.md](docs/roadmap.md) for the deferred work.
 
 ## Roadmap
 
-GEDCOM import and export, printable charts, OCR, face detection, multi-replica presence, and a person merge flow are deferred beyond v0.1.0. See [docs/roadmap.md](docs/roadmap.md) for scope and open questions. Pre-release checks and their current status live in [docs/release-checklist.md](docs/release-checklist.md).
+GEDCOM import and export, printable charts, OCR, face naming suggestions, multi-replica presence, and a person merge flow are deferred beyond v0.1.0. See [docs/roadmap.md](docs/roadmap.md) for scope and open questions. Pre-release checks and their current status live in [docs/release-checklist.md](docs/release-checklist.md).
 
 ## License
 

@@ -46,17 +46,18 @@ Scope:
 - Offer suggested names and dates for an editor to accept, never apply them automatically.
 - Keep a per-tree toggle so families can opt out.
 
-## 4. Face detection and photo tagging
+## 4. Face naming suggestions
 
-`file_tags` already has nullable `face_box` and a `source` of `manual` or `face`. Nothing writes `face` yet.
+Face detection is live: the browser finds faces, editors link them to people, and only boxes are stored. Recognition is the deferred half, and it needs care because a face template is sensitive data.
 
 Scope:
 
-- Detect faces after an image upload and store boxes.
-- Ask an editor to label each box, then reuse the labels to suggest names in later photos.
-- Let members confirm or reject suggestions for their own person.
-- Keep detection optional and off by default for privacy.
-- Never auto-tag a living person without confirmation.
+- Cluster faces inside one tree using an embedding computed on the device, and store the vector only if the family opts in.
+- Suggest a name for a new face when a cluster already has a confident label.
+- Never auto-tag a living person; ask an owner to confirm, and let members reject suggestions.
+- Let editors merge or split clusters.
+- Bulk-scan existing albums with progress, cancellation, and a per-tree opt-out.
+- Optional portrait crops derived from a face box.
 
 ## 5. Multi-replica presence
 

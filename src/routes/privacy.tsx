@@ -60,6 +60,14 @@ export default function PrivacyPage() {
           visible to people who can see the tree.
         </p>
         <p>
+          <span class="font-medium text-foreground">Face boxes.</span> If a tree uses face detection,
+          the browser finds faces and stores only their position in the photo. Detection runs on your
+          device with a model served by this app, so the image is not sent to a third party. We do not
+          create or store face embeddings, biometric templates, or any value that could identify a
+          person across photos. A box and its link to a person are visible to tree members, included in
+          your account export, and removed with the photo or tree.
+        </p>
+        <p>
           <span class="font-medium text-foreground">Collaboration data.</span> Tree memberships and
           roles, invitations you create, the email address of an invitee, and whether an invite was
           accepted or revoked. Invitations can be sent as a link or by email.
