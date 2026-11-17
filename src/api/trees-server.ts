@@ -18,6 +18,7 @@ import {
   type TreeRole,
 } from "../server/guards";
 import { AppError, runAction, type ActionResult } from "../server/errors";
+import { log } from "../server/logger";
 import { inviteEmailSchema, inviteSchema, treeRoleSchema, treeSchema } from "../server/validation";
 import { deletePrefix, TREE_PREFIX } from "../server/storage";
 import { publicOrigin } from "../server/config";
@@ -139,7 +140,7 @@ export async function deleteTree(treeId: string): Promise<ActionResult<undefined
     try {
       await deletePrefix(`${TREE_PREFIX}/${treeId}/`);
     } catch (error) {
-      console.error("Could not remove all tree objects from storage", error);
+      log.error("trees.storage_delete_failed", { treeId, error });
     }
     await db.delete(trees).where(eq(trees.id, treeId));
     await recordUsage({

@@ -1,3 +1,4 @@
+import { log } from "../../src/server/logger";
 import { definePlugin } from "nitro";
 import { sendBirthdayNotifications } from "../../src/server/birthday-notifications";
 import { captureServerError } from "../../src/server/sentry";
@@ -39,12 +40,10 @@ export default definePlugin(nitroApp => {
     try {
       const summary = await sendBirthdayNotifications();
       if (summary.emailsSent || summary.emailsFailed) {
-        console.info(
-          `Birthday emails: ${summary.emailsSent} sent, ${summary.emailsSkipped} skipped, ${summary.emailsFailed} failed, ${summary.usersNotified} people notified.`,
-        );
+        log.info("birthday.run_completed", { ...summary });
       }
     } catch (error) {
-      console.error("Birthday email run failed", error);
+      log.error("birthday.run_failed", { error });
       captureServerError(error, { source: "birthday-emails" });
     } finally {
       global.__familyTreeBirthdayRunning = false;

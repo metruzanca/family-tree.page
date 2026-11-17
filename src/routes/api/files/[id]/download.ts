@@ -1,3 +1,4 @@
+import { log } from "../../../../server/logger";
 import type { APIEvent } from "@solidjs/start/server";
 import { getOptionalUser } from "../../../../server/auth-service";
 import { getFileWithAccess } from "../../../../server/file-service";
@@ -26,7 +27,7 @@ export async function GET({ params, request }: APIEvent) {
       headers: { Location: signed, "Cache-Control": "no-store" },
     });
   } catch (error) {
-    console.error("Could not create download URL", error);
+    log.error("files.download_url_failed", { fileId: params.id, error });
     return new Response("Not found", { status: 404 });
   }
 }

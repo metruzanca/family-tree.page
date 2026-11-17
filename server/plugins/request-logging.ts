@@ -91,6 +91,21 @@ export default definePlugin(nitroApp => {
     });
   });
 
+  nitroApp.hooks.hook("error", (error, context) => {
+    const event = context.event as unknown as RuntimeEvent | undefined;
+    const request = event ? contextOf(event) : undefined;
+    log.error("request.error", {
+      requestId: request?.requestId,
+      method: request?.requestMethod,
+      path: request?.requestPath,
+      userId: request?.userId,
+      treeId: request?.treeId,
+      action: request?.action,
+      tags: context.tags,
+      error,
+    });
+  });
+
   nitroApp.hooks.hook("response", (res, rawEvent) => {
     const event = rawEvent as unknown as RuntimeEvent;
     const context = contextOf(event);

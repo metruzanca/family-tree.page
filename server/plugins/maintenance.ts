@@ -1,3 +1,4 @@
+import { log } from "../../src/server/logger";
 import { definePlugin } from "nitro";
 import { runMaintenance } from "../../src/server/maintenance";
 
@@ -34,13 +35,9 @@ export default definePlugin(nitroApp => {
     try {
       const summary = await runMaintenance();
       global.__familyTreeMaintenanceDay = today;
-      console.info(
-        `Maintenance: ${summary.staleUploads} stale uploads, ${summary.authTokens} tokens, ` +
-          `${summary.invites} invites, ${summary.birthdayLogs} birthday logs, ` +
-          `${summary.usageEvents} usage events pruned; ${summary.abuseWarnings} warnings.`,
-      );
+      log.info("maintenance.completed", { ...summary });
     } catch (error) {
-      console.error("Maintenance run failed", error);
+      log.error("maintenance.failed", { error });
     } finally {
       global.__familyTreeMaintenanceRunning = false;
     }

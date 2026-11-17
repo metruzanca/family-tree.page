@@ -1,3 +1,4 @@
+import { log } from "./logger";
 import { and, eq } from "drizzle-orm";
 import { fileTypeFromBuffer } from "file-type";
 import { db } from "./db";
@@ -200,7 +201,7 @@ export async function cleanupFile(file: StoredFile) {
     const keys = [file.storageKey, file.thumbKey].filter((key): key is string => Boolean(key));
     await deleteKeys(keys);
   } catch (error) {
-    console.error("Could not remove upload objects", error);
+    log.error("storage.delete_objects_failed", { fileId: file.id, treeId: file.treeId, error });
   }
   await db.delete(files).where(eq(files.id, file.id));
 }
@@ -269,7 +270,7 @@ export async function deleteFileGroup(
     try {
       await deleteKeys(keys);
     } catch (error) {
-      console.error("Could not remove album objects", error);
+      log.error("storage.delete_album_failed", { groupId, treeId, error });
     }
   }
   await db

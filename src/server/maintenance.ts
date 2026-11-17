@@ -1,3 +1,4 @@
+import { log } from "./logger";
 import { and, eq, isNotNull, lt, or, sql } from "drizzle-orm";
 import { db } from "./db";
 import {
@@ -45,7 +46,7 @@ export async function runMaintenance(): Promise<MaintenanceSummary> {
       await cleanupFile(file);
       staleUploads += 1;
     } catch (error) {
-      console.error("Could not clean up a stale upload", file.id, error);
+      log.error("maintenance.stale_upload_failed", { fileId: file.id, error });
     }
   }
 
@@ -90,7 +91,7 @@ export async function runMaintenance(): Promise<MaintenanceSummary> {
     abuseWarnings = digest.warnings;
     abuseDigestSent = digest.sent;
   } catch (error) {
-    console.error("Could not send the abuse digest", error);
+    log.error("maintenance.abuse_digest_failed", { error });
   }
 
   return {

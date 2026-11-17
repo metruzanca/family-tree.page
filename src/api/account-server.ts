@@ -13,6 +13,7 @@ import {
   verifyPassword,
 } from "../server/auth-service";
 import { AppError, runAction, type ActionResult } from "../server/errors";
+import { log } from "../server/logger";
 import { deleteAccountSchema, emailChangeSchema } from "../server/validation";
 import {
   EMAIL_CHANGE_TTL_MS,
@@ -122,10 +123,13 @@ export async function requestEmailChange(input: {
         }),
       );
       if (!notice.delivered && !notice.simulated) {
-        console.warn(`Email change notice for ${user.email} was not delivered.`);
+        log.warn("account.email_change_notice_failed", {
+          userId: user.id,
+          reason: notice.reason,
+        });
       }
     } catch (error) {
-      console.error("Could not send the email change notice", error);
+      log.error("account.email_change_notice_failed", { userId: user.id, error });
     }
 
     return {
@@ -285,7 +289,7 @@ export async function deleteAccount(input: {
         try {
           await deletePrefix(`${TREE_PREFIX}/${treeId}/`);
         } catch (error) {
-          console.error(`Could not remove storage for deleted tree ${treeId}`, error);
+          log.error("account.tree_storage_delete_failed", { treeId, error });
         }
       }
     }

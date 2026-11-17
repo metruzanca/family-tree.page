@@ -1,9 +1,16 @@
 import { Resend } from "resend";
 import { env, isProduction } from "./config";
+import { log } from "./logger";
 import type { EmailMessage } from "./email-templates";
 
 let client: Resend | null = null;
 let clientKey: string | null = null;
+
+function maskAddress(address: string) {
+  const [local, domain] = address.split("@");
+  if (!domain) return "[redacted]";
+  return `${local.slice(0, 1)}***@${domain}`;
+}
 
 export function isEmailConfigured() {
   return Boolean(process.env.RESEND_API_KEY?.trim());
@@ -34,7 +41,7 @@ export type SendEmailResult =
 export async function sendEmail(to: string, message: EmailMessage): Promise<SendEmailResult> {
   if (!isEmailConfigured()) {
     if (isProduction) {
-      console.error(`Cannot send "${message.subject}" to ${to}: RESEND_API_KEY is not set.`);
+      log.error("email.not_configured", { subject: message.subject, recipient: maskAddress(to) });
       return { delivered: false, reason: "not_configured" };
     }
     console.info(
@@ -56,7 +63,7 @@ export async function sendEmail(to: string, message: EmailMessage): Promise<Send
   try {
     from = env("RESEND_FROM_EMAIL").trim();
   } catch (error) {
-    console.error("Cannot send email: RESEND_FROM_EMAIL is not set.", error);
+    log.error("email.from_missing", { subject: message.subject, error });
     return { delivered: false, reason: "not_configured" };
   }
 
@@ -69,12 +76,20 @@ export async function sendEmail(to: string, message: EmailMessage): Promise<Send
       text: message.text,
     });
     if (error) {
-      console.error(`Resend rejected "${message.subject}" to ${to}:`, error);
+      log.error("email.rejected", {
+        subject: message.subject,
+        recipient: maskAddress(to),
+        error,
+      });
       return { delivered: false, reason: "failed" };
     }
     return { delivered: true };
   } catch (error) {
-    console.error(`Could not send "${message.subject}" to ${to}:`, error);
+    log.error("email.send_failed", {
+      subject: message.subject,
+      recipient: maskAddress(to),
+      error,
+    });
     return { delivered: false, reason: "failed" };
   }
 }

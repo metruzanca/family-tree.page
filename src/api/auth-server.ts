@@ -34,6 +34,7 @@ import {
 } from "../server/validation";
 import { markTokenUsed, validateAuthToken } from "../server/tokens";
 import type { PublicUser } from "../server/auth-service";
+import { log } from "../server/logger";
 
 export async function getUser(): Promise<PublicUser | null> {
   return getOptionalUser();
@@ -45,19 +46,25 @@ export async function login(formData: FormData) {
     password: formData.get("password"),
     redirectTo: formData.get("redirectTo") ?? undefined,
   });
-  if (!parsed.success) return new Error(parsed.error.issues[0]?.message ?? "Check your details.");
+  if (!parsed.success) {
+    log.warn("auth.login_rejected", { reason: "validation" });
+    return new Error(parsed.error.issues[0]?.message ?? "Check your details.");
+  }
   const { email, password, redirectTo } = parsed.data;
 
   if (!checkRateLimit("login", email, 10, 15 * 60_000)) {
+    log.warn("auth.login_rejected", { reason: "rate_limited" });
     return new Error("Too many attempts. Wait a few minutes and try again.");
   }
 
   const user = await findUserByEmail(email);
   if (!user || !(await verifyPassword(password, user.passwordHash))) {
+    log.warn("auth.login_rejected", { reason: "bad_credentials", userId: user?.id });
     return new Error("Invalid email or password.");
   }
 
   clearRateLimit("login", email);
+  log.info("auth.login_succeeded", { userId: user.id });
   await startSession(user.id);
   throw redirect(sanitizeRedirect(redirectTo, "/trees"));
 }
@@ -69,15 +76,22 @@ export async function register(formData: FormData) {
     password: formData.get("password"),
     redirectTo: formData.get("redirectTo") ?? undefined,
   });
-  if (!parsed.success) return new Error(parsed.error.issues[0]?.message ?? "Check your details.");
+  if (!parsed.success) {
+    log.warn("auth.register_rejected", { reason: "validation" });
+    return new Error(parsed.error.issues[0]?.message ?? "Check your details.");
+  }
   const { email, displayName, password, redirectTo } = parsed.data;
 
   if (!checkRateLimit("register", email, 5, 60 * 60_000)) {
+    log.warn("auth.register_rejected", { reason: "rate_limited" });
     return new Error("Too many accounts created from this address. Try again later.");
   }
 
   const existing = await findUserByEmail(email);
-  if (existing) return new Error("An account with that email already exists.");
+  if (existing) {
+    log.warn("auth.register_rejected", { reason: "duplicate_account" });
+    return new Error("An account with that email already exists.");
+  }
 
   const passwordHash = await hashPassword(password);
   let user;
@@ -87,30 +101,38 @@ export async function register(formData: FormData) {
       .values({ email, displayName, passwordHash })
       .returning();
   } catch (error) {
-    if (isUniqueViolation(error)) return new Error("An account with that email already exists.");
-    console.error(error);
+    if (isUniqueViolation(error)) {
+      log.warn("auth.register_rejected", { reason: "duplicate_account" });
+      return new Error("An account with that email already exists.");
+    }
+    log.error("auth.register_failed", { error });
     return new Error("Could not create your account. Please try again.");
   }
 
   try {
     const sent = await sendVerificationEmail(user);
     if (!sent.delivered && !sent.simulated) {
-      console.warn(`Verification email for ${email} was not delivered; the user can resend it later.`);
+      log.warn("auth.verification_email_failed", { userId: user.id, reason: sent.reason });
     }
   } catch (error) {
-    console.error("Could not send the verification email", error);
+    log.error("auth.verification_email_failed", { userId: user.id, error });
   }
 
+  log.info("auth.register_succeeded", { userId: user.id });
   await startSession(user.id);
   throw redirect(sanitizeRedirect(redirectTo, "/trees"));
 }
 
 export async function requestPasswordReset(formData: FormData) {
   const parsed = forgotPasswordSchema.safeParse({ email: formData.get("email") });
-  if (!parsed.success) return new Error(parsed.error.issues[0]?.message ?? "Enter your email.");
+  if (!parsed.success) {
+    log.warn("auth.password_reset_rejected", { reason: "validation" });
+    return new Error(parsed.error.issues[0]?.message ?? "Enter your email.");
+  }
   const { email } = parsed.data;
 
   if (!checkRateLimit("forgot-password", email, 5, 60 * 60_000)) {
+    log.warn("auth.password_reset_rejected", { reason: "rate_limited" });
     return new Error("Too many reset emails requested. Try again in an hour.");
   }
 
@@ -119,10 +141,10 @@ export async function requestPasswordReset(formData: FormData) {
     try {
       const sent = await sendPasswordResetEmail(user);
       if (!sent.delivered && !sent.simulated) {
-        console.warn(`Password reset email for ${email} was not delivered.`);
+        log.warn("auth.password_reset_email_failed", { userId: user.id, reason: sent.reason });
       }
     } catch (error) {
-      console.error("Could not send the password reset email", error);
+      log.error("auth.password_reset_email_failed", { userId: user.id, error });
     }
   }
 

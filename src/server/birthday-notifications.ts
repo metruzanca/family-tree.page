@@ -1,3 +1,4 @@
+import { log } from "./logger";
 import { and, eq, isNotNull, isNull, or } from "drizzle-orm";
 import { db } from "./db";
 import {
@@ -182,7 +183,7 @@ export async function sendBirthdayNotifications(
       } catch (error) {
         summary.emailsFailed += 1;
         await releaseClaim(candidate.userId, kind, dateKey(today));
-        console.error("Could not send a birthday email", error);
+        log.error("birthday.email_failed", { userId: candidate.userId, kind, error });
       }
     }
 

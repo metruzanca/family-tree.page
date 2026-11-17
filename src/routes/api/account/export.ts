@@ -1,3 +1,4 @@
+import { log } from "../../../server/logger";
 import { Readable } from "node:stream";
 import { ZipArchive } from "archiver";
 import { eq, inArray, isNull, and } from "drizzle-orm";
@@ -186,10 +187,10 @@ export async function GET(event: APIEvent) {
 
   const archive = new ZipArchive({ zlib: { level: 9 } });
   archive.on("warning", (error: Error) => {
-    console.warn("Account export warning", error);
+    log.warn("account.export_warning", { error });
   });
   archive.on("error", (error: Error) => {
-    console.error("Account export failed", error);
+    log.error("account.export_failed", { error });
   });
 
   archive.append(JSON.stringify(manifest, null, 2), {
@@ -223,11 +224,11 @@ export async function GET(event: APIEvent) {
               name: `trees/${media.treeId}/media/thumbs/${media.fileId}-${media.name}`,
             });
           } catch (error) {
-            console.warn(`Could not add thumbnail ${media.thumbKey} to export`, error);
+            log.warn("account.export_thumbnail_failed", { fileId: media.fileId, error });
           }
         }
       } catch (error) {
-        console.warn(`Could not add ${media.storageKey} to export`, error);
+        log.warn("account.export_media_failed", { fileId: media.fileId, error });
       }
     }
   }

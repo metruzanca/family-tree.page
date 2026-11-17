@@ -1,3 +1,4 @@
+import { log } from "./logger";
 import { and, eq, ne, sql } from "drizzle-orm";
 import { db } from "./db";
 import {
@@ -156,7 +157,7 @@ export async function recordUsage(input: {
     });
   } catch (error) {
     // Monitoring must never break the action it is observing.
-    console.error("Could not record usage event", error);
+    log.error("usage.record_failed", { error });
   }
 }
 

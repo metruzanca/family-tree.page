@@ -1,3 +1,4 @@
+import { log } from "../../../../server/logger";
 import type { APIEvent } from "@solidjs/start/server";
 import { getOptionalUser } from "../../../../server/auth-service";
 import { getFileWithAccess } from "../../../../server/file-service";
@@ -23,7 +24,7 @@ export async function GET({ params }: APIEvent) {
     if (object.etag) headers.set("ETag", object.etag);
     return new Response(object.stream, { headers });
   } catch (error) {
-    console.error("Could not read thumbnail", error);
+    log.error("files.thumbnail_failed", { fileId: params.id, error });
     return new Response("Not found", { status: 404 });
   }
 }

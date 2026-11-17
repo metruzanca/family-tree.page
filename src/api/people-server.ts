@@ -21,6 +21,7 @@ import {
 import type { FuzzyDate } from "../lib/fuzzy-date";
 import { requireTreeMember, type TreeRole } from "../server/guards";
 import { AppError, runAction, type ActionResult } from "../server/errors";
+import { log } from "../server/logger";
 import {
   addRelativeSchema,
   parentChildSchema,
@@ -382,7 +383,11 @@ export async function deletePerson(input: {
     try {
       await deletePrefix(`${TREE_PREFIX}/${input.treeId}/people/${input.personId}/`);
     } catch (error) {
-      console.error("Could not remove person files from storage", error);
+      log.error("people.storage_delete_failed", {
+        treeId: input.treeId,
+        personId: input.personId,
+        error,
+      });
     }
     const deleted = await db
       .delete(people)
