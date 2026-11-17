@@ -32,7 +32,7 @@ The graph is the main view. People are nodes, parent and partner relationships a
 - Media clusters around its owner through a short hidden spring and is drawn behind the graph, so a photo never covers a person
 - Partner edges are dashed, parent arms follow the relationship type, and hovering a person dims everyone outside their immediate family
 - Cycle-safe relationship analysis that stays bounded when relationships contradict each other, with an in-app warning and `pnpm db:check`
-- "This is me" links a member to their person, so the tree opens around their own branch instead of the whole family
+- The focus menu links a member to their person, so the tree opens around their own branch instead of the whole family
 - Focus rings from immediate family out to first cousins, with a "Show more" chip and an Everyone option that reveals the rest of the tree in one click
 - Search, neighbor highlighting, zoom and pan
 - Calendar tab with birth and death anniversaries, plus upcoming birthdays for living relatives
@@ -568,7 +568,7 @@ Account settings also shows storage and people usage against your limits, with a
 
 ## Focused browsing
 
-Every member can mark the person they represent with "This is me" on a profile. The graph then opens with distance rings around that person instead of the whole family:
+Every member can mark the person they represent from the focus menu in the graph toolbar. The graph then opens with distance rings around that person instead of the whole family:
 
 - 1 hop: partner, parents and children
 - 2 hops: siblings, grandparents, grandchildren and in-laws
