@@ -740,7 +740,7 @@ function TreePageInner() {
   return (
     <Show when={data()} fallback={<GraphLoading />}>
       {graph => (
-        <div class="relative h-[100dvh] w-full overflow-hidden bg-graph-bg">
+        <div class="relative h-[100dvh] w-full overflow-hidden bg-graph-bg" data-testid="tree-page">
           <GraphView
             data={graph()}
             role={graph().role}
@@ -758,7 +758,10 @@ function TreePageInner() {
           />
 
           <Show when={conflicts().length}>
-            <div class="pointer-events-none absolute inset-x-0 top-20 z-30 flex justify-center px-3">
+            <div
+              class="pointer-events-none absolute inset-x-0 top-20 z-30 flex justify-center px-3"
+              data-testid="tree-conflict-alert"
+            >
               <Alert
                 variant="destructive"
                 class="pointer-events-auto max-w-xl border-destructive/30 bg-card/95 shadow-xl backdrop-blur"
@@ -777,6 +780,7 @@ function TreePageInner() {
                           <button
                             type="button"
                             class="text-left underline decoration-destructive/40 underline-offset-2 hover:text-foreground"
+                            data-testid={`tree-conflict-${conflict.personIds[0]}`}
                             onClick={() => focusPerson(conflict.personIds[0])}
                           >
                             {conflictTitle(conflict)}
@@ -820,7 +824,10 @@ function TreePageInner() {
           />
 
           <Show when={graph().people.length === 0}>
-            <div class="pointer-events-none absolute inset-0 z-10 grid place-items-center px-6">
+            <div
+              class="pointer-events-none absolute inset-0 z-10 grid place-items-center px-6"
+              data-testid="tree-empty"
+            >
               <div class="pointer-events-auto w-full max-w-md rounded-3xl border border-white/10 bg-black/45 p-7 text-center text-white/85 shadow-2xl backdrop-blur-xl">
                 <div class="mx-auto grid h-14 w-14 place-items-center rounded-3xl bg-white/10 text-gold">
                   <Sprout size={27} />
@@ -832,7 +839,11 @@ function TreePageInner() {
                     : "The people who manage this tree have not added anyone yet."}
                 </p>
                 <Show when={editable()}>
-                  <Button class="mt-6" onClick={() => setAddPersonOpen(true)}>
+                  <Button
+                    class="mt-6"
+                    data-testid="tree-empty-add-person"
+                    onClick={() => setAddPersonOpen(true)}
+                  >
                     <Plus size={16} />
                     Add the first person
                   </Button>
@@ -914,7 +925,10 @@ function TreePageInner() {
             )}
           </Show>
 
-          <div class="pointer-events-none absolute bottom-4 left-4 z-10 hidden items-center gap-3 rounded-full border border-white/10 bg-black/30 px-3 py-1.5 text-[0.65rem] text-white/45 backdrop-blur sm:flex">
+          <div
+            class="pointer-events-none absolute bottom-4 left-4 z-10 hidden items-center gap-3 rounded-full border border-white/10 bg-black/30 px-3 py-1.5 text-[0.65rem] text-white/45 backdrop-blur sm:flex"
+            data-testid="tree-legend"
+          >
             <span class="rounded-full bg-white/10 px-2 py-0.5 text-[0.6rem] font-semibold uppercase tracking-wide text-white/60">
               {generationDirection() === "oldest-top"
                 ? "Oldest at top"
@@ -933,7 +947,10 @@ function TreePageInner() {
 
           <Show when={canShowMore()}>
             <div class="pointer-events-none absolute inset-x-0 bottom-20 z-20 flex justify-center px-4 sm:bottom-24">
-              <div class="pointer-events-auto flex items-center gap-1.5 rounded-full border border-white/15 bg-black/60 py-1.5 pl-3 pr-1.5 text-xs text-white/80 shadow-xl backdrop-blur-md">
+              <div
+                class="pointer-events-auto flex items-center gap-1.5 rounded-full border border-white/15 bg-black/60 py-1.5 pl-3 pr-1.5 text-xs text-white/80 shadow-xl backdrop-blur-md"
+                data-testid="tree-show-more"
+              >
                 <Target size={14} class="text-gold" />
                 <span class="pr-1">
                   {focus().nextRingCount} more{" "}
@@ -942,6 +959,7 @@ function TreePageInner() {
                 <button
                   type="button"
                   class="rounded-full bg-white/10 px-3 py-1 font-semibold text-white transition hover:bg-white/20"
+                  data-testid="tree-show-more-button"
                   onClick={showMore}
                 >
                   Show more
@@ -949,6 +967,7 @@ function TreePageInner() {
                 <button
                   type="button"
                   class="rounded-full px-2.5 py-1 text-white/55 transition hover:text-white"
+                  data-testid="tree-show-more-everyone"
                   onClick={() => chooseFocusRadius("all")}
                 >
                   Everyone
@@ -959,11 +978,15 @@ function TreePageInner() {
 
           <Show when={showFocusPrompt()}>
             <div class="pointer-events-none absolute inset-x-0 bottom-20 z-20 flex justify-center px-4 sm:bottom-24">
-              <div class="pointer-events-auto relative w-full max-w-md rounded-2xl border border-white/10 bg-black/60 p-4 pr-10 text-white/85 shadow-xl backdrop-blur-md">
+              <div
+                class="pointer-events-auto relative w-full max-w-md rounded-2xl border border-white/10 bg-black/60 p-4 pr-10 text-white/85 shadow-xl backdrop-blur-md"
+                data-testid="tree-focus-prompt"
+              >
                 <button
                   type="button"
                   class="absolute right-2 top-2 grid size-7 place-items-center rounded-full text-white/45 transition hover:bg-white/10 hover:text-white"
                   aria-label="Dismiss"
+                  data-testid="tree-focus-prompt-dismiss"
                   onClick={dismissFocusPrompt}
                 >
                   <X size={15} />
@@ -976,6 +999,7 @@ function TreePageInner() {
                 <Button
                   size="sm"
                   class="mt-3"
+                  data-testid="tree-focus-prompt-find"
                   onClick={() => setFocusPersonOpen(true)}
                 >
                   <Target size={14} />
@@ -990,6 +1014,7 @@ function TreePageInner() {
               type="button"
               class="absolute bottom-5 right-5 z-20 grid h-14 w-14 place-items-center rounded-full bg-gold text-[#161a12] shadow-2xl transition hover:scale-105 sm:hidden"
               aria-label="Add a person"
+              data-testid="tree-add-person-mobile"
               onClick={() => setAddPersonOpen(true)}
             >
               <Plus size={24} />
@@ -1059,6 +1084,7 @@ function TreePageInner() {
             confirmLabel="Delete event"
             danger
             pending={pendingDeleteEvent()}
+            testId="tree-confirm-delete-event"
             onConfirm={handleDeleteEvent}
           />
 
@@ -1075,6 +1101,7 @@ function TreePageInner() {
             confirmLabel="Delete person"
             danger
             pending={pendingDelete()}
+            testId="tree-confirm-delete-person"
             onConfirm={handleDeletePerson}
           />
 
@@ -1086,6 +1113,7 @@ function TreePageInner() {
             confirmLabel="Delete file"
             danger
             pending={pendingDelete()}
+            testId="tree-confirm-delete-file"
             onConfirm={handleDeleteFile}
           />
 
@@ -1097,6 +1125,7 @@ function TreePageInner() {
             confirmLabel="Delete album"
             danger
             pending={pendingDelete()}
+            testId="tree-confirm-delete-album"
             onConfirm={handleDeleteGroup}
           />
         </div>
@@ -1107,7 +1136,7 @@ function TreePageInner() {
 
 function GraphLoading() {
   return (
-    <div class="graph-shell relative">
+    <div class="graph-shell relative" data-testid="tree-loading">
       <div class="pointer-events-none absolute inset-x-0 top-0 z-20 p-3 sm:p-4">
         <div class="flex items-center gap-2">
           <div class="h-10 w-24 animate-pulse rounded-full border border-white/10 bg-black/35 backdrop-blur" />

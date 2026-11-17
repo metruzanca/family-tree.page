@@ -17,7 +17,11 @@ import { useTheme } from "../ui/Theme";
 
 export function BrandMark(props: { compact?: boolean; href?: string }) {
   return (
-    <A href={props.href ?? "/trees"} class="inline-flex items-center gap-2.5">
+    <A
+      href={props.href ?? "/trees"}
+      class="inline-flex items-center gap-2.5"
+      data-testid="header-brand"
+    >
       <span class="grid h-9 w-9 place-items-center rounded-xl bg-[#22331f] text-[#f5efe2] shadow-sm">
         <svg viewBox="0 0 64 64" class="h-5 w-5" aria-hidden="true">
           <path d="M32 52V30" stroke="currentColor" stroke-width="6" stroke-linecap="round" />
@@ -50,6 +54,7 @@ export function AppHeader(props: {
           <A
             href={props.back!.href}
             class={buttonVariants({ variant: "ghost", size: "sm", class: "-ml-2 gap-1.5" })}
+            data-testid="header-back"
           >
             <span aria-hidden="true">←</span>
             <span class="hidden sm:inline">{props.back!.label}</span>
@@ -69,6 +74,7 @@ export function AppHeader(props: {
           <IconButton
             label={theme() === "dark" ? "Switch to light theme" : "Switch to dark theme"}
             onClick={toggle}
+            data-testid="header-theme-toggle"
           >
             <Show when={theme() === "dark"} fallback={<Moon />}>
               <Sun />
@@ -79,6 +85,7 @@ export function AppHeader(props: {
             <DropdownMenuTrigger
               class="rounded-full p-0.5 outline-hidden transition hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/35"
               aria-label="Account menu"
+              data-testid="header-account-menu"
             >
               <Avatar name={props.user.displayName} size={34} />
             </DropdownMenuTrigger>
@@ -90,6 +97,7 @@ export function AppHeader(props: {
               <DropdownMenuSeparator class="my-1" />
               <DropdownMenuItem
                 class="gap-2 rounded-xl px-3 py-2"
+                data-testid="header-account-settings"
                 onSelect={() => navigate("/settings")}
               >
                 <Settings />
@@ -98,6 +106,7 @@ export function AppHeader(props: {
               <DropdownMenuItem
                 variant="destructive"
                 class="gap-2 rounded-xl px-3 py-2"
+                data-testid="header-sign-out"
                 onSelect={() => signOutForm?.requestSubmit()}
               >
                 <LogOut />

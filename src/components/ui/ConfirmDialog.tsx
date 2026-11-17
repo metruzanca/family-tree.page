@@ -17,9 +17,11 @@ export function ConfirmDialog(props: {
   confirmLabel?: string;
   danger?: boolean;
   pending?: boolean;
+  testId?: string;
   onClose: () => void;
   onConfirm: () => void;
 }) {
+  const baseTestId = () => props.testId ?? "confirm-dialog";
   return (
     <AlertDialog
       open={props.open}
@@ -30,7 +32,7 @@ export function ConfirmDialog(props: {
       <AlertDialogPortal>
         <AlertDialogContent
           class="gap-5 rounded-[1.35rem] border-border bg-card shadow-[var(--shadow-soft)]"
-          data-testid="confirm-dialog"
+          data-testid={baseTestId()}
         >
           <AlertDialogHeader class="gap-2">
             <AlertDialogTitle class="font-display text-xl leading-tight tracking-tight">
@@ -47,7 +49,7 @@ export function ConfirmDialog(props: {
               variant="ghost"
               type="button"
               onClick={props.onClose}
-              data-testid="confirm-dialog-cancel"
+              data-testid={`${baseTestId()}-cancel`}
             >
               Cancel
             </Button>
@@ -55,7 +57,7 @@ export function ConfirmDialog(props: {
               variant={props.danger ? "destructive" : "default"}
               type="button"
               disabled={props.pending}
-              data-testid="confirm-dialog-confirm"
+              data-testid={`${baseTestId()}-confirm`}
               onClick={props.onConfirm}
             >
               {props.pending ? "Working…" : (props.confirmLabel ?? "Confirm")}
