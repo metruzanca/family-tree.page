@@ -343,9 +343,44 @@ Proposed paid tiers, the cost model, and how to map a plan to the two quota colu
 
 ## Backups
 
-Production keeps two private Railway Storage Buckets in `iad`: the live bucket (`roots-files`) and a backup bucket (`roots-backups`). A Railway cron service runs `pnpm backup` daily at 03:00 UTC from `Dockerfile.backup`.
+Production keeps two private Railway Storage Buckets in `iad`: the live bucket (`roots-files`) and a backup bucket (`roots-backups`). A Railway cron service, `roots-backup`, runs `pnpm backup` daily at 03:00 UTC from `Dockerfile.backup`.
 
-Each run:
+### Provisioned cron service
+
+| Setting | Value |
+|---|---|
+| Service | `roots-backup` |
+| Schedule | `0 3 * * *`, daily at 03:00 UTC |
+| Source | `metruzanca/family-tree.page`, branch `main` |
+| Build | `Dockerfile.backup` |
+| Start command | `pnpm backup` |
+| Restart policy | `NEVER` |
+| Region | `us-east4-eqdc4a` |
+| Source bucket | `roots-files` in `iad` |
+| Backup bucket | `roots-backups` in `iad` |
+
+The service has no public domain and no HTTP health check. Its variables reference `Postgres`, `roots-files`, and `roots-backups`, so database and bucket credentials are resolved by Railway instead of being copied into the service.
+
+Inspect the service and its runs:
+
+```sh
+railway status
+railway logs --service roots-backup
+railway redeploy --service roots-backup --yes
+```
+
+`railway redeploy` runs the backup once outside the schedule. A successful run ends with:
+
+```text
+Uploaded postgres/<timestamp>.dump (...)
+Media: N copied (...), N deleted, N in source.
+No expired dumps to delete.
+Backup finished.
+```
+
+The first manual run on 2026-11-17 wrote a 70 KB dump, copied 48 media objects (44 MB), and finished with no errors.
+
+### What each run does
 
 1. Writes a compressed `pg_dump` to `postgres/<timestamp>.dump` and updates `postgres/latest.json` with the size, SHA-256, git SHA, and media status.
 2. Copies media keys under `trees/` to `media/trees/` in the backup bucket. Storage keys are immutable, so only missing objects are copied.
@@ -365,10 +400,10 @@ pnpm backup:restore --yes     restore the latest dump into a local database
 
 Media restore is manual: copy `media/trees/` from the backup bucket back to `trees/` in the live bucket with `aws s3 sync` or the Railway dashboard. Storage keys are stable, so the database rows point at the restored objects without changes.
 
-Set up the cron service on Railway:
+To recreate the service from scratch:
 
 1. Add a second Storage Bucket in the same project and region.
-2. Add a service from this repository and set its config file path to `/railway.backup.json`. It builds `Dockerfile.backup` and runs `pnpm backup` on the cron schedule.
+2. Add a service from this repository and set its config file path to `/railway.backup.json`, or set the Dockerfile path, start command, and cron schedule directly. It builds `Dockerfile.backup` and runs `pnpm backup` on the cron schedule.
 3. Set these variables on the backup service:
 
 ```text
@@ -388,7 +423,7 @@ BACKUP_S3_FORCE_PATH_STYLE=false
 ```
 
 4. Disable the HTTP health check and keep the restart policy at `NEVER`.
-5. Enable Postgres point-in-time recovery as the first line of defense between dumps. Railway currently offers this only on Pro workspaces.
+5. Enable Postgres point-in-time recovery as the first line of defense between dumps. Check it with `railway postgres pitr status --service Postgres`. Railway currently offers this only on Pro workspaces, so it stays off on the current plan.
 
 The backup bucket is private, but the dumps are not encrypted by the app. Both buckets live in the same provider and region, so a Railway account or regional failure loses both. The upgrade path is an external S3-compatible target, `age` encryption, and object versioning.
 
