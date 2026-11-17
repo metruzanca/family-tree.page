@@ -147,6 +147,7 @@ Copy `.env.example` to `.env`. The important variables:
 | `BACKUP_S3_SECRET_ACCESS_KEY` | Backup bucket secret |
 | `BACKUP_S3_FORCE_PATH_STYLE` | `true` for local s3rver, `false` for Railway buckets |
 | `BACKUP_MEDIA` | Set to `off` to back up PostgreSQL only |
+| `LOG_LEVEL` | Optional log verbosity: `debug`, `info`, `warn`, or `error` |
 | `SENTRY_DSN` | Optional server Sentry DSN |
 | `VITE_SENTRY_DSN` | Optional browser Sentry DSN, inlined at build time |
 | `SENTRY_ENVIRONMENT` / `VITE_SENTRY_ENVIRONMENT` | Optional Sentry environment labels |
@@ -364,11 +365,22 @@ BACKUP_S3_FORCE_PATH_STYLE=false
 
 The backup bucket is private, but the dumps are not encrypted by the app. Both buckets live in the same provider and region, so a Railway account or regional failure loses both. The upgrade path is an external S3-compatible target, `age` encryption, and object versioning.
 
-## Error tracking
+## Logging and error tracking
+
+The server writes structured JSON logs to stdout and stderr. Every request gets
+an `x-request-id`, every server action logs its outcome, and expected failures
+such as validation and permission errors are logged at `warn` instead of being
+silently returned to the browser. Set `LOG_LEVEL` to `debug`, `info`, `warn`, or
+`error`; production defaults to `info`. See [docs/logging.md](docs/logging.md)
+for the event catalog, privacy rules, and the support workflow.
+
+Railway runtime logs are short-lived. Add a log drain to a service such as
+Axiom or Better Stack if you need long-term search. The startup `app.started`
+line confirms that the log pipeline is working after a deploy.
 
 Sentry is optional and off by default. Set `SENTRY_DSN` on the server and `VITE_SENTRY_DSN` at build time for the browser. Without a DSN both sides do nothing.
 
-The server captures unexpected errors in `runAction`, the Nitro error hook, the presence socket, and the birthday scheduler. The browser captures route errors and unhandled errors. Data collection is disabled for user info, cookies, headers, bodies, query strings, and database values, and `beforeSend` removes any request or user fields that still appear.
+The server captures unexpected errors in `runAction`, the Nitro error hook, the presence socket, and the birthday scheduler. The browser captures route errors and unhandled errors. Data collection is disabled for user info, cookies, headers, bodies, query strings, and database values, and `beforeSend` removes any request or user fields that still appear. Errors include the same request id as the logs.
 
 Set `SENTRY_ORG`, `SENTRY_PROJECT`, and `SENTRY_AUTH_TOKEN` to upload source maps during `pnpm build`. All three are required, otherwise the Vite plugin is skipped. `SENTRY_ENVIRONMENT` and `VITE_SENTRY_ENVIRONMENT` label events, and `VITE_RELEASE` sets the browser release.
 
@@ -397,6 +409,7 @@ S3_BUCKET=${{BucketName.BUCKET}}
 S3_ACCESS_KEY_ID=${{BucketName.ACCESS_KEY_ID}}
 S3_SECRET_ACCESS_KEY=${{BucketName.SECRET_ACCESS_KEY}}
 S3_FORCE_PATH_STYLE=false
+LOG_LEVEL=info
 SENTRY_DSN=<optional server DSN>
 VITE_SENTRY_DSN=<optional browser DSN>
 SENTRY_ENVIRONMENT=production
