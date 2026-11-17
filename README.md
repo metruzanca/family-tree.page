@@ -28,6 +28,7 @@ The graph is the main view. People are nodes, parent and partner relationships a
 - Force-directed layout: parent and partner edges pull families into loose clusters, so relatives stay together and edges stay short
 - Every parent set meets at a hidden family junction, so a couple and their children fan out from one point instead of crossing lines
 - A label-aware collision force keeps names readable, and disconnected branches find their own space
+- Optional birth-year gravity drifts older people upward without pinning rows, toggled from the toolbar and remembered per browser
 - Media clusters around its owner through a short hidden spring and is drawn behind the graph, so a photo never covers a person
 - Partner edges are dashed, parent arms follow the relationship type, and hovering a person dims everyone outside their immediate family
 - Cycle-safe relationship analysis that stays bounded when relationships contradict each other, with an in-app warning and `pnpm db:check`
