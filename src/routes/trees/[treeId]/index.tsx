@@ -474,9 +474,12 @@ function TreePageInner() {
   function handleGraphSelection(id: string | null) {
     if (id) {
       focusPerson(id);
-    } else {
-      selectPerson(null);
+      return;
     }
+    // Clicking the canvas should not dismiss the person panel; it stays open
+    // until the close button is used.
+    if (selectedPerson()) return;
+    selectPerson(null);
   }
 
   function toggleMedia() {

@@ -77,6 +77,17 @@ export function SharedTreeView(props: SharedTreeViewProps) {
     setTimeout(() => handle()?.focus(id), 80);
   }
 
+  function handleGraphSelection(id: string | null) {
+    if (id) {
+      focusPerson(id);
+      return;
+    }
+    // Clicking the canvas should not dismiss the person panel; it stays open
+    // until the close button is used.
+    if (selectedPerson()) return;
+    closePanels();
+  }
+
   function focusFile(id: string) {
     const file = props.graph.files.find(candidate => candidate.id === id);
     if (!file) return;
@@ -120,7 +131,7 @@ export function SharedTreeView(props: SharedTreeViewProps) {
         selectedId={selectedNodeId()}
         showMedia={showMedia()}
         thumbUrlFor={props.thumbUrlFor}
-        onSelect={focusPerson}
+        onSelect={handleGraphSelection}
         onFileSelect={focusFile}
         onGroupSelect={focusGroup}
         onReady={setHandle}
