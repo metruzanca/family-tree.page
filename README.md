@@ -41,6 +41,9 @@ The graph is the main view. People are nodes, parent and partner relationships a
 - Live presence: see who else has the tree open, which person, file, or album they are looking at, and a colored ring and name tag around that node
 - Pointer cursor only over nodes, not links or empty canvas
 - Person and document info panels on desktop and mobile
+- Tree activity feed with filters, field-level changes, and an actor history
+- Live refresh nudge when another member changes the tree
+- Duplicate person warnings before adding a similar name or birth year
 - Nightly PostgreSQL and media backups to a second private bucket, with checksum verification and a one-command restore
 - Optional Sentry error tracking with PII scrubbing
 - Optional Umami analytics with page views and product events, enabled by environment variables
@@ -205,6 +208,20 @@ The same model is used for `people.birth_date`, `people.death_date`, `partnershi
 ## Life events
 
 Each person has a timeline of life events. An event has a kind (residence, occupation, education, military service, immigration, emigration, burial, or other), an optional title, a place, a fuzzy date, and notes. Editors can add, edit, and delete events from the person panel. Events are included in account exports and are removed with the person or tree.
+
+## Tree activity
+
+Every meaningful change writes a row to `tree_activity` with an actor name snapshot, an action, the affected person when there is one, a human summary, and field-level before and after values for person and event edits. The activity page is at `/trees/:treeId/activity` and is visible to every member. It supports filtering by person, member, and type, with cursor pagination.
+
+The actor name is snapshotted. Deleting an account replaces the actor with "Former member" instead of erasing the history. Rows are deleted with the tree.
+
+## Live refresh
+
+The presence WebSocket also carries a `tree-changed` message. Mutations call `notifyTreeChanged`, the WebSocket route forwards it to sockets in that tree, and open tabs revalidate the graph after a short debounce. Tabs also refresh on focus, visibility change, and reconnect. If a dialog is open, the refresh waits until it closes and a toast explains why.
+
+## Duplicate people
+
+Before creating a person, the app compares normalized names, maiden names, nicknames, and birth year ranges. A likely duplicate shows a warning with the matching reasons. The add-relative flow can switch to the existing person, and "Add anyway" records an explicit override. `pnpm db:check` prints likely duplicate pairs.
 
 ## How presence works
 
@@ -510,7 +527,8 @@ This is a reading aid, not access control. The whole graph is still sent to ever
 
 ## Known limitations
 
-- No realtime co-editing. Presence is live, but the graph still refreshes after changes.
+- No realtime co-editing. The graph refreshes after changes and a live nudge refreshes other open tabs, but edits are not merged character by character.
+- Duplicate detection is heuristic. There is no merge tool yet, so "Add anyway" can still create a duplicate.
 - Presence is held in the app process. It works as-is on a single Railway replica. Running more than one replica needs a shared presence store, such as Redis or Postgres `LISTEN`/`NOTIFY`.
 - HEIC photos work only when the browser can decode them; otherwise the user is asked to export as JPEG.
 - Backups live in a second Railway bucket in the same region and are not encrypted by the app. Backups run daily, so enable PostgreSQL point-in-time recovery for the gap between dumps.
