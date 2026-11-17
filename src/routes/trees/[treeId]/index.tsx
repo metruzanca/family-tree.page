@@ -35,6 +35,13 @@ import {
   updateFileTakenAt,
 } from "~/api/files-server";
 import {
+  addManualFileFace,
+  assignFileFace,
+  deleteFileFace,
+  setFileFaceIgnored,
+  unlinkFileFace,
+} from "~/api/faces-server";
+import {
   getMyTrees,
   getTreeGraph,
   getTreeMembers,
@@ -56,6 +63,8 @@ import { Alert, AlertDescription, AlertTitle } from "~/components/ui/alert";
 import { Button } from "~/components/ui/button";
 import { useToast } from "~/components/ui/Toast";
 import { uploadPersonFile } from "~/lib/upload";
+import { scanFileForFaces } from "~/lib/face-scan";
+import type { FaceBox } from "~/lib/face-box";
 import { attemptAction, friendlyMessage } from "~/lib/action-result";
 import type { FuzzyDate } from "~/lib/fuzzy-date";
 import { fileNodeId, groupNodeId } from "~/lib/graph";
@@ -114,6 +123,8 @@ function TreePageInner() {
   const [pendingDelete, setPendingDelete] = createSignal(false);
   const [tagPending, setTagPending] = createSignal(false);
   const [takenAtPending, setTakenAtPending] = createSignal(false);
+  const [facePending, setFacePending] = createSignal(false);
+  const [faceScanPending, setFaceScanPending] = createSignal(false);
   const [uploading, setUploading] = createSignal(false);
   const [uploadProgress, setUploadProgress] = createSignal(0);
 
@@ -593,6 +604,96 @@ function TreePageInner() {
     toast.show("Photo tags updated.", "success");
   }
 
+  async function handleAssignFace(fileId: string, faceId: string, personId: string) {
+    setFacePending(true);
+    const result = await attemptAction(() =>
+      assignFileFace({ treeId: params.treeId, fileId, faceId, personId }),
+    );
+    setFacePending(false);
+    if (!result.ok) {
+      toast.show(result.error, "error");
+      return;
+    }
+    await revalidate(getTreeGraph.key);
+    track("face_linked");
+    toast.show("Face linked.", "success");
+  }
+
+  async function handleUnlinkFace(fileId: string, faceId: string) {
+    setFacePending(true);
+    const result = await attemptAction(() =>
+      unlinkFileFace({ treeId: params.treeId, fileId, faceId }),
+    );
+    setFacePending(false);
+    if (!result.ok) {
+      toast.show(result.error, "error");
+      return;
+    }
+    await revalidate(getTreeGraph.key);
+    toast.show("Face link removed.", "success");
+  }
+
+  async function handleSetFaceIgnored(fileId: string, faceId: string, ignored: boolean) {
+    setFacePending(true);
+    const result = await attemptAction(() =>
+      setFileFaceIgnored({ treeId: params.treeId, fileId, faceId, ignored }),
+    );
+    setFacePending(false);
+    if (!result.ok) {
+      toast.show(result.error, "error");
+      return;
+    }
+    await revalidate(getTreeGraph.key);
+    toast.show(ignored ? "Face ignored." : "Face restored.", "success");
+  }
+
+  async function handleDeleteFace(fileId: string, faceId: string) {
+    setFacePending(true);
+    const result = await attemptAction(() =>
+      deleteFileFace({ treeId: params.treeId, fileId, faceId }),
+    );
+    setFacePending(false);
+    if (!result.ok) {
+      toast.show(result.error, "error");
+      return;
+    }
+    await revalidate(getTreeGraph.key);
+    toast.show("Face box removed.", "success");
+  }
+
+  async function handleAddFace(fileId: string, personId: string, box: FaceBox) {
+    setFacePending(true);
+    const result = await attemptAction(() =>
+      addManualFileFace({ treeId: params.treeId, fileId, personId, box }),
+    );
+    setFacePending(false);
+    if (!result.ok) {
+      toast.show(result.error, "error");
+      return;
+    }
+    await revalidate(getTreeGraph.key);
+    track("face_linked");
+    toast.show("Face added.", "success");
+  }
+
+  async function handleScanFaces(fileId: string) {
+    setFaceScanPending(true);
+    const result = await scanFileForFaces(params.treeId, fileId);
+    setFaceScanPending(false);
+    if (!result.ok) {
+      toast.show(result.error, "error");
+      return;
+    }
+    await revalidate(getTreeGraph.key);
+    track("faces_scanned", { count: result.count });
+    toast.show(
+      result.count === 0
+        ? "No faces found in this photo."
+        : `${result.count} face${result.count === 1 ? "" : "s"} found.`,
+      "success",
+    );
+  }
+
   async function handleSetTakenAt(fileId: string, value: FuzzyDate | null) {
     setTakenAtPending(true);
     const result = await attemptAction(() =>
@@ -890,12 +991,20 @@ function TreePageInner() {
               role={graph().role}
               tagPending={tagPending()}
               takenAtPending={takenAtPending()}
+              facePending={facePending()}
+              faceScanPending={faceScanPending()}
               onClose={() => selectPerson(null)}
               onSelectPerson={focusPerson}
               onSetAvatar={handleSetAvatar}
               onSaveTags={handleSaveTags}
               onSetTakenAt={handleSetTakenAt}
               onDeleteFile={file => setDeleteFileTarget(file)}
+              onAssignFace={handleAssignFace}
+              onUnlinkFace={handleUnlinkFace}
+              onSetFaceIgnored={handleSetFaceIgnored}
+              onDeleteFace={handleDeleteFace}
+              onAddFace={handleAddFace}
+              onScanFaces={handleScanFaces}
               onRenameGroup={handleRenameGroup}
               onDeleteGroup={() => {
                 const group = effectiveGroup();

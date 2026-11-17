@@ -26,6 +26,8 @@ export type AnalyticsEvent =
   | "calendar_feed_created"
   | "client_error"
   | "calendar_feed_disabled"
+  | "face_linked"
+  | "faces_scanned"
   | "file_date_taken_set"
   | "file_deleted"
   | "file_people_tagged"
@@ -55,6 +57,8 @@ type AnalyticsPayloads = {
   file_date_taken_set: { cleared: boolean };
   file_deleted: { album: boolean };
   file_people_tagged: { count: number };
+  face_linked: undefined;
+  faces_scanned: { count: number };
   focus_identity_claimed: undefined;
   focus_identity_cleared: undefined;
   focus_radius_changed: { radius: string };
@@ -82,6 +86,8 @@ const PAYLOAD_KEYS: Record<AnalyticsEvent, readonly string[]> = {
   file_date_taken_set: ["cleared"],
   file_deleted: ["album"],
   file_people_tagged: ["count"],
+  face_linked: [],
+  faces_scanned: ["count"],
   focus_identity_claimed: [],
   focus_identity_cleared: [],
   focus_radius_changed: ["radius"],

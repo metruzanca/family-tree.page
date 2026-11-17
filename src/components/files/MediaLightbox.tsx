@@ -21,10 +21,14 @@ import {
 } from "lucide-solid";
 import type { GraphFile, GraphFileGroup, GraphPerson } from "~/api/people-server";
 import type { TreeRole } from "~/server/guards";
+import type { FaceBox } from "~/lib/face-box";
 import { Avatar } from "../ui/Avatar";
 import { Badge } from "../ui/badge";
 import { Button, buttonVariants } from "../ui/button";
 import { IconButton } from "../ui/icon-button";
+import { AssignFaceDialog } from "./AssignFaceDialog";
+import { FaceListSection } from "./FaceListSection";
+import { FaceOverlay } from "./FaceOverlay";
 import { FilePeopleSection } from "./FilePeopleSection";
 import { TakenAtField } from "./TakenAtField";
 import { formatBytes, formatDate, formatRelative } from "~/lib/format";
@@ -40,12 +44,20 @@ type MediaLightboxProps = {
   role: TreeRole;
   tagPending?: boolean;
   takenAtPending?: boolean;
+  facePending?: boolean;
+  faceScanPending?: boolean;
   onClose: () => void;
   onSelectPerson: (id: string) => void;
   onSetAvatar: (personId: string, fileId: string | null) => void;
   onSaveTags: (fileId: string, personIds: string[]) => void;
   onSetTakenAt: (fileId: string, value: FuzzyDate | null) => void;
   onDeleteFile: (file: GraphFile) => void;
+  onAssignFace?: (fileId: string, faceId: string, personId: string) => void;
+  onUnlinkFace?: (fileId: string, faceId: string) => void;
+  onSetFaceIgnored?: (fileId: string, faceId: string, ignored: boolean) => void;
+  onDeleteFace?: (fileId: string, faceId: string) => void;
+  onAddFace?: (fileId: string, personId: string, box: FaceBox) => void;
+  onScanFaces?: (fileId: string) => void;
   onRenameGroup?: (name: string) => void;
   onDeleteGroup?: () => void;
   /** When false, only thumbnails are shown and download links are hidden. */
@@ -73,9 +85,28 @@ export function MediaLightbox(props: MediaLightboxProps) {
   };
   const [index, setIndex] = createSignal(initialIndex());
   const [albumName, setAlbumName] = createSignal(props.group?.name ?? "");
+  const [activeFaceId, setActiveFaceId] = createSignal<string | null>(null);
+  const [draftBox, setDraftBox] = createSignal<FaceBox | null>(null);
+  const [drawingFace, setDrawingFace] = createSignal(false);
+  let imageRef: HTMLImageElement | undefined;
 
   const current = createMemo(() => props.files[index()] ?? props.files[0]);
   const isImage = () => current()?.kind === "image";
+  const canEditFaces = () =>
+    editable() && Boolean(props.onAssignFace) && isImage();
+  const activeFace = createMemo(() => {
+    const id = activeFaceId();
+    return id ? (current()?.faces.find(face => face.id === id) ?? null) : null;
+  });
+  const faceDialogOpen = () => Boolean(activeFace() || draftBox());
+
+  createEffect(() => {
+    // Moving to another photo must not carry a selection or an unfinished box.
+    current()?.id;
+    setActiveFaceId(null);
+    setDraftBox(null);
+    setDrawingFace(false);
+  });
 
   createEffect(() => {
     const list = props.files;
@@ -114,6 +145,11 @@ export function MediaLightbox(props: MediaLightboxProps) {
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const onKeyDown = (event: KeyboardEvent) => {
+      if (drawingFace()) {
+        if (event.key === "Escape") setDrawingFace(false);
+        return;
+      }
+      if (faceDialogOpen()) return;
       if (event.key === "Escape") props.onClose();
       if (event.key === "ArrowRight") next();
       if (event.key === "ArrowLeft") previous();
@@ -174,9 +210,28 @@ export function MediaLightbox(props: MediaLightboxProps) {
             >
               {file => (
                 <img
+                  ref={imageRef}
                   src={previewUrl(file())}
                   alt={file().name}
                   class="max-h-full max-w-full object-contain"
+                />
+              )}
+            </Show>
+
+            <Show when={canEditFaces() && current() ? current()! : null}>
+              {file => (
+                <FaceOverlay
+                  img={imageRef}
+                  faces={file().faces}
+                  people={props.people}
+                  selectedFaceId={activeFaceId()}
+                  onSelect={setActiveFaceId}
+                  drawing={drawingFace()}
+                  onDrawBox={box => {
+                    setDrawingFace(false);
+                    setDraftBox(box);
+                  }}
+                  onCancelDraw={() => setDrawingFace(false)}
                 />
               )}
             </Show>
@@ -448,6 +503,21 @@ export function MediaLightbox(props: MediaLightboxProps) {
                       onSave={personIds => props.onSaveTags(file().id, personIds)}
                     />
                   </div>
+                  <Show when={canEditFaces()}>
+                    <FaceListSection
+                      file={file()}
+                      pending={props.facePending}
+                      scanning={props.faceScanPending}
+                      onSelectFace={setActiveFaceId}
+                      onScan={() => props.onScanFaces?.(file().id)}
+                      onAddFace={() => {
+                        setDraftBox(null);
+                        setDrawingFace(true);
+                      }}
+                      onUnignore={faceId => props.onSetFaceIgnored?.(file().id, faceId, false)}
+                      onDeleteFace={faceId => props.onDeleteFace?.(file().id, faceId)}
+                    />
+                  </Show>
                 </Show>
               )}
             </Show>
@@ -480,6 +550,44 @@ export function MediaLightbox(props: MediaLightboxProps) {
           </div>
         </aside>
       </div>
+
+      <Show when={current()}>
+        {file => (
+          <AssignFaceDialog
+            open={faceDialogOpen()}
+            onClose={() => {
+              setDraftBox(null);
+              setActiveFaceId(null);
+            }}
+            file={file()}
+            face={activeFace()}
+            draftBox={draftBox()}
+            people={props.people}
+            pending={props.facePending}
+            onAssign={personId => {
+              const face = activeFace();
+              const box = draftBox();
+              setDraftBox(null);
+              setActiveFaceId(null);
+              if (face) {
+                props.onAssignFace?.(file().id, face.id, personId);
+              } else if (box && props.onAddFace) {
+                props.onAddFace(file().id, personId, box);
+              }
+            }}
+            onUnlink={() => {
+              const face = activeFace();
+              setActiveFaceId(null);
+              if (face) props.onUnlinkFace?.(file().id, face.id);
+            }}
+            onIgnore={() => {
+              const face = activeFace();
+              setActiveFaceId(null);
+              if (face) props.onSetFaceIgnored?.(file().id, face.id, true);
+            }}
+          />
+        )}
+      </Show>
     </Portal>
   );
 }
