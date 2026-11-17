@@ -33,6 +33,7 @@ export function SharedTreeView(props: SharedTreeViewProps) {
   const [selectedGroupId, setSelectedGroupId] = createSignal<string | null>(null);
   const [searchOpen, setSearchOpen] = createSignal(false);
   const [showMedia, setShowMedia] = createSignal(true);
+  const [ageOrder, setAgeOrder] = createSignal(true);
 
   const selectedPerson = createMemo(
     () => props.graph.people.find(person => person.id === selectedPersonId()) ?? null,
@@ -130,6 +131,7 @@ export function SharedTreeView(props: SharedTreeViewProps) {
         role="viewer"
         selectedId={selectedNodeId()}
         showMedia={showMedia()}
+        ageOrder={ageOrder()}
         thumbUrlFor={props.thumbUrlFor}
         onSelect={handleGraphSelection}
         onFileSelect={focusFile}
@@ -142,6 +144,7 @@ export function SharedTreeView(props: SharedTreeViewProps) {
         treeName={props.graph.tree.name}
         role="viewer"
         showMedia={showMedia()}
+        ageOrder={ageOrder()}
         focus={{
           personName: null,
           radius: "all",
@@ -157,6 +160,7 @@ export function SharedTreeView(props: SharedTreeViewProps) {
         backLabel={props.backLabel}
         badgeLabel={props.badgeLabel}
         onToggleMedia={() => setShowMedia(value => !value)}
+        onToggleAgeOrder={() => setAgeOrder(value => !value)}
         onSearch={() => setSearchOpen(true)}
         onFit={() => handle()?.fit()}
         onZoomIn={() => handle()?.zoomBy(1.25)}

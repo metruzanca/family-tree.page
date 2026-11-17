@@ -2,6 +2,7 @@ import { A } from "@solidjs/router";
 import { For, Show, type JSX } from "solid-js";
 import {
   ArrowLeft,
+  CalendarArrowUp,
   CalendarDays,
   History,
   Image as ImageIcon,
@@ -39,6 +40,7 @@ type ToolbarProps = {
   treeName: string;
   role: TreeRole;
   showMedia: boolean;
+  ageOrder: boolean;
   focus: {
     personName: string | null;
     radius: FocusRadius;
@@ -54,6 +56,7 @@ type ToolbarProps = {
   };
   resolveNode: (nodeId: string | null) => string | null;
   onToggleMedia: () => void;
+  onToggleAgeOrder: () => void;
   onSearch: () => void;
   onFit: () => void;
   onZoomIn: () => void;
@@ -153,6 +156,18 @@ export function GraphToolbar(props: ToolbarProps) {
               </Show>
             </ToolButton>
             <ToolButton
+              testId="tree-toolbar-age-order"
+              active={props.ageOrder}
+              label={
+                props.ageOrder
+                  ? "Turn off birth-year order"
+                  : "Order by birth year"
+              }
+              onClick={props.onToggleAgeOrder}
+            >
+              <CalendarArrowUp size={17} />
+            </ToolButton>
+            <ToolButton
               testId="tree-toolbar-zoom-out"
               label="Zoom out"
               shortcut="−"
@@ -218,6 +233,17 @@ export function GraphToolbar(props: ToolbarProps) {
                 <Show when={props.showMedia} fallback={<ImageOff />}>
                   <ImageIcon />
                 </Show>
+              </GlassItem>
+              <GlassItem
+                testId="tree-toolbar-more-age-order"
+                label={
+                  props.ageOrder
+                    ? "Turn off birth-year order"
+                    : "Order by birth year"
+                }
+                onSelect={props.onToggleAgeOrder}
+              >
+                <CalendarArrowUp />
               </GlassItem>
               <Show when={props.showFocus !== false}>
                 <GlassItem

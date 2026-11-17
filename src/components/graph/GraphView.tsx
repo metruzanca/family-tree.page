@@ -1,4 +1,4 @@
-import { forceCollide, forceLink, forceManyBody } from "d3-force";
+import { forceCollide, forceLink, forceManyBody, forceY } from "d3-force";
 import {
   createEffect,
   createMemo,
@@ -11,7 +11,7 @@ import type { TreeGraph } from "~/api/people-server";
 import type { TreeRole } from "~/server/guards";
 import type { PresencePeer } from "~/lib/presence-protocol";
 import { presenceColor } from "~/lib/presence-color";
-import { formatFuzzyYearRange } from "~/lib/fuzzy-date";
+import { formatFuzzyYearRange, fuzzyOrderYear } from "~/lib/fuzzy-date";
 import { cx } from "~/lib/utils";
 import {
   branchColor,
@@ -36,6 +36,19 @@ const LINK_DISTANCE: Record<GraphLink["kind"], number> = {
   media: 32,
 };
 
+/**
+ * Birth-year gravity maps one year to a vertical offset. The band is clamped so
+ * a short span does not stretch a small family apart and a long span does not
+ * collapse into a thin line.
+ */
+const AGE_ORDER_YEARS_TO_UNITS = 12;
+const AGE_ORDER_MIN_SPAN = 400;
+const AGE_ORDER_MAX_SPAN = 1200;
+/** Strong enough to read as a timeline, still weaker than a family link. */
+const AGE_ORDER_STRENGTH = 0.3;
+/** Undated people drift toward the middle band instead of one end. */
+const AGE_ORDER_FALLBACK_STRENGTH = 0.05;
+
 export type GraphHandle = {
   fit: () => void;
   focus: (id: string) => void;
@@ -53,6 +66,8 @@ type GraphViewProps = {
    * changes the generation of the people already on screen.
    */
   visible?: ReadonlySet<string>;
+  /** Drift older people upward with a gentle birth-year gravity. */
+  ageOrder: boolean;
   presence?: PresencePeer[];
   selfPeerId?: string | null;
   /** Extra classes for the graph shell, for example a fixed height when embedded. */
@@ -74,6 +89,7 @@ export function GraphView(props: GraphViewProps) {
   let graph: any;
   let resizeObserver: ResizeObserver | undefined;
   let needsFit = true;
+  let previousAgeOrder = props.ageOrder;
   let pressedNode: GraphNode | null = null;
   let pressStart = { x: 0, y: 0 };
   let pressDistance = 0;
@@ -660,6 +676,55 @@ export function GraphView(props: GraphViewProps) {
     return Math.max(radius + 14, labelWidth / 2 + 10);
   }
 
+  function ageYear(node: GraphNode) {
+    if (node.kind !== "person") return null;
+    return fuzzyOrderYear(node.person?.birthDate);
+  }
+
+  /**
+   * Birth-year gravity is a soft pull, not a pinned row. The band is computed
+   * from the whole tree so focusing a branch never rescales the people who
+   * are left on screen, and anyone without a birth year keeps strength zero.
+   */
+  function applyAgeOrder(tree: TreeGraph, enabled: boolean) {
+    if (!graph) return;
+    if (!enabled) {
+      graph.d3Force("y", null);
+      return;
+    }
+    const years = tree.people
+      .map(person => fuzzyOrderYear(person.birthDate))
+      .filter((year): year is number => year !== null);
+    if (!years.length) {
+      graph.d3Force("y", null);
+      return;
+    }
+    const min = Math.min(...years);
+    const max = Math.max(...years);
+    const span = max - min;
+    if (span <= 0) {
+      graph.d3Force("y", null);
+      return;
+    }
+    const band = Math.min(
+      AGE_ORDER_MAX_SPAN,
+      Math.max(AGE_ORDER_MIN_SPAN, span * AGE_ORDER_YEARS_TO_UNITS),
+    );
+    graph.d3Force(
+      "y",
+      forceY<GraphNode>(node => {
+        const year = ageYear(node);
+        if (year === null) return 0;
+        return ((year - min) / span - 0.5) * band;
+      }).strength(node => {
+        if (node.kind !== "person") return 0;
+        return ageYear(node) === null
+          ? AGE_ORDER_FALLBACK_STRENGTH
+          : AGE_ORDER_STRENGTH;
+      }),
+    );
+  }
+
   function drawMediaLayer(
     context: CanvasRenderingContext2D,
     globalScale: number,
@@ -767,6 +832,7 @@ export function GraphView(props: GraphViewProps) {
         forceCollide<GraphNode>(collisionRadius).iterations(2),
       );
 
+    applyAgeOrder(props.data, props.ageOrder);
     syncGraph(model());
     if (import.meta.env.DEV) {
       (window as any).__familyTreeGraph = graph;
@@ -896,6 +962,19 @@ export function GraphView(props: GraphViewProps) {
       graph?._destructor?.();
       graph = undefined;
     };
+  });
+
+  createEffect(() => {
+    const enabled = props.ageOrder;
+    const tree = props.data;
+    const toggled = enabled !== previousAgeOrder;
+    previousAgeOrder = enabled;
+    if (!graph) return;
+    applyAgeOrder(tree, enabled);
+    if (toggled) {
+      needsFit = true;
+      graph.d3ReheatSimulation();
+    }
   });
 
   createEffect(() => {

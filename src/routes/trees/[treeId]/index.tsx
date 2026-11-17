@@ -99,6 +99,7 @@ function TreePageInner() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [handle, setHandle] = createSignal<GraphHandle>();
   const [showMedia, setShowMedia] = createSignal(true);
+  const [ageOrder, setAgeOrder] = createSignal(true);
   const [searchOpen, setSearchOpen] = createSignal(false);
   const [addPersonOpen, setAddPersonOpen] = createSignal(false);
   const [editPersonOpen, setEditPersonOpen] = createSignal(false);
@@ -397,6 +398,7 @@ function TreePageInner() {
     localStorage.removeItem("family-tree-layout");
     localStorage.removeItem("family-tree-generation-direction");
     if (localStorage.getItem("family-tree-media") === "off") setShowMedia(false);
+    if (localStorage.getItem("family-tree-age-order") === "off") setAgeOrder(false);
     const storedFocus = parseFocusRadius(localStorage.getItem(focusStorageKey()));
     if (storedFocus) setFocusRadius(storedFocus);
     setFocusPromptDismissed(localStorage.getItem(focusPromptKey()) === "off");
@@ -486,6 +488,12 @@ function TreePageInner() {
     const next = !showMedia();
     setShowMedia(next);
     localStorage.setItem("family-tree-media", next ? "on" : "off");
+  }
+
+  function toggleAgeOrder() {
+    const next = !ageOrder();
+    setAgeOrder(next);
+    localStorage.setItem("family-tree-age-order", next ? "on" : "off");
   }
 
   async function handleUpload(files: File[]) {
@@ -737,6 +745,7 @@ function TreePageInner() {
             role={graph().role}
             selectedId={selectedNodeId()}
             showMedia={showMedia()}
+            ageOrder={ageOrder()}
             visible={focus().visible}
             fitPadding={canShowMore() || showFocusPrompt() ? 190 : 110}
             presence={presence.peers()}
@@ -789,6 +798,7 @@ function TreePageInner() {
             treeName={graph().tree.name}
             role={graph().role}
             showMedia={showMedia()}
+            ageOrder={ageOrder()}
             focus={{
               personName: viewerPerson()?.displayName ?? null,
               radius: effectiveFocusRadius(),
@@ -804,6 +814,7 @@ function TreePageInner() {
             }}
             resolveNode={nodeLabel}
             onToggleMedia={toggleMedia}
+            onToggleAgeOrder={toggleAgeOrder}
             onSearch={() => setSearchOpen(true)}
             onFit={() => handle()?.fit()}
             onZoomIn={() => handle()?.zoomBy(1.25)}
