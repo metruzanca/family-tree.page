@@ -19,6 +19,7 @@ type ModalProps = {
   children: JSX.Element;
   footer?: JSX.Element;
   wide?: boolean;
+  testId?: string;
 };
 
 export function Modal(props: ModalProps) {
@@ -44,6 +45,7 @@ export function Modal(props: ModalProps) {
         <DialogContent
           showCloseButton={false}
           onOpenAutoFocus={focusFirstField}
+          data-testid={props.testId}
           class={`flex max-h-[min(88dvh,52rem)] flex-col gap-0 overflow-hidden rounded-[1.35rem] border-border bg-card p-0 shadow-[var(--shadow-soft)] ${
             props.wide ? "sm:max-w-2xl" : "sm:max-w-lg"
           }`}

@@ -47,6 +47,7 @@ export function GraphSearch(props: {
       onClose={props.onClose}
       title="Search the tree"
       description="Find a person or a file. Selecting a result opens its panel and brings it into view."
+      testId="graph-search-dialog"
       footer={
         <div class="flex w-full items-center justify-between text-xs text-muted-foreground">
           <span>
@@ -67,6 +68,7 @@ export function GraphSearch(props: {
           value={query()}
           onInput={event => setQuery(event.currentTarget.value)}
           placeholder="Name, nickname, maiden name, file…"
+          data-testid="graph-search-input"
           autofocus
         />
       </label>
@@ -81,6 +83,7 @@ export function GraphSearch(props: {
                   <button
                     type="button"
                     class="flex w-full items-center gap-2.5 rounded-xl px-2 py-2 text-left transition hover:bg-accent/70 focus-visible:bg-accent/70 focus-visible:outline-none"
+                    data-testid={`graph-search-person-${person.id}`}
                     onClick={() => {
                       props.onPerson(person);
                       props.onClose();
@@ -118,6 +121,7 @@ export function GraphSearch(props: {
                   <button
                     type="button"
                     class="flex w-full items-center gap-2.5 rounded-xl px-2 py-2 text-left transition hover:bg-accent/70 focus-visible:bg-accent/70 focus-visible:outline-none"
+                    data-testid={`graph-search-file-${file.id}`}
                     onClick={() => {
                       props.onFile(file);
                       props.onClose();
@@ -153,7 +157,10 @@ export function GraphSearch(props: {
         </Show>
 
         <Show when={!people().length && !files().length}>
-          <p class="py-10 text-center text-sm text-muted-foreground">
+          <p
+            class="py-10 text-center text-sm text-muted-foreground"
+            data-testid="graph-search-empty"
+          >
             Nothing matches “{query()}”.
           </p>
         </Show>

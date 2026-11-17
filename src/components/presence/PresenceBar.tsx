@@ -56,6 +56,7 @@ export function PresenceBar(props: PresenceBarProps) {
         <DropdownMenuTrigger
           class="flex h-10 items-center gap-2 rounded-full border border-white/10 bg-black/35 px-2 text-white/75 backdrop-blur-md transition hover:bg-black/55 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
           aria-label="People viewing this tree"
+          data-testid="presence-bar"
         >
           <span class="flex -space-x-1.5">
             <For each={users().slice(0, 3)}>
@@ -86,7 +87,10 @@ export function PresenceBar(props: PresenceBarProps) {
           </div>
           <For each={users()}>
             {user => (
-              <div class="flex items-center gap-2 rounded-xl px-3 py-2">
+              <div
+                class="flex items-center gap-2 rounded-xl px-3 py-2"
+                data-testid={`presence-user-${user.userId}`}
+              >
                 <span
                   class="h-1.5 w-1.5 shrink-0 rounded-full"
                   style={{ "background-color": presenceColor(user.userId) }}

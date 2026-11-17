@@ -884,11 +884,11 @@ export function GraphView(props: GraphViewProps) {
   });
 
   return (
-    <div class={cx("graph-shell", props.class)}>
-      <div ref={container} class="graph-canvas" />
+    <div class={cx("graph-shell", props.class)} data-testid="tree-graph">
+      <div ref={container} class="graph-canvas" data-testid="tree-graph-canvas" />
       <div class="graph-vignette" />
       <Show when={!ready()}>
-        <div class="absolute inset-0 grid place-items-center">
+        <div class="absolute inset-0 grid place-items-center" data-testid="tree-graph-loading">
           <div class="flex items-center gap-3 rounded-full border border-white/10 bg-black/30 px-4 py-2 text-xs text-white/60 backdrop-blur">
             <span class="h-2 w-2 animate-pulse rounded-full bg-gold" />
             Drawing the branches…

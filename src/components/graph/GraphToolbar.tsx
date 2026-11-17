@@ -73,11 +73,19 @@ export function GraphToolbar(props: ToolbarProps) {
   return (
     <div class="pointer-events-none absolute inset-x-0 top-0 z-20 p-3 sm:p-4">
       <div class="pointer-events-auto flex items-center gap-2">
-        <A href="/trees" class={`${glass} px-3`} aria-label="Back to your trees">
+        <A
+          href="/trees"
+          class={`${glass} px-3`}
+          aria-label="Back to your trees"
+          data-testid="tree-toolbar-back"
+        >
           <ArrowLeft size={16} />
           <span class="hidden sm:inline">Trees</span>
         </A>
-        <div class="flex min-w-0 items-center gap-2 rounded-full border border-white/10 bg-black/35 px-3 py-2 backdrop-blur-md">
+        <div
+          class="flex min-w-0 items-center gap-2 rounded-full border border-white/10 bg-black/35 px-3 py-2 backdrop-blur-md"
+          data-testid="tree-toolbar-title"
+        >
           <span class="max-w-44 truncate text-sm font-semibold text-white/90 sm:max-w-xs">
             {props.treeName}
           </span>
@@ -103,7 +111,12 @@ export function GraphToolbar(props: ToolbarProps) {
         />
 
         <div class="ml-auto flex items-center gap-1.5">
-          <ToolButton label="Search people and files" shortcut="/" onClick={props.onSearch}>
+          <ToolButton
+            testId="tree-toolbar-search"
+            label="Search people and files"
+            shortcut="/"
+            onClick={props.onSearch}
+          >
             <Search size={17} />
           </ToolButton>
           <FocusMenu
@@ -116,6 +129,7 @@ export function GraphToolbar(props: ToolbarProps) {
               type="button"
               class={`${glass} font-semibold`}
               aria-label="Add person"
+              data-testid="tree-toolbar-add-person"
               onClick={props.onAddPerson}
             >
               <Plus size={16} />
@@ -124,6 +138,7 @@ export function GraphToolbar(props: ToolbarProps) {
           </Show>
           <div class="hidden items-center gap-1.5 lg:flex">
             <ToolButton
+              testId="tree-toolbar-media"
               active={props.showMedia}
               label={props.showMedia ? "Hide media" : "Show media"}
               onClick={props.onToggleMedia}
@@ -133,6 +148,7 @@ export function GraphToolbar(props: ToolbarProps) {
               </Show>
             </ToolButton>
             <ToolButton
+              testId="tree-toolbar-flip"
               label={
                 props.generationDirection === "oldest-top"
                   ? "Oldest at top. Flip so oldest is at the bottom"
@@ -142,32 +158,64 @@ export function GraphToolbar(props: ToolbarProps) {
             >
               <ArrowDownUp size={17} />
             </ToolButton>
-            <ToolButton label="Zoom out" shortcut="−" onClick={props.onZoomOut}>
+            <ToolButton
+              testId="tree-toolbar-zoom-out"
+              label="Zoom out"
+              shortcut="−"
+              onClick={props.onZoomOut}
+            >
               <ZoomOut size={17} />
             </ToolButton>
-            <ToolButton label="Zoom in" shortcut="+" onClick={props.onZoomIn}>
+            <ToolButton
+              testId="tree-toolbar-zoom-in"
+              label="Zoom in"
+              shortcut="+"
+              onClick={props.onZoomIn}
+            >
               <ZoomIn size={17} />
             </ToolButton>
-            <ToolButton label="Fit tree" shortcut="F" onClick={props.onFit}>
+            <ToolButton
+              testId="tree-toolbar-fit"
+              label="Fit tree"
+              shortcut="F"
+              onClick={props.onFit}
+            >
               <Maximize2 size={17} />
             </ToolButton>
-            <ToolButton label="Activity" href={`/trees/${props.treeId}/activity`}>
+            <ToolButton
+              testId="tree-toolbar-activity"
+              label="Activity"
+              href={`/trees/${props.treeId}/activity`}
+            >
               <History size={17} />
             </ToolButton>
-            <ToolButton label="Calendar" href={`/trees/${props.treeId}/calendar`}>
+            <ToolButton
+              testId="tree-toolbar-calendar"
+              label="Calendar"
+              href={`/trees/${props.treeId}/calendar`}
+            >
               <CalendarDays size={17} />
             </ToolButton>
-            <ToolButton label="Tree settings" href={`/trees/${props.treeId}/settings`}>
+            <ToolButton
+              testId="tree-toolbar-settings"
+              label="Tree settings"
+              href={`/trees/${props.treeId}/settings`}
+            >
               <Settings size={17} />
             </ToolButton>
           </div>
 
           <DropdownMenu placement="bottom-end">
-            <DropdownMenuTrigger class={`${glass} px-2 lg:hidden`} aria-label="More controls">
+            <DropdownMenuTrigger
+              class={`${glass} px-2 lg:hidden`}
+              aria-label="More controls"
+              data-testid="tree-toolbar-more"
+            >
               <MoreHorizontal size={18} />
             </DropdownMenuTrigger>
             <DropdownMenuContent class="w-56 rounded-2xl border-white/10 bg-[#161b14] p-1.5 text-white/80">
               <GlassItem
+                testId="tree-toolbar-more-media"
                 label={props.showMedia ? "Hide media" : "Show media"}
                 onSelect={props.onToggleMedia}
               >
@@ -175,10 +223,15 @@ export function GraphToolbar(props: ToolbarProps) {
                   <ImageIcon />
                 </Show>
               </GlassItem>
-              <GlassItem label="Flip generations" onSelect={props.onFlipDirection}>
+              <GlassItem
+                testId="tree-toolbar-more-flip"
+                label="Flip generations"
+                onSelect={props.onFlipDirection}
+              >
                 <ArrowDownUp />
               </GlassItem>
               <GlassItem
+                testId="tree-toolbar-more-focus-person"
                 label={
                   props.focus.personName
                     ? `Focused on ${props.focus.personName}. Change who you are`
@@ -189,24 +242,37 @@ export function GraphToolbar(props: ToolbarProps) {
                 <UserRound />
               </GlassItem>
               <Show when={props.focus.radius !== "all"}>
-                <GlassItem label="Show the whole tree" onSelect={() => props.onFocusRadius("all")}>
+                <GlassItem
+                  testId="tree-toolbar-more-show-all"
+                  label="Show the whole tree"
+                  onSelect={() => props.onFocusRadius("all")}
+                >
                   <Target />
                 </GlassItem>
               </Show>
               <DropdownMenuSeparator class="my-1 bg-white/10" />
-              <GlassItem label="Zoom out" onSelect={props.onZoomOut}>
+              <GlassItem
+                testId="tree-toolbar-more-zoom-out"
+                label="Zoom out"
+                onSelect={props.onZoomOut}
+              >
                 <ZoomOut />
               </GlassItem>
-              <GlassItem label="Zoom in" onSelect={props.onZoomIn}>
+              <GlassItem
+                testId="tree-toolbar-more-zoom-in"
+                label="Zoom in"
+                onSelect={props.onZoomIn}
+              >
                 <ZoomIn />
               </GlassItem>
-              <GlassItem label="Fit tree" onSelect={props.onFit}>
+              <GlassItem testId="tree-toolbar-more-fit" label="Fit tree" onSelect={props.onFit}>
                 <Maximize2 />
               </GlassItem>
               <DropdownMenuSeparator class="my-1 bg-white/10" />
               <DropdownMenuItem
                 as={A}
                 href={`/trees/${props.treeId}/activity`}
+                data-testid="tree-toolbar-more-activity"
                 class="gap-2 rounded-xl px-3 py-2 text-white/80 data-[highlighted]:bg-white/10 data-[highlighted]:text-white"
               >
                 <History />
@@ -215,6 +281,7 @@ export function GraphToolbar(props: ToolbarProps) {
               <DropdownMenuItem
                 as={A}
                 href={`/trees/${props.treeId}/calendar`}
+                data-testid="tree-toolbar-more-calendar"
                 class="gap-2 rounded-xl px-3 py-2 text-white/80 data-[highlighted]:bg-white/10 data-[highlighted]:text-white"
               >
                 <CalendarDays />
@@ -223,6 +290,7 @@ export function GraphToolbar(props: ToolbarProps) {
               <DropdownMenuItem
                 as={A}
                 href={`/trees/${props.treeId}/settings`}
+                data-testid="tree-toolbar-more-settings"
                 class="gap-2 rounded-xl px-3 py-2 text-white/80 data-[highlighted]:bg-white/10 data-[highlighted]:text-white"
               >
                 <Settings />
@@ -253,6 +321,7 @@ function FocusMenu(props: {
           props.focus.personName ? "!text-white" : "!text-white/55 hover:!text-white"
         }`}
         aria-label="Focus and visibility"
+        data-testid="tree-toolbar-focus"
       >
         <Target size={17} />
       </DropdownMenuTrigger>
@@ -279,6 +348,7 @@ function FocusMenu(props: {
             {band => (
               <DropdownMenuRadioItem
                 value={String(band.radius)}
+                data-testid={`tree-toolbar-focus-radius-${band.radius}`}
                 class="items-start gap-2 rounded-xl py-2 pr-2 pl-8 text-white/80 outline-none data-[highlighted]:bg-white/10 data-[highlighted]:text-white"
               >
                 <span class="flex min-w-0 flex-col">
@@ -293,6 +363,7 @@ function FocusMenu(props: {
         </DropdownMenuRadioGroup>
         <DropdownMenuSeparator class="my-1 bg-white/10" />
         <GlassItem
+          testId="tree-toolbar-focus-change-person"
           label={props.focus.personName ? "Change who I am" : "Tell us who you are"}
           onSelect={props.onChangePerson}
         >
@@ -308,6 +379,7 @@ function ToolButton(props: {
   shortcut?: string;
   active?: boolean;
   href?: string;
+  testId?: string;
   onClick?: () => void;
   children: JSX.Element;
 }) {
@@ -327,13 +399,20 @@ function ToolButton(props: {
             class={classes()}
             aria-label={props.label}
             aria-pressed={props.active}
+            data-testid={props.testId}
             onClick={props.onClick}
           >
             {props.children}
           </TooltipTrigger>
         }
       >
-        <TooltipTrigger as={A} href={props.href!} class={classes()} aria-label={props.label}>
+        <TooltipTrigger
+          as={A}
+          href={props.href!}
+          class={classes()}
+          aria-label={props.label}
+          data-testid={props.testId}
+        >
           {props.children}
         </TooltipTrigger>
       </Show>
@@ -351,12 +430,14 @@ function ToolButton(props: {
 
 function GlassItem(props: {
   label: string;
+  testId?: string;
   onSelect: () => void;
   children: JSX.Element;
 }) {
   return (
     <DropdownMenuItem
       class="gap-2 rounded-xl px-3 py-2 text-white/80 data-[highlighted]:bg-white/10 data-[highlighted]:text-white"
+      data-testid={props.testId}
       onSelect={props.onSelect}
     >
       {props.children}
