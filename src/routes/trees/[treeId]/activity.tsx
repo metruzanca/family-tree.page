@@ -101,7 +101,7 @@ function TreeActivityInner() {
       {currentUser => (
         <Show when={graph()}>
           {data => (
-            <div class="page-shell min-h-[100dvh]">
+            <div class="page-shell min-h-[100dvh]" data-testid="activity-page">
               <AppHeader
                 user={currentUser()}
                 back={{ href: `/trees/${params.treeId}`, label: "Back to tree" }}
@@ -125,6 +125,7 @@ function TreeActivityInner() {
                   <A
                     href={`/trees/${params.treeId}`}
                     class={buttonVariants({ variant: "secondary", size: "sm" })}
+                    data-testid="activity-open-graph"
                   >
                     Open graph
                   </A>
@@ -135,6 +136,7 @@ function TreeActivityInner() {
                     Person
                     <select
                       class="input text-sm normal-case tracking-normal"
+                      data-testid="activity-person-filter"
                       value={personId()}
                       onChange={event => setPersonId(event.currentTarget.value)}
                     >
@@ -148,6 +150,7 @@ function TreeActivityInner() {
                     Member
                     <select
                       class="input text-sm normal-case tracking-normal"
+                      data-testid="activity-actor-filter"
                       value={actorUserId()}
                       onChange={event => setActorUserId(event.currentTarget.value)}
                     >
@@ -161,6 +164,7 @@ function TreeActivityInner() {
                     Type
                     <select
                       class="input text-sm normal-case tracking-normal"
+                      data-testid="activity-group-filter"
                       value={group()}
                       onChange={event =>
                         setGroup(event.currentTarget.value as ActivityGroup | "")
@@ -176,7 +180,10 @@ function TreeActivityInner() {
                 <Show
                   when={items().length}
                   fallback={
-                    <div class="mt-8 rounded-3xl border border-dashed border-border p-10 text-center">
+                    <div
+                      class="mt-8 rounded-3xl border border-dashed border-border p-10 text-center"
+                      data-testid="activity-empty"
+                    >
                       <Clock3 class="mx-auto text-muted-foreground" />
                       <p class="mt-3 text-sm font-medium">Nothing here yet</p>
                       <p class="mt-1 text-xs text-muted-foreground">
@@ -185,7 +192,7 @@ function TreeActivityInner() {
                     </div>
                   }
                 >
-                  <ol class="mt-6 space-y-2">
+                  <ol class="mt-6 space-y-2" data-testid="activity-list">
                     <For each={items()}>
                       {item => <ActivityRow item={item} />}
                     </For>
@@ -195,6 +202,7 @@ function TreeActivityInner() {
                       <Button
                         variant="secondary"
                         type="button"
+                        data-testid="activity-load-older"
                         disabled={loadingOlder()}
                         onClick={() => void loadOlder()}
                       >
@@ -215,7 +223,10 @@ function TreeActivityInner() {
 function ActivityRow(props: { item: ActivityItem }) {
   const group = () => activityGroupFor(props.item.action);
   return (
-    <li class="rounded-2xl border border-border bg-card/60 px-4 py-3">
+    <li
+      class="rounded-2xl border border-border bg-card/60 px-4 py-3"
+      data-testid={`activity-row-${props.item.id}`}
+    >
       <div class="flex items-start gap-3">
         <Avatar name={props.item.actorName} fileId={null} size={34} />
         <div class="min-w-0 flex-1">
@@ -230,7 +241,10 @@ function ActivityRow(props: { item: ActivityItem }) {
             {formatDate(props.item.createdAt)}
           </p>
           <Show when={props.item.changes?.length}>
-            <ul class="mt-2 space-y-1 rounded-xl bg-background/60 px-3 py-2">
+            <ul
+              class="mt-2 space-y-1 rounded-xl bg-background/60 px-3 py-2"
+              data-testid={`activity-changes-${props.item.id}`}
+            >
               <For each={props.item.changes ?? []}>
                 {change => (
                   <li class="text-xs leading-relaxed text-muted-foreground">
