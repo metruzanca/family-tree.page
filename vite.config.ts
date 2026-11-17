@@ -30,7 +30,16 @@ export default defineConfig({
     // Only generate maps when the Sentry plugin will upload and delete them.
     sourcemap: sentryPlugins.length ? "hidden" : false,
   },
-  plugins: [solidStart(), tailwindcss(), nitro(), ...sentryPlugins],
+  plugins: [
+    solidStart({
+      serverFunctions: {
+        onError: "./src/server/server-fn-error.ts",
+      },
+    }),
+    tailwindcss(),
+    nitro(),
+    ...sentryPlugins,
+  ],
   nitro: {
     serverDir: "./server",
     features: {

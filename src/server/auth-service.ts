@@ -6,6 +6,7 @@ import { db } from "./db";
 import { users, type User } from "../../drizzle/schema";
 import { getCurrentPath, getSession } from "./session";
 import { publicOrigin } from "./config";
+import { setLogContext } from "./logger";
 import { sendEmail, type SendEmailResult } from "./email";
 import { passwordResetMessage, verifyEmailMessage } from "./email-templates";
 import {
@@ -84,6 +85,7 @@ export async function getOptionalUser(): Promise<PublicUser | null> {
     await session.update({ userId: undefined, sessionVersion: undefined });
     return null;
   }
+  setLogContext({ userId: user.id });
   return toPublicUser(user);
 }
 

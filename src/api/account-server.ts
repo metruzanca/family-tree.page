@@ -64,7 +64,7 @@ export async function requestEmailChange(input: {
   newEmail: string;
   currentPassword: string;
 }): Promise<ActionResult<{ emailSent: boolean; emailSimulated: boolean }>> {
-  return runAction(async () => {
+  return runAction("account.requestEmailChange", async () => {
     const current = await requireUser();
     const parsed = emailChangeSchema.parse(input);
     const user = await findUserById(current.id);
@@ -163,7 +163,7 @@ export async function getEmailChangePreview(token: string): Promise<EmailChangeP
 }
 
 export async function confirmEmailChange(token: string): Promise<ActionResult<{ email: string }>> {
-  return runAction(async () => {
+  return runAction("account.confirmEmailChange", async () => {
     const current = await requireUser();
     const state = await validateAuthToken(token, "email_change");
 
@@ -201,7 +201,7 @@ export async function confirmEmailChange(token: string): Promise<ActionResult<{ 
 }
 
 export async function cancelEmailChange(): Promise<ActionResult<undefined>> {
-  return runAction(async () => {
+  return runAction("account.cancelEmailChange", async () => {
     const current = await requireUser();
     await db
       .delete(authTokens)
@@ -220,7 +220,7 @@ export async function deleteAccount(input: {
   password: string;
   confirmation: string;
 }): Promise<ActionResult<undefined>> {
-  return runAction(async () => {
+  return runAction("account.deleteAccount", async () => {
     const current = await requireUser();
     const parsed = deleteAccountSchema.parse(input);
     const user = await findUserById(current.id);

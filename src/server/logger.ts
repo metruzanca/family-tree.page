@@ -140,7 +140,8 @@ function write(level: LogLevel, message: string, fields: LogContext = {}) {
     line = `${ts} ${level.toUpperCase()} ${msg}${details ? ` ${details}` : ""}\n`;
     if (record.error && typeof record.error === "object") {
       const stack = (record.error as Record<string, unknown>).stack;
-      if (typeof stack === "string" && stack !== record.error.message) line += `${stack}\n`;
+      const message = (record.error as Record<string, unknown>).message;
+      if (typeof stack === "string" && stack !== message) line += `${stack}\n`;
     }
   }
 

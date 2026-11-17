@@ -247,7 +247,7 @@ export async function setMyPerson(input: {
   treeId: string;
   personId: string | null;
 }): Promise<ActionResult<undefined>> {
-  return runAction(async () => {
+  return runAction("people.setMyPerson", async () => {
     const access = await requireTreeMember(input.treeId);
     if (input.personId) {
       const rows = await db
@@ -311,7 +311,7 @@ function toGraphFile(file: StoredFile, taggedPersonIds: string[]): GraphFile {
 export async function createPerson(
   input: { treeId: string } & PersonInput,
 ): Promise<ActionResult<{ id: string }>> {
-  return runAction(async () => {
+  return runAction("people.createPerson", async () => {
     const access = await requireTreeMember(input.treeId, "editor");
     const parsed = personSchema.parse(input);
     const person = await db.transaction(async tx => {
@@ -348,7 +348,7 @@ export async function createPerson(
 export async function updatePerson(
   input: { treeId: string; personId: string } & PersonInput,
 ): Promise<ActionResult<undefined>> {
-  return runAction(async () => {
+  return runAction("people.updatePerson", async () => {
     const access = await requireTreeMember(input.treeId, "editor");
     const parsed = personUpdateSchema.parse(input);
     const updated = await db
@@ -377,7 +377,7 @@ export async function deletePerson(input: {
   treeId: string;
   personId: string;
 }): Promise<ActionResult<undefined>> {
-  return runAction(async () => {
+  return runAction("people.deletePerson", async () => {
     const access = await requireTreeMember(input.treeId, "editor");
     try {
       await deletePrefix(`${TREE_PREFIX}/${input.treeId}/people/${input.personId}/`);
@@ -406,7 +406,7 @@ export async function createParentChild(input: {
   childId: string;
   parentType?: "biological" | "adoptive" | "foster" | "step" | "unknown";
 }): Promise<ActionResult<{ id: string }>> {
-  return runAction(async () => {
+  return runAction("people.createParentChild", async () => {
     const access = await requireTreeMember(input.treeId, "editor");
     const parsed = parentChildSchema.parse(input);
     await assertPeopleInTree(access.tree.id, [parsed.parentId, parsed.childId]);
@@ -450,7 +450,7 @@ export async function deleteParentChild(input: {
   treeId: string;
   relationshipId: string;
 }): Promise<ActionResult<undefined>> {
-  return runAction(async () => {
+  return runAction("people.deleteParentChild", async () => {
     const access = await requireTreeMember(input.treeId, "editor");
     const deleted = await db
       .delete(parentChild)
@@ -472,7 +472,7 @@ export async function createPartnership(input: {
   startDate?: string | null;
   endDate?: string | null;
 }): Promise<ActionResult<{ id: string }>> {
-  return runAction(async () => {
+  return runAction("people.createPartnership", async () => {
     const access = await requireTreeMember(input.treeId, "editor");
     const parsed = partnershipSchema.parse(input);
     if (parsed.personAId === parsed.personBId) {
@@ -523,7 +523,7 @@ export async function updatePartnership(input: {
   startDate?: string | null;
   endDate?: string | null;
 }): Promise<ActionResult<undefined>> {
-  return runAction(async () => {
+  return runAction("people.updatePartnership", async () => {
     const access = await requireTreeMember(input.treeId, "editor");
     const parsed = partnershipSchema
       .pick({ status: true, startDate: true, endDate: true })
@@ -548,7 +548,7 @@ export async function deletePartnership(input: {
   treeId: string;
   relationshipId: string;
 }): Promise<ActionResult<undefined>> {
-  return runAction(async () => {
+  return runAction("people.deletePartnership", async () => {
     const access = await requireTreeMember(input.treeId, "editor");
     const deleted = await db
       .delete(partnerships)
@@ -576,7 +576,7 @@ export async function addRelative(input: {
   parentType?: "biological" | "adoptive" | "foster" | "step" | "unknown";
   status?: "married" | "partnered" | "divorced" | "separated" | "widowed" | "unknown";
 }): Promise<ActionResult<{ personId: string; relationshipIds: string[] }>> {
-  return runAction(async () => {
+  return runAction("people.addRelative", async () => {
     const access = await requireTreeMember(input.treeId, "editor");
     const parsed = addRelativeSchema.parse(input);
 
@@ -739,7 +739,7 @@ export async function addRelative(input: {
 export async function createPersonEvent(
   input: { treeId: string; personId: string } & PersonEventInput,
 ): Promise<ActionResult<{ id: string }>> {
-  return runAction(async () => {
+  return runAction("people.createPersonEvent", async () => {
     const access = await requireTreeMember(input.treeId, "editor");
     const parsed = personEventSchema.parse(input);
     await assertPeopleInTree(access.tree.id, [parsed.personId]);
@@ -766,7 +766,7 @@ export async function createPersonEvent(
 export async function updatePersonEvent(
   input: { treeId: string; eventId: string } & PersonEventInput,
 ): Promise<ActionResult<undefined>> {
-  return runAction(async () => {
+  return runAction("people.updatePersonEvent", async () => {
     const access = await requireTreeMember(input.treeId, "editor");
     const parsed = personEventUpdateSchema.parse(input);
     const updated = await db
@@ -796,7 +796,7 @@ export async function deletePersonEvent(input: {
   treeId: string;
   eventId: string;
 }): Promise<ActionResult<undefined>> {
-  return runAction(async () => {
+  return runAction("people.deletePersonEvent", async () => {
     const access = await requireTreeMember(input.treeId, "editor");
     const deleted = await db
       .delete(personEvents)

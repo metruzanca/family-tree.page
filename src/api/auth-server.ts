@@ -171,7 +171,7 @@ export async function resetPassword(formData: FormData) {
 export async function resendVerificationEmail(): Promise<
   ActionResult<{ delivered: boolean; simulated: boolean }>
 > {
-  return runAction(async () => {
+  return runAction("auth.resendVerificationEmail", async () => {
     const current = await requireUser();
     if (current.emailVerified) throw new AppError("Your email is already verified.");
     if (!checkRateLimit("verification-email", current.email, 3, 60 * 60_000)) {
@@ -201,7 +201,7 @@ export async function logout() {
 export async function updateProfile(input: {
   displayName: string;
 }): Promise<ActionResult<PublicUser>> {
-  return runAction(async () => {
+  return runAction("auth.updateProfile", async () => {
     const current = await requireUser();
     const parsed = updateProfileSchema.parse(input);
     const [updated] = await db
@@ -219,7 +219,7 @@ export async function updateNotificationSettings(input: {
   notifyBirthdayDayBefore: boolean;
   notifyBirthdayDayOf: boolean;
 }): Promise<ActionResult<PublicUser>> {
-  return runAction(async () => {
+  return runAction("auth.updateNotificationSettings", async () => {
     const current = await requireUser();
     const parsed = updateNotificationSettingsSchema.parse(input);
     const [updated] = await db
@@ -241,7 +241,7 @@ export async function changePassword(input: {
   currentPassword: string;
   newPassword: string;
 }): Promise<ActionResult<undefined>> {
-  return runAction(async () => {
+  return runAction("auth.changePassword", async () => {
     const current = await requireUser();
     const parsed = changePasswordSchema.parse(input);
     const user = await findUserById(current.id);

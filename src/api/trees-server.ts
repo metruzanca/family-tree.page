@@ -89,7 +89,7 @@ export async function createTree(input: {
   name: string;
   description?: string | null;
 }): Promise<ActionResult<{ id: string; role: TreeRole }>> {
-  return runAction(async () => {
+  return runAction("trees.createTree", async () => {
     const user = await requireUser();
     const parsed = treeSchema.parse(input);
     const result = await db.transaction(async tx => {
@@ -120,7 +120,7 @@ export async function updateTree(input: {
   name: string;
   description?: string | null;
 }): Promise<ActionResult<undefined>> {
-  return runAction(async () => {
+  return runAction("trees.updateTree", async () => {
     const access = await requireTreeMember(input.treeId, "owner");
     if (!canManage(access.role)) throw new AppError("Only owners can change tree settings.");
     const parsed = treeSchema.parse(input);
@@ -133,7 +133,7 @@ export async function updateTree(input: {
 }
 
 export async function deleteTree(treeId: string): Promise<ActionResult<undefined>> {
-  return runAction(async () => {
+  return runAction("trees.deleteTree", async () => {
     const access = await requireTreeMember(treeId, "owner");
     if (!canManage(access.role)) throw new AppError("Only owners can delete a tree.");
     try {
@@ -200,7 +200,7 @@ export async function clearMemberPerson(input: {
   treeId: string;
   userId: string;
 }): Promise<ActionResult<undefined>> {
-  return runAction(async () => {
+  return runAction("trees.clearMemberPerson", async () => {
     await requireTreeMember(input.treeId, "owner");
     const updated = await db
       .update(treeMembers)
@@ -222,7 +222,7 @@ export async function updateMemberRole(input: {
   userId: string;
   role: "owner" | "editor" | "viewer";
 }): Promise<ActionResult<undefined>> {
-  return runAction(async () => {
+  return runAction("trees.updateMemberRole", async () => {
     await requireTreeMember(input.treeId, "owner");
     const role = treeRoleSchema.parse(input.role);
     await db.transaction(async tx => {
@@ -250,7 +250,7 @@ export async function removeMember(input: {
   treeId: string;
   userId: string;
 }): Promise<ActionResult<undefined>> {
-  return runAction(async () => {
+  return runAction("trees.removeMember", async () => {
     await requireTreeMember(input.treeId, "owner");
     await db.transaction(async tx => {
       const members = await tx
@@ -273,7 +273,7 @@ export async function removeMember(input: {
 }
 
 export async function leaveTree(treeId: string): Promise<ActionResult<undefined>> {
-  return runAction(async () => {
+  return runAction("trees.leaveTree", async () => {
     const access = await requireTreeMember(treeId);
     await db.transaction(async tx => {
       if (access.role === "owner") {
@@ -427,7 +427,7 @@ export async function createInvite(input: {
   expiresInDays: number;
   email?: string | null;
 }): Promise<ActionResult<CreatedInvite>> {
-  return runAction(async () => {
+  return runAction("trees.createInvite", async () => {
     const access = await requireTreeMember(input.treeId, "owner");
     const parsed = inviteSchema.parse(input);
     const email = input.email ? inviteEmailSchema.parse(input.email) : null;
@@ -464,7 +464,7 @@ export async function resendInvite(input: {
   treeId: string;
   inviteId: string;
 }): Promise<ActionResult<CreatedInvite>> {
-  return runAction(async () => {
+  return runAction("trees.resendInvite", async () => {
     const access = await requireTreeMember(input.treeId, "owner");
     if (!access.user.emailVerified) {
       throw new AppError("Verify your email address before sending invitations.");
@@ -517,7 +517,7 @@ export async function revokeInvite(input: {
   treeId: string;
   inviteId: string;
 }): Promise<ActionResult<undefined>> {
-  return runAction(async () => {
+  return runAction("trees.revokeInvite", async () => {
     await requireTreeMember(input.treeId, "owner");
     const updated = await db
       .update(treeInvites)
@@ -580,7 +580,7 @@ export async function getInvitePreview(token: string): Promise<InvitePreview> {
 }
 
 export async function acceptInvite(token: string): Promise<ActionResult<{ treeId: string }>> {
-  return runAction(async () => {
+  return runAction("trees.acceptInvite", async () => {
     const user = await requireUser();
     if (!token || token.length > 200) throw new AppError("That invite link is not valid.");
     const tokenHash = hashInviteToken(token);

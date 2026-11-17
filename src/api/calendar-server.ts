@@ -35,7 +35,7 @@ export async function getCalendarFeed(): Promise<CalendarFeedView | null> {
 }
 
 export async function createCalendarFeed(): Promise<ActionResult<CalendarFeedView>> {
-  return runAction(async () => {
+  return runAction("calendar.createCalendarFeed", async () => {
     const user = await requireUser();
     const feed = await db.transaction(async tx => {
       // Serialize concurrent creates for the same user before replacing the
@@ -63,7 +63,7 @@ export async function createCalendarFeed(): Promise<ActionResult<CalendarFeedVie
 }
 
 export async function disableCalendarFeed(): Promise<ActionResult<undefined>> {
-  return runAction(async () => {
+  return runAction("calendar.disableCalendarFeed", async () => {
     const user = await requireUser();
     await db
       .update(calendarFeeds)

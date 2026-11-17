@@ -7,6 +7,7 @@ import { AppError } from "./errors";
 import { isUuid } from "./ids";
 import { checkAccountRateLimit } from "./rate-limit";
 import { recordRejection } from "./usage";
+import { setLogContext } from "./logger";
 
 export { isUuid };
 
@@ -32,6 +33,7 @@ export async function requireTreeMember(
 ): Promise<TreeAccess> {
   if (!isUuid(treeId)) throw redirect("/trees");
   const user = await requireUser();
+  setLogContext({ userId: user.id });
   if (!checkAccountRateLimit(user.id)) {
     await recordRejection({
       userId: user.id,

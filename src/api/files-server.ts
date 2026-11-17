@@ -56,7 +56,7 @@ export async function prepareUpload(input: {
   height?: number | null;
   takenAt?: FuzzyDate | null;
 }): Promise<ActionResult<PreparedUpload>> {
-  return runAction(async () => {
+  return runAction("files.prepareUpload", async () => {
     const access = await requireTreeMember(input.treeId, "editor");
     const parsed = prepareUploadSchema.parse(input);
     const mimeType = parsed.mimeType.split(";")[0].trim().toLowerCase();
@@ -165,7 +165,7 @@ export async function prepareUpload(input: {
 }
 
 export async function finalizeUpload(fileId: string): Promise<ActionResult<{ id: string }>> {
-  return runAction(async () => {
+  return runAction("files.finalizeUpload", async () => {
     const user = await requireUser();
     const file = await getFileById(fileId);
     if (!file) throw new AppError("That upload could not be found.");
@@ -185,7 +185,7 @@ export async function finalizeUpload(fileId: string): Promise<ActionResult<{ id:
 }
 
 export async function cancelUpload(fileId: string): Promise<ActionResult<undefined>> {
-  return runAction(async () => {
+  return runAction("files.cancelUpload", async () => {
     const user = await requireUser();
     const file = await getFileById(fileId);
     if (!file) return undefined;
@@ -201,7 +201,7 @@ export async function deleteFile(input: {
   treeId: string;
   fileId: string;
 }): Promise<ActionResult<undefined>> {
-  return runAction(async () => {
+  return runAction("files.deleteFile", async () => {
     const access = await requireTreeMember(input.treeId, "editor");
     const file = await getFileById(input.fileId);
     if (!file || file.treeId !== access.tree.id) throw new AppError("That file could not be found.");
@@ -222,7 +222,7 @@ export async function createFileGroup(input: {
   personId: string;
   name: string;
 }): Promise<ActionResult<{ id: string; name: string }>> {
-  return runAction(async () => {
+  return runAction("files.createFileGroup", async () => {
     const access = await requireTreeMember(input.treeId, "editor");
     const parsed = fileGroupSchema.parse(input);
     const personRows = await db
@@ -248,7 +248,7 @@ export async function renameFileGroup(input: {
   groupId: string;
   name: string;
 }): Promise<ActionResult<{ id: string; name: string }>> {
-  return runAction(async () => {
+  return runAction("files.renameFileGroup", async () => {
     const parsed = renameFileGroupSchema.parse(input);
     const rows = await db
       .select()
@@ -272,7 +272,7 @@ export async function renameFileGroup(input: {
 }
 
 export async function deleteFileGroup(groupId: string): Promise<ActionResult<undefined>> {
-  return runAction(async () => {
+  return runAction("files.deleteFileGroup", async () => {
     const rows = await db
       .select()
       .from(fileGroups)
@@ -298,7 +298,7 @@ export async function setAvatar(input: {
   personId: string;
   fileId: string | null;
 }): Promise<ActionResult<undefined>> {
-  return runAction(async () => {
+  return runAction("files.setAvatar", async () => {
     const access = await requireTreeMember(input.treeId, "editor");
     const personRows = await db
       .select({ id: people.id })
@@ -321,7 +321,7 @@ export async function updateFileTags(input: {
   fileId: string;
   personIds: string[];
 }): Promise<ActionResult<string[]>> {
-  return runAction(async () => {
+  return runAction("files.updateFileTags", async () => {
     const access = await requireTreeMember(input.treeId, "editor");
     const parsed = fileTagsSchema.parse(input);
 
@@ -390,7 +390,7 @@ export async function updateFileTakenAt(input: {
   fileId: string;
   takenAt: FuzzyDate | null;
 }): Promise<ActionResult<undefined>> {
-  return runAction(async () => {
+  return runAction("files.updateFileTakenAt", async () => {
     const access = await requireTreeMember(input.treeId, "editor");
     const parsed = fileTakenAtSchema.parse(input);
     const updated = await db
