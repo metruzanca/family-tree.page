@@ -128,9 +128,6 @@ export function FuzzyDateField(props: FuzzyDateFieldProps) {
             {option => <option value={option.value}>{option.label}</option>}
           </For>
         </select>
-        <Show when={preview()}>
-          <span class="truncate text-xs text-muted-foreground">{preview()}</span>
-        </Show>
       </div>
 
       <Show when={qualifier() !== "unknown"}>
@@ -158,6 +155,15 @@ export function FuzzyDateField(props: FuzzyDateFieldProps) {
             onChange={(field, raw) => updatePart("end", field, raw)}
           />
         </Show>
+      </Show>
+
+      <Show when={preview()}>
+        <p
+          class="text-xs leading-snug text-muted-foreground"
+          data-testid={props.testId ? `${props.testId}-preview` : undefined}
+        >
+          {preview()}
+        </p>
       </Show>
 
       <Show when={invalid()}>
