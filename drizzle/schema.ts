@@ -13,6 +13,7 @@ import {
   pgEnum,
   pgTable,
   primaryKey,
+  real,
   text,
   timestamp,
   unique,
@@ -54,6 +55,11 @@ export const personEventKind = pgEnum("person_event_kind", [
   "other",
 ]);
 export const fileTagSource = pgEnum("file_tag_source", ["manual", "face"]);
+export const fileFaceStatus = pgEnum("file_face_status", [
+  "unassigned",
+  "assigned",
+  "ignored",
+]);
 export const authTokenKind = pgEnum("auth_token_kind", [
   "email_verification",
   "password_reset",
@@ -368,6 +374,8 @@ export const files = pgTable(
     width: integer("width"),
     height: integer("height"),
     takenAt: jsonb("taken_at").$type<FuzzyDate>(),
+    /** When the browser last looked for faces. Null means never attempted. */
+    facesScannedAt: timestamp("faces_scanned_at", { withTimezone: true }),
     status: fileStatus("status").notNull().default("uploading"),
     isAvatar: boolean("is_avatar").notNull().default(false),
     uploadedBy: uuid("uploaded_by").references(() => users.id, { onDelete: "set null" }),
@@ -395,7 +403,9 @@ export const files = pgTable(
 );
 
 export type FaceBox = {
+  /** Fraction of the image width, 0 to 1. */
   x: number;
+  /** Fraction of the image height, 0 to 1. */
   y: number;
   width: number;
   height: number;
@@ -411,7 +421,6 @@ export const fileTags = pgTable(
     fileId: uuid("file_id").notNull(),
     personId: uuid("person_id").notNull(),
     source: fileTagSource("source").notNull().default("manual"),
-    faceBox: jsonb("face_box").$type<FaceBox>(),
     createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -430,6 +439,50 @@ export const fileTags = pgTable(
       foreignColumns: [people.id, people.treeId],
       name: "file_tags_person_fk",
     }).onDelete("cascade"),
+  ],
+);
+
+/**
+ * A face found in a photo. Boxes are normalized fractions of the image, so
+ * they survive thumbnails and any rendered size. Only geometry is stored: no
+ * embedding or identity template is ever created.
+ *
+ * `file_tags` stays the list of people in the photo. Linking a face to a
+ * person writes both rows in one transaction.
+ *
+ * The person reference is single-column so deleting a person unassigns the
+ * face instead of deleting the box. Code checks that the person belongs to
+ * `treeId` before writing.
+ */
+export const fileFaces = pgTable(
+  "file_faces",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    treeId: uuid("tree_id")
+      .notNull()
+      .references(() => trees.id, { onDelete: "cascade" }),
+    fileId: uuid("file_id").notNull(),
+    personId: uuid("person_id").references(() => people.id, { onDelete: "set null" }),
+    box: jsonb("box").$type<FaceBox>().notNull(),
+    confidence: real("confidence"),
+    status: fileFaceStatus("status").notNull().default("unassigned"),
+    source: fileTagSource("source").notNull().default("face"),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  t => [
+    index("file_faces_file_idx").on(t.fileId),
+    index("file_faces_person_idx").on(t.personId),
+    index("file_faces_tree_idx").on(t.treeId),
+    foreignKey({
+      columns: [t.fileId, t.treeId],
+      foreignColumns: [files.id, files.treeId],
+      name: "file_faces_file_fk",
+    }).onDelete("cascade"),
+    uniqueIndex("file_faces_person_unique")
+      .on(t.fileId, t.personId)
+      .where(sql`${t.personId} is not null`),
   ],
 );
 
@@ -535,6 +588,7 @@ export type Partnership = typeof partnerships.$inferSelect;
 export type FileGroup = typeof fileGroups.$inferSelect;
 export type StoredFile = typeof files.$inferSelect;
 export type FileTag = typeof fileTags.$inferSelect;
+export type FileFace = typeof fileFaces.$inferSelect;
 export type UsageEvent = typeof usageEvents.$inferSelect;
 export type TreeActivity = typeof treeActivity.$inferSelect;
 export type TreeShareLink = typeof treeShareLinks.$inferSelect;
