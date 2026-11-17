@@ -53,6 +53,52 @@ export function AssignFaceDialog(props: AssignFaceDialogProps) {
       .sort((a, b) => a.displayName.localeCompare(b.displayName));
   });
 
+  /** Group photos usually include people the editor already linked elsewhere. */
+  const isGroupPhoto = () =>
+    props.file.faces.filter(face => face.status !== "ignored").length > 1;
+  const taggedInPhoto = createMemo(() => new Set(props.file.taggedPersonIds));
+  const priorityPeople = createMemo(() =>
+    isGroupPhoto() ? candidates().filter(person => taggedInPhoto().has(person.id)) : [],
+  );
+  const otherPeople = createMemo(() =>
+    candidates().filter(
+      person => !priorityPeople().some(tagged => tagged.id === person.id),
+    ),
+  );
+
+  function personRow(person: GraphPerson) {
+    const isCurrent = () => props.face?.personId === person.id;
+    return (
+      <li>
+        <button
+          type="button"
+          class={`flex w-full items-center gap-3 rounded-xl px-2 py-1.5 text-left transition ${
+            isCurrent() ? "bg-primary/10" : "hover:bg-primary/5"
+          }`}
+          disabled={props.pending || isCurrent()}
+          aria-pressed={isCurrent()}
+          data-testid={`assign-face-person-${person.id}`}
+          onClick={() => props.onAssign(person.id)}
+        >
+          <Avatar name={person.displayName} fileId={person.avatarFileId} size={32} />
+          <span class="min-w-0 flex-1">
+            <span class="block truncate text-sm font-medium">{person.displayName}</span>
+            <Show when={formatYears(person.birthDate, person.deathDate)}>
+              <span class="block text-[0.68rem] text-muted-foreground">
+                {formatYears(person.birthDate, person.deathDate)}
+              </span>
+            </Show>
+          </span>
+          <Show when={isCurrent()}>
+            <span class="grid h-6 w-6 place-items-center rounded-full border border-primary bg-primary text-primary-foreground">
+              <Check size={14} />
+            </span>
+          </Show>
+        </button>
+      </li>
+    );
+  }
+
   return (
     <Modal
       open={props.open}
@@ -168,48 +214,38 @@ export function AssignFaceDialog(props: AssignFaceDialogProps) {
             </p>
           }
         >
-          <ul class="space-y-1">
-            <For each={candidates()}>
-              {person => {
-                const isCurrent = () => props.face?.personId === person.id;
-                return (
-                  <li>
-                    <button
-                      type="button"
-                      class={`flex w-full items-center gap-3 rounded-xl px-2 py-1.5 text-left transition ${
-                        isCurrent() ? "bg-primary/10" : "hover:bg-primary/5"
-                      }`}
-                      disabled={props.pending || isCurrent()}
-                      aria-pressed={isCurrent()}
-                      data-testid={`assign-face-person-${person.id}`}
-                      onClick={() => props.onAssign(person.id)}
-                    >
-                      <Avatar
-                        name={person.displayName}
-                        fileId={person.avatarFileId}
-                        size={32}
-                      />
-                      <span class="min-w-0 flex-1">
-                        <span class="block truncate text-sm font-medium">
-                          {person.displayName}
-                        </span>
-                        <Show when={formatYears(person.birthDate, person.deathDate)}>
-                          <span class="block text-[0.68rem] text-muted-foreground">
-                            {formatYears(person.birthDate, person.deathDate)}
-                          </span>
-                        </Show>
-                      </span>
-                      <Show when={isCurrent()}>
-                        <span class="grid h-6 w-6 place-items-center rounded-full border border-primary bg-primary text-primary-foreground">
-                          <Check size={14} />
-                        </span>
-                      </Show>
-                    </button>
-                  </li>
-                );
-              }}
-            </For>
-          </ul>
+          <Show
+            when={priorityPeople().length}
+            fallback={
+              <ul class="space-y-1" data-testid="assign-face-list">
+                <For each={candidates()}>{person => personRow(person)}</For>
+              </ul>
+            }
+          >
+            <div class="space-y-3">
+              <div data-testid="assign-face-tagged">
+                <p
+                  class="mb-1 px-2 text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground"
+                  data-testid="assign-face-tagged-heading"
+                >
+                  Already in this photo
+                </p>
+                <ul class="space-y-1">
+                  <For each={priorityPeople()}>{person => personRow(person)}</For>
+                </ul>
+              </div>
+              <Show when={otherPeople().length}>
+                <div data-testid="assign-face-others">
+                  <p class="mb-1 px-2 text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Everyone else
+                  </p>
+                  <ul class="space-y-1">
+                    <For each={otherPeople()}>{person => personRow(person)}</For>
+                  </ul>
+                </div>
+              </Show>
+            </div>
+          </Show>
         </Show>
       </div>
     </Modal>

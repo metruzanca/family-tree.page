@@ -199,6 +199,8 @@ Editors can link people to individual faces in a photo. Detection runs in the br
 - The detector runs on the 640 px thumbnail after an image upload and on demand from "Check for faces" in the lightbox. Browser support is required; unsupported browsers fall back to tagging without boxes.
 - Only the box is stored, in `file_faces`, as normalized `x`, `y`, `width`, and `height` fractions. No embedding or identity template is created, so nothing can match a face across photos.
 - An unassigned box waits for an editor to link a person. Linking writes a `file_tags` row with `source = face`, so profiles, "Also in photos", activity, and exports keep working.
+- When the first check finds exactly one face, it is linked to the person the photo is filed under. Unlink it if the detector caught someone else. Re-scans never re-apply this, so an unlink stays put.
+- In a group photo, people already tagged in the picture appear first in the picker under "Already in this photo", followed by everyone else alphabetically.
 - If the detector misses a face, "Add a face" draws a box and links a person in one step. The photo owner is already linked by ownership, so no duplicate tag is created.
 - "Not a face" keeps the box but hides it and protects it from re-scans. Removing a person from the tag list unassigns their face and keeps the box. Re-scanning matches boxes by overlap, so links and ignored faces survive.
 - Share links and the demo never include face boxes or the scan marker. Deleting a person unassigns their faces; deleting a photo or tree removes them.

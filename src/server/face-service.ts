@@ -138,6 +138,24 @@ export async function recordDetectedFaces(input: {
         })),
       );
     }
+    // A lone face in a photo is almost always the person the photo is filed
+    // under. Only do this on the first check, so unlinking survives a re-scan.
+    if (existing.length === 0 && plan.additions.length === 1) {
+      await tx
+        .update(fileFaces)
+        .set({
+          personId: file.personId,
+          status: "assigned",
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(fileFaces.fileId, input.fileId),
+            eq(fileFaces.treeId, input.treeId),
+            eq(fileFaces.status, "unassigned"),
+          ),
+        );
+    }
     await tx
       .update(files)
       .set({ facesScannedAt: new Date(), updatedAt: new Date() })
