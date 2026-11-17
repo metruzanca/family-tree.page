@@ -44,6 +44,8 @@ The graph is the main view. People are nodes, parent and partner relationships a
 - Tree activity feed with filters, field-level changes, and an actor history
 - Live refresh nudge when another member changes the tree
 - Duplicate person warnings before adding a similar name or birth year
+- Read-only `/demo` that runs the real tree workspace on sample data
+- Public read-only share links with living-person privacy, optional thumbnails, expiry, and revocation
 - Nightly PostgreSQL and media backups to a second private bucket, with checksum verification and a one-command restore
 - Optional Sentry error tracking with PII scrubbing
 - Optional Umami analytics with page views and product events, enabled by environment variables
@@ -222,6 +224,14 @@ The presence WebSocket also carries a `tree-changed` message. Mutations call `no
 ## Duplicate people
 
 Before creating a person, the app compares normalized names, maiden names, nicknames, and birth year ranges. A likely duplicate shows a warning with the matching reasons. The add-relative flow can switch to the existing person, and "Add anyway" records an explicit override. `pnpm db:check` prints likely duplicate pairs.
+
+## Demo and share links
+
+`/demo` runs the real tree workspace on the static sample data from `src/components/landing/demo-tree.ts`. It has no account, no presence, and no write actions, and it shows a banner that links to registration.
+
+Tree owners can create public read-only links from the Sharing tab in tree settings. Each link stores only a SHA-256 hash of its token, so the URL is shown once at creation. A link can have a label, an expiry from one day to ninety days or no expiry, and can be revoked immediately. Revoked, expired, or unknown tokens show a simple unavailable page.
+
+Living people are anyone without a recorded death date. The default share setting is names only: names and relationships, with dates, places, biographies, portraits, events, and media removed. Owners can instead hide living people entirely or show full details. When media is enabled, only image thumbnails are served, never original files or documents, and a thumbnail request for a living person is rejected unless the link allows full details. Share responses send `X-Robots-Tag: noindex` and `Cache-Control: private, no-store`.
 
 ## How presence works
 
@@ -529,6 +539,7 @@ This is a reading aid, not access control. The whole graph is still sent to ever
 
 - No realtime co-editing. The graph refreshes after changes and a live nudge refreshes other open tabs, but edits are not merged character by character.
 - Duplicate detection is heuristic. There is no merge tool yet, so "Add anyway" can still create a duplicate.
+- Share links cover a whole tree. There is no per-person sharing or comment access yet.
 - Presence is held in the app process. It works as-is on a single Railway replica. Running more than one replica needs a shared presence store, such as Redis or Postgres `LISTEN`/`NOTIFY`.
 - HEIC photos work only when the browser can decode them; otherwise the user is asked to export as JPEG.
 - Backups live in a second Railway bucket in the same region and are not encrypted by the app. Backups run daily, so enable PostgreSQL point-in-time recovery for the gap between dumps.
