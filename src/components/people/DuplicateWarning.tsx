@@ -11,7 +11,10 @@ export function DuplicateWarning(props: {
   pending?: boolean;
 }) {
   return (
-    <div class="rounded-xl border border-warning/35 bg-warning/10 px-3.5 py-3">
+    <div
+      class="rounded-xl border border-warning/35 bg-warning/10 px-3.5 py-3"
+      data-testid="duplicate-warning"
+    >
       <p class="text-sm font-semibold">Is this someone who is already here?</p>
       <p class="mt-1 text-xs leading-relaxed text-muted-foreground">
         We found a similar person. Check before adding a duplicate.
@@ -19,7 +22,10 @@ export function DuplicateWarning(props: {
       <ul class="mt-3 space-y-2">
         <For each={props.candidates}>
           {candidate => (
-            <li class="rounded-xl border border-warning/25 bg-card/70 px-3 py-2">
+            <li
+              class="rounded-xl border border-warning/25 bg-card/70 px-3 py-2"
+              data-testid={`duplicate-warning-candidate-${candidate.id}`}
+            >
               <div class="flex flex-wrap items-start justify-between gap-2">
                 <div class="min-w-0">
                   <p class="truncate text-sm font-medium">{candidate.displayName}</p>
@@ -37,6 +43,7 @@ export function DuplicateWarning(props: {
                     type="button"
                     variant="secondary"
                     size="sm"
+                    data-testid={`duplicate-warning-use-${candidate.id}`}
                     onClick={() => props.onUseExisting?.(candidate)}
                   >
                     Use this person
@@ -48,7 +55,13 @@ export function DuplicateWarning(props: {
         </For>
       </ul>
       <div class="mt-3 flex flex-wrap gap-2">
-        <Button type="button" variant="ghost" size="sm" onClick={props.onCancel}>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={props.onCancel}
+          data-testid="duplicate-warning-back"
+        >
           Go back
         </Button>
         <Button
@@ -56,6 +69,7 @@ export function DuplicateWarning(props: {
           size="sm"
           disabled={props.pending}
           onClick={props.onCreateAnyway}
+          data-testid="duplicate-warning-add-anyway"
         >
           Add anyway
         </Button>

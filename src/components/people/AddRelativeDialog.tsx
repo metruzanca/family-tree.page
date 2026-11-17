@@ -252,9 +252,15 @@ export function AddRelativeDialog(props: {
       onClose={props.onClose}
       title={props.anchor ? `Connect someone to ${props.anchor.firstName}` : "Add a relative"}
       description="Choose how they are related, then pick an existing person or create a new one."
+      testId="add-relative-dialog"
       footer={
         <>
-          <Button variant="ghost" type="button" onClick={props.onClose}>
+          <Button
+            variant="ghost"
+            type="button"
+            onClick={props.onClose}
+            data-testid="add-relative-cancel"
+          >
             Cancel
           </Button>
           <Button
@@ -263,18 +269,25 @@ export function AddRelativeDialog(props: {
             form="relative-form"
             data-keep-open="true"
             disabled={pending()}
+            data-testid="add-relative-submit-more"
           >
             Connect and add more
           </Button>
-          <Button type="submit" form="relative-form" disabled={pending()}>
+          <Button
+            type="submit"
+            form="relative-form"
+            disabled={pending()}
+            data-testid="add-relative-submit"
+          >
             {pending() ? "Connecting…" : "Connect"}
           </Button>
         </>
       }
     >
-      <form id="relative-form" class="space-y-5" onSubmit={submit}>
+      <form id="relative-form" class="space-y-5" onSubmit={submit} data-testid="add-relative-form">
         <div class="grid grid-cols-3 gap-2">
           <RelationChoice
+            testId="add-relative-relation-parent"
             active={relation() === "parent"}
             disabled={parentDisabled()}
             icon={<ArrowUp size={17} />}
@@ -283,6 +296,7 @@ export function AddRelativeDialog(props: {
             onClick={() => setRelation("parent")}
           />
           <RelationChoice
+            testId="add-relative-relation-partner"
             active={relation() === "partner"}
             icon={<Heart size={17} />}
             label="Partner"
@@ -290,6 +304,7 @@ export function AddRelativeDialog(props: {
             onClick={() => setRelation("partner")}
           />
           <RelationChoice
+            testId="add-relative-relation-child"
             active={relation() === "child"}
             icon={<ArrowDown size={17} />}
             label="Child"
@@ -310,7 +325,12 @@ export function AddRelativeDialog(props: {
                 <SelectItem item={itemProps.item}>{itemProps.item.rawValue.label}</SelectItem>
               )}
             >
-              <SelectTrigger id="parent-type" class="w-full" aria-label="Relationship type">
+              <SelectTrigger
+                id="parent-type"
+                class="w-full"
+                aria-label="Relationship type"
+                data-testid="add-relative-parent-type"
+              >
                 <SelectValue<{ value: string; label: string }>>
                   {state => state.selectedOption().label}
                 </SelectValue>
@@ -338,7 +358,12 @@ export function AddRelativeDialog(props: {
                 <SelectItem item={itemProps.item}>{itemProps.item.rawValue.label}</SelectItem>
               )}
             >
-              <SelectTrigger id="other-parent" class="w-full" aria-label="Other parent">
+              <SelectTrigger
+                id="other-parent"
+                class="w-full"
+                aria-label="Other parent"
+                data-testid="add-relative-other-parent"
+              >
                 <SelectValue<{ value: string; label: string }>>
                   {state => state.selectedOption().label}
                 </SelectValue>
@@ -362,7 +387,12 @@ export function AddRelativeDialog(props: {
                 <SelectItem item={itemProps.item}>{itemProps.item.rawValue.label}</SelectItem>
               )}
             >
-              <SelectTrigger id="partner-status" class="w-full" aria-label="Partnership">
+              <SelectTrigger
+                id="partner-status"
+                class="w-full"
+                aria-label="Partnership"
+                data-testid="add-relative-partner-status"
+              >
                 <SelectValue<{ value: string; label: string }>>
                   {state => state.selectedOption().label}
                 </SelectValue>
@@ -379,6 +409,7 @@ export function AddRelativeDialog(props: {
             type="button"
             aria-pressed={mode() === "existing"}
             class={`flex-1 rounded-full px-3 py-1.5 font-semibold transition ${mode() === "existing" ? "border border-border/70 bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"}`}
+            data-testid="add-relative-mode-existing"
             onClick={() => setMode("existing")}
           >
             Existing person
@@ -387,6 +418,7 @@ export function AddRelativeDialog(props: {
             type="button"
             aria-pressed={mode() === "new"}
             class={`flex-1 rounded-full px-3 py-1.5 font-semibold transition ${mode() === "new" ? "border border-border/70 bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"}`}
+            data-testid="add-relative-mode-new"
             onClick={() => setMode("new")}
           >
             New person
@@ -403,13 +435,17 @@ export function AddRelativeDialog(props: {
                 placeholder="Search people already in this tree"
                 value={search()}
                 onInput={event => setSearch(event.currentTarget.value)}
+                data-testid="add-relative-search"
               />
             </label>
             <div class="scroll-thin max-h-52 space-y-1 overflow-y-auto rounded-2xl border border-border p-1.5">
               <Show
                 when={options().length}
                 fallback={
-                  <p class="px-3 py-8 text-center text-xs leading-relaxed text-muted-foreground">
+                  <p
+                    class="px-3 py-8 text-center text-xs leading-relaxed text-muted-foreground"
+                    data-testid="add-relative-people-empty"
+                  >
                     {props.people.length <= 1
                       ? "There is nobody else in this tree yet. Switch to New person."
                       : "No matching people."}
@@ -423,6 +459,7 @@ export function AddRelativeDialog(props: {
                       class={`flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left transition ${
                         selectedId() === person.id ? "bg-accent" : "hover:bg-primary/5"
                       }`}
+                      data-testid={`add-relative-person-${person.id}`}
                       onClick={() => setSelectedId(person.id)}
                     >
                       <Avatar name={person.displayName} fileId={person.avatarFileId} size={32} />
@@ -451,6 +488,7 @@ export function AddRelativeDialog(props: {
                 value={form.firstName}
                 onInput={event => setForm("firstName", event.currentTarget.value)}
                 required
+                data-testid="add-relative-first-name"
               />
             </Field>
             <Field label="Last name" for="relative-last">
@@ -459,11 +497,13 @@ export function AddRelativeDialog(props: {
                 class="input"
                 value={form.lastName}
                 onInput={event => setForm("lastName", event.currentTarget.value)}
+                data-testid="add-relative-last-name"
               />
             </Field>
             <Field label="Born" for="relative-birth">
               <FuzzyDateField
                 id="relative-birth"
+                testId="add-relative-birth-date"
                 value={form.birthDate}
                 onChange={value => setForm("birthDate", value)}
               />
@@ -471,6 +511,7 @@ export function AddRelativeDialog(props: {
             <Field label="Died" for="relative-death">
               <FuzzyDateField
                 id="relative-death"
+                testId="add-relative-death-date"
                 value={form.deathDate}
                 onChange={value => setForm("deathDate", value)}
               />
@@ -497,7 +538,11 @@ export function AddRelativeDialog(props: {
           />
         </Show>
         <Show when={error()}>
-          <p class="rounded-xl border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
+          <p
+            class="rounded-xl border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+            role="alert"
+            data-testid="add-relative-error"
+          >
             {error()}
           </p>
         </Show>
@@ -507,6 +552,7 @@ export function AddRelativeDialog(props: {
 }
 
 function RelationChoice(props: {
+  testId: string;
   active: boolean;
   icon: any;
   label: string;
@@ -519,6 +565,7 @@ function RelationChoice(props: {
       type="button"
       disabled={props.disabled}
       aria-disabled={props.disabled}
+      data-testid={props.testId}
       class={`flex flex-col items-center gap-1 rounded-2xl border px-2 py-3 text-center transition ${
         props.disabled
           ? "cursor-not-allowed border-border bg-muted/40 text-muted-foreground/50"

@@ -37,6 +37,7 @@ type FuzzyDateFieldProps = {
   value: FuzzyDate | null;
   onChange: (value: FuzzyDate | null) => void;
   id?: string;
+  testId?: string;
   compact?: boolean;
   disabled?: boolean;
 };
@@ -118,6 +119,7 @@ export function FuzzyDateField(props: FuzzyDateFieldProps) {
           value={qualifier()}
           disabled={props.disabled}
           aria-label="Date type"
+          data-testid={props.testId ? `${props.testId}-qualifier` : undefined}
           onChange={event =>
             changeQualifier(event.currentTarget.value as FuzzyDateQualifier)
           }
@@ -134,6 +136,7 @@ export function FuzzyDateField(props: FuzzyDateFieldProps) {
       <Show when={qualifier() !== "unknown"}>
         <DatePartsInputs
           id={props.id}
+          testId={props.testId}
           parts={start()}
           compact={props.compact}
           disabled={props.disabled}
@@ -148,6 +151,7 @@ export function FuzzyDateField(props: FuzzyDateFieldProps) {
             <span class="h-px flex-1 bg-border" />
           </div>
           <DatePartsInputs
+            testId={props.testId ? `${props.testId}-end` : undefined}
             parts={end()}
             compact={props.compact}
             disabled={props.disabled}
@@ -166,6 +170,7 @@ export function FuzzyDateField(props: FuzzyDateFieldProps) {
 function DatePartsInputs(props: {
   parts: PartialDate;
   id?: string;
+  testId?: string;
   compact?: boolean;
   disabled?: boolean;
   onChange: (field: keyof PartialDate, raw: string) => void;
@@ -187,6 +192,7 @@ function DatePartsInputs(props: {
         value={props.parts.year ?? ""}
         disabled={props.disabled}
         aria-label="Year"
+        data-testid={props.testId}
         onInput={event => props.onChange("year", event.currentTarget.value)}
       />
       <select
@@ -194,6 +200,7 @@ function DatePartsInputs(props: {
         value={props.parts.month ?? ""}
         disabled={props.disabled}
         aria-label="Month"
+        data-testid={props.testId ? `${props.testId}-month` : undefined}
         onChange={event => props.onChange("month", event.currentTarget.value)}
       >
         <option value="">Month</option>
@@ -211,6 +218,7 @@ function DatePartsInputs(props: {
         value={props.parts.day ?? ""}
         disabled={props.disabled || props.parts.month === null}
         aria-label="Day"
+        data-testid={props.testId ? `${props.testId}-day` : undefined}
         onInput={event => props.onChange("day", event.currentTarget.value)}
       />
     </div>

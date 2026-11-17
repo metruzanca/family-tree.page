@@ -142,6 +142,7 @@ export function PersonFormDialog(props: {
       open={props.open}
       onClose={props.onClose}
       title={props.person ? "Edit person" : "Add a person"}
+      testId="person-form-dialog"
       description={
         props.person
           ? "Update the details that appear on the tree and in their profile."
@@ -149,16 +150,26 @@ export function PersonFormDialog(props: {
       }
       footer={
         <>
-          <Button variant="ghost" type="button" onClick={props.onClose}>
+          <Button
+            variant="ghost"
+            type="button"
+            onClick={props.onClose}
+            data-testid="person-form-cancel"
+          >
             Cancel
           </Button>
-          <Button type="submit" form="person-form" disabled={pending()}>
+          <Button
+            type="submit"
+            form="person-form"
+            disabled={pending()}
+            data-testid="person-form-submit"
+          >
             {pending() ? "Saving…" : props.person ? "Save changes" : "Add person"}
           </Button>
         </>
       }
     >
-      <form id="person-form" class="space-y-4" onSubmit={submit}>
+      <form id="person-form" class="space-y-4" onSubmit={submit} data-testid="person-form">
         <div class="grid gap-4 sm:grid-cols-2">
           <Field label="First name" for="person-first">
             <input
@@ -169,6 +180,7 @@ export function PersonFormDialog(props: {
               maxlength={80}
               required
               autofocus
+              data-testid="person-form-first-name"
             />
           </Field>
           <Field label="Last name" for="person-last">
@@ -178,6 +190,7 @@ export function PersonFormDialog(props: {
               value={form.lastName}
               onInput={event => setForm("lastName", event.currentTarget.value)}
               maxlength={80}
+              data-testid="person-form-last-name"
             />
           </Field>
           <Field label="Nickname" for="person-nick">
@@ -188,6 +201,7 @@ export function PersonFormDialog(props: {
               value={form.nickname}
               onInput={event => setForm("nickname", event.currentTarget.value)}
               maxlength={80}
+              data-testid="person-form-nickname"
             />
           </Field>
           <Field label="Maiden name" for="person-maiden">
@@ -198,11 +212,13 @@ export function PersonFormDialog(props: {
               value={form.maidenName}
               onInput={event => setForm("maidenName", event.currentTarget.value)}
               maxlength={80}
+              data-testid="person-form-maiden-name"
             />
           </Field>
           <Field label="Born" for="person-birth">
             <FuzzyDateField
               id="person-birth"
+              testId="person-form-birth-date"
               value={form.birthDate}
               onChange={value => setForm("birthDate", value)}
             />
@@ -210,6 +226,7 @@ export function PersonFormDialog(props: {
           <Field label="Died" for="person-death">
             <FuzzyDateField
               id="person-death"
+              testId="person-form-death-date"
               value={form.deathDate}
               onChange={value => setForm("deathDate", value)}
             />
@@ -222,6 +239,7 @@ export function PersonFormDialog(props: {
               value={form.birthPlace}
               onInput={event => setForm("birthPlace", event.currentTarget.value)}
               maxlength={160}
+              data-testid="person-form-birthplace"
             />
           </Field>
           <Field label="Resting place" for="person-deathplace">
@@ -232,6 +250,7 @@ export function PersonFormDialog(props: {
               value={form.deathPlace}
               onInput={event => setForm("deathPlace", event.currentTarget.value)}
               maxlength={160}
+              data-testid="person-form-deathplace"
             />
           </Field>
         </div>
@@ -242,6 +261,7 @@ export function PersonFormDialog(props: {
             value={form.bio}
             onInput={event => setForm("bio", event.currentTarget.value)}
             maxlength={4000}
+            data-testid="person-form-bio"
           />
         </Field>
         <Show when={duplicates().length}>
@@ -257,7 +277,11 @@ export function PersonFormDialog(props: {
           />
         </Show>
         <Show when={error()}>
-          <p class="rounded-xl border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
+          <p
+            class="rounded-xl border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+            role="alert"
+            data-testid="person-form-error"
+          >
             {error()}
           </p>
         </Show>

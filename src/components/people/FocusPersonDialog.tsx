@@ -40,6 +40,7 @@ export function FocusPersonDialog(props: {
       onClose={props.onClose}
       title="Who are you in this tree?"
       description="The tree opens around this person. Everyone can still see the whole family when they want to."
+      testId="focus-person-dialog"
       footer={
         <div class="flex w-full items-center justify-between gap-3 text-xs text-muted-foreground">
           <span>This only changes what you see first.</span>
@@ -48,6 +49,7 @@ export function FocusPersonDialog(props: {
               type="button"
               class="font-semibold text-primary underline decoration-primary/30 underline-offset-4 disabled:opacity-50"
               disabled={props.pending}
+              data-testid="focus-person-clear"
               onClick={() => props.onSave(null)}
             >
               Clear my link
@@ -66,6 +68,7 @@ export function FocusPersonDialog(props: {
           value={query()}
           onInput={event => setQuery(event.currentTarget.value)}
           placeholder="Search by name, nickname or maiden name"
+          data-testid="focus-person-search"
           autofocus
         />
       </label>
@@ -79,6 +82,7 @@ export function FocusPersonDialog(props: {
                 type="button"
                 class="flex w-full items-center gap-2.5 rounded-xl px-2 py-2 text-left transition hover:bg-accent/70 focus-visible:bg-accent/70 focus-visible:outline-none"
                 disabled={props.pending}
+                data-testid={`focus-person-result-${person.id}`}
                 onClick={() => props.onSave(person.id)}
               >
                 <Avatar
@@ -104,7 +108,7 @@ export function FocusPersonDialog(props: {
           }}
         </For>
         <Show when={!matches().length}>
-          <p class="py-8 text-center text-sm text-muted-foreground">
+          <p class="py-8 text-center text-sm text-muted-foreground" data-testid="focus-person-empty">
             Nothing matches “{query()}”.
           </p>
         </Show>

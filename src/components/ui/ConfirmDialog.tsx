@@ -28,7 +28,10 @@ export function ConfirmDialog(props: {
       }}
     >
       <AlertDialogPortal>
-        <AlertDialogContent class="gap-5 rounded-[1.35rem] border-border bg-card shadow-[var(--shadow-soft)]">
+        <AlertDialogContent
+          class="gap-5 rounded-[1.35rem] border-border bg-card shadow-[var(--shadow-soft)]"
+          data-testid="confirm-dialog"
+        >
           <AlertDialogHeader class="gap-2">
             <AlertDialogTitle class="font-display text-xl leading-tight tracking-tight">
               {props.title}
@@ -40,13 +43,19 @@ export function ConfirmDialog(props: {
             </Show>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <Button variant="ghost" type="button" onClick={props.onClose}>
+            <Button
+              variant="ghost"
+              type="button"
+              onClick={props.onClose}
+              data-testid="confirm-dialog-cancel"
+            >
               Cancel
             </Button>
             <Button
               variant={props.danger ? "destructive" : "default"}
               type="button"
               disabled={props.pending}
+              data-testid="confirm-dialog-confirm"
               onClick={props.onConfirm}
             >
               {props.pending ? "Working…" : (props.confirmLabel ?? "Confirm")}

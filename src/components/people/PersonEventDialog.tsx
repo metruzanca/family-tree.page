@@ -94,24 +94,36 @@ export function PersonEventDialog(props: PersonEventDialogProps) {
       onClose={props.onClose}
       title={props.event ? "Edit life event" : `Add a life event for ${props.person.firstName}`}
       description="Residences, work, military service, migration, burial, and anything else worth keeping."
+      testId="person-event-form-dialog"
       footer={
         <>
-          <Button variant="ghost" type="button" onClick={props.onClose}>
+          <Button
+            variant="ghost"
+            type="button"
+            onClick={props.onClose}
+            data-testid="person-event-form-cancel"
+          >
             Cancel
           </Button>
-          <Button type="submit" form="person-event-form" disabled={pending()}>
+          <Button
+            type="submit"
+            form="person-event-form"
+            disabled={pending()}
+            data-testid="person-event-form-submit"
+          >
             {pending() ? "Saving…" : props.event ? "Save changes" : "Add event"}
           </Button>
         </>
       }
     >
-      <form id="person-event-form" class="space-y-4" onSubmit={submit}>
+      <form id="person-event-form" class="space-y-4" onSubmit={submit} data-testid="person-event-form">
         <div class="grid gap-4 sm:grid-cols-2">
           <Field label="Type" for="event-kind">
             <select
               id="event-kind"
               class="input"
               value={form.kind}
+              data-testid="person-event-form-kind"
               onChange={event =>
                 setForm("kind", event.currentTarget.value as PersonEventKind)
               }
@@ -132,6 +144,7 @@ export function PersonEventDialog(props: PersonEventDialogProps) {
               placeholder="Opened the hardware store"
               value={form.title}
               maxlength={120}
+              data-testid="person-event-form-title"
               onInput={event => setForm("title", event.currentTarget.value)}
             />
           </Field>
@@ -140,6 +153,7 @@ export function PersonEventDialog(props: PersonEventDialogProps) {
         <Field label="Date" for="event-date">
           <FuzzyDateField
             id="event-date"
+            testId="person-event-form-date"
             value={form.date}
             onChange={value => setForm("date", value)}
           />
@@ -152,6 +166,7 @@ export function PersonEventDialog(props: PersonEventDialogProps) {
             placeholder="Springfield"
             value={form.place}
             maxlength={160}
+            data-testid="person-event-form-place"
             onInput={event => setForm("place", event.currentTarget.value)}
           />
         </Field>
@@ -163,6 +178,7 @@ export function PersonEventDialog(props: PersonEventDialogProps) {
             placeholder="Anything that gives this event context."
             value={form.description}
             maxlength={2000}
+            data-testid="person-event-form-description"
             onInput={event => setForm("description", event.currentTarget.value)}
           />
         </Field>
@@ -175,6 +191,7 @@ export function PersonEventDialog(props: PersonEventDialogProps) {
           <p
             class="rounded-xl border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive"
             role="alert"
+            data-testid="person-event-form-error"
           >
             {error()}
           </p>
