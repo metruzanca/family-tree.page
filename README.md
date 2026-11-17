@@ -2,7 +2,7 @@
 
 A private, collaborative family tree built around an interactive graph of people, relationships, and the photographs and documents attached to them.
 
-The graph is the main view. People are nodes, parent and partner relationships are edges, and media sits on a ring behind the person who owns it. Each tree can have one owner and any number of editors and viewers, invited by link.
+The graph is the main view. People are nodes, parent and partner relationships are edges, and media clusters behind the person who owns it. Each tree can have one owner and any number of editors and viewers, invited by link.
 
 ## Stack
 
@@ -25,14 +25,11 @@ The graph is the main view. People are nodes, parent and partner relationships a
 - Invites by copyable link or by email, with expiry and single use
 - People, parent-child relationships, and partnerships
 - Add a child with a second parent in one step, and keep the dialog open to add several children quickly
-- Tidy family clusters: partners and same-level co-parents sit together, children are ordered under their parents, and every subtree owns its own horizontal space
-- Parents always sit on the row above their children, with no node overlap
-- Connectors run through empty row gutters, so no line passes through a person or paints over another line
-- Media sits on a ring around its owner and is drawn behind the graph, so adding photos never moves a person
-- Cycle-safe generation rows that stay bounded when relationships contradict each other, with an in-app warning and `pnpm db:check`
-- Partner pairs stay side by side, and a parent pair joins at one junction before branching to its children
-- Direction flip for oldest-at-top or oldest-at-bottom layouts
-- Disconnected groups inside a tree get their own side-by-side space, so a new unconnected person never overlaps the rest of the tree
+- Force-directed layout: parent and partner edges pull families into loose clusters, so relatives stay together and edges stay short
+- A label-aware collision force keeps names readable, and disconnected branches find their own space
+- Media clusters around its owner through a short hidden spring and is drawn behind the graph, so a photo never covers a person
+- Parent edges carry an arrow, partner edges are dashed, and hovering a person dims everyone outside their immediate family
+- Cycle-safe relationship analysis that stays bounded when relationships contradict each other, with an in-app warning and `pnpm db:check`
 - "This is me" links a member to their person, so the tree opens around their own branch instead of the whole family
 - Focus rings from immediate family out to first cousins, with a "Show more" chip and an Everyone option that reveals the rest of the tree in one click
 - Search, neighbor highlighting, zoom and pan
