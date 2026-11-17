@@ -1,6 +1,7 @@
 import { cancelUpload, finalizeUpload, prepareUpload } from "~/api/files-server";
 import { friendlyMessage } from "./action-result";
 import { formatExifDate } from "./exif";
+import { scanBlobForFaces } from "./face-scan";
 import { exactDateFromISO } from "./fuzzy-date";
 import { makeThumbnail, mimeForFile } from "./image-thumb";
 
@@ -85,6 +86,15 @@ export async function uploadPersonFile(options: UploadOptions): Promise<UploadRe
     if (!finalized.ok) {
       await cancelUpload(fileId);
       return { ok: false, error: finalized.error };
+    }
+    if (thumb) {
+      // Detection is a bonus. A failed detector must never fail the upload.
+      options.onProgress?.(0.96);
+      await scanBlobForFaces({
+        treeId: options.treeId,
+        fileId: finalized.data.id,
+        blob: thumb.blob,
+      });
     }
     options.onProgress?.(1);
     return { ok: true, fileId };
