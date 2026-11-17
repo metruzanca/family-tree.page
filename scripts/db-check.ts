@@ -22,6 +22,8 @@ try {
   const [personRows, parentRows, partnerRows] = await Promise.all([
     pool.query<{
       id: string;
+      tree_id: string;
+      tree_name: string;
       display_name: string;
       first_name: string;
       last_name: string;
@@ -30,7 +32,7 @@ try {
       birth_date: FuzzyDate | null;
       death_date: FuzzyDate | null;
     }>(
-      "select id, trim(first_name || ' ' || coalesce(last_name, '')) as display_name, first_name, last_name, maiden_name, nickname, birth_date, death_date from people",
+      "select p.id, p.tree_id, t.name as tree_name, trim(p.first_name || ' ' || coalesce(p.last_name, '')) as display_name, p.first_name, p.last_name, p.maiden_name, p.nickname, p.birth_date, p.death_date from people p join trees t on t.id = p.tree_id",
     ),
     pool.query<{ id: string; parent_id: string; child_id: string }>(
       "select id, parent_id, child_id from parent_child",
@@ -42,31 +44,45 @@ try {
 
   const names = new Map(personRows.rows.map(row => [row.id, row.display_name]));
 
-  const duplicatePeople: DuplicatePerson[] = personRows.rows.map(row => ({
-    id: row.id,
-    displayName: row.display_name || "Unnamed person",
-    firstName: row.first_name,
-    lastName: row.last_name,
-    maidenName: row.maiden_name,
-    nickname: row.nickname,
-    birthDate: row.birth_date,
-    deathDate: row.death_date,
-  }));
+  const peopleByTree = new Map<
+    string,
+    { treeName: string; people: DuplicatePerson[] }
+  >();
+  for (const row of personRows.rows) {
+    const entry = peopleByTree.get(row.tree_id) ?? {
+      treeName: row.tree_name,
+      people: [],
+    };
+    entry.people.push({
+      id: row.id,
+      displayName: row.display_name || "Unnamed person",
+      firstName: row.first_name,
+      lastName: row.last_name,
+      maidenName: row.maiden_name,
+      nickname: row.nickname,
+      birthDate: row.birth_date,
+      deathDate: row.death_date,
+    });
+    peopleByTree.set(row.tree_id, entry);
+  }
+
   const seenPairs = new Set<string>();
   let duplicateCount = 0;
-  for (const person of duplicatePeople) {
-    const matches = findDuplicateCandidates(person, duplicatePeople, {
-      excludePersonId: person.id,
-      limit: 3,
-    });
-    for (const match of matches) {
-      const pair = [person.id, match.id].sort().join(":");
-      if (seenPairs.has(pair)) continue;
-      seenPairs.add(pair);
-      duplicateCount += 1;
-      console.log(
-        `Possible duplicate: ${person.displayName} and ${match.displayName} (${match.reasons.join(", ")})`,
-      );
+  for (const { treeName, people: treePeople } of peopleByTree.values()) {
+    for (const person of treePeople) {
+      const matches = findDuplicateCandidates(person, treePeople, {
+        excludePersonId: person.id,
+        limit: 3,
+      });
+      for (const match of matches) {
+        const pair = [person.id, match.id].sort().join(":");
+        if (seenPairs.has(pair)) continue;
+        seenPairs.add(pair);
+        duplicateCount += 1;
+        console.log(
+          `Possible duplicate in ${treeName}: ${person.displayName} and ${match.displayName} (${match.reasons.join(", ")})`,
+        );
+      }
     }
   }
   if (duplicateCount) {

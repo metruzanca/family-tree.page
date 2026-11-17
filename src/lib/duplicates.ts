@@ -120,7 +120,7 @@ export function findDuplicateCandidates(
     limit?: number;
   } = {},
 ): DuplicateCandidate[] {
-  const threshold = options.threshold ?? 45;
+  const threshold = options.threshold ?? 55;
   const limit = options.limit ?? 5;
   const inputFull = fullName(input);
   if (!inputFull) return [];

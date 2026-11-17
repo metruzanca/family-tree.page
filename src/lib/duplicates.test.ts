@@ -50,6 +50,14 @@ describe("duplicate detection", () => {
     expect(candidates).toHaveLength(1);
   });
 
+  it("does not flag siblings who share a surname and birth year", () => {
+    const candidates = findDuplicateCandidates(
+      { firstName: "Patty", lastName: "Bouvier", birthDate: exactFuzzyDate(1954) },
+      [person("selma", "Selma", "Bouvier", 1954)],
+    );
+    expect(candidates).toEqual([]);
+  });
+
   it("does not warn on a different name and year", () => {
     const candidates = findDuplicateCandidates(
       { firstName: "Lisa", lastName: "Simpson", birthDate: exactFuzzyDate(1982) },
