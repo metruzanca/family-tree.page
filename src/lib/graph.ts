@@ -7,9 +7,20 @@ import type {
 } from "~/api/people-server";
 import { analyzeRelationships } from "./relationships";
 
+export type ParentType =
+  | "biological"
+  | "adoptive"
+  | "foster"
+  | "step"
+  | "unknown";
+
 export type GraphNode = {
   id: string;
-  kind: "person" | "file" | "group";
+  /**
+   * Junctions are layout-only nodes where a parent set meets its children.
+   * They are never painted or clickable.
+   */
+  kind: "person" | "file" | "group" | "junction";
   name: string;
   person?: GraphPerson;
   file?: GraphFile;
@@ -30,12 +41,13 @@ export type GraphLink = {
   source: string | GraphNode;
   target: string | GraphNode;
   /**
-   * Parent and partner links come from relationships. Media links are the
-   * spring that keeps a photo or album near the person who owns it; the graph
-   * never paints them.
+   * A parent link runs from a parent to a family junction, a child link runs
+   * from that junction to a child. Partner links come from relationships.
+   * Media links are the spring that keeps a photo or album near its owner;
+   * the graph never paints them.
    */
-  kind: "parent" | "partner" | "media";
-  parentType?: "biological" | "adoptive" | "foster" | "step" | "unknown";
+  kind: "parent" | "child" | "partner" | "media";
+  parentType?: ParentType;
   status?: string;
 };
 
@@ -45,7 +57,14 @@ export type GraphModel = {
   generations: Map<string, number>;
   byId: Map<string, GraphNode>;
   people: GraphNode[];
+  junctions: GraphNode[];
   mediaByOwner: Map<string, GraphNode[]>;
+};
+
+export type FamilyGroup = {
+  parentIds: string[];
+  childIds: string[];
+  parentTypes: Map<string, ParentType>;
 };
 
 export function fileNodeId(fileId: string) {
@@ -56,8 +75,81 @@ export function groupNodeId(groupId: string) {
   return `group:${groupId}`;
 }
 
+export function junctionNodeId(parentIds: Iterable<string>) {
+  return `family:${[...parentIds].sort().join("+")}`;
+}
+
 export function nodeIdOf(endpoint: string | GraphNode) {
   return typeof endpoint === "string" ? endpoint : endpoint.id;
+}
+
+const PARENT_TYPE_PRIORITY: ParentType[] = [
+  "biological",
+  "adoptive",
+  "foster",
+  "step",
+  "unknown",
+];
+
+/**
+ * The dashed arm should show the strongest parent type in the group, so a
+ * biological link always wins over a legal or informal one.
+ */
+function strongestParentType(current: ParentType | undefined, next: ParentType) {
+  if (!current) return next;
+  return PARENT_TYPE_PRIORITY.indexOf(next) < PARENT_TYPE_PRIORITY.indexOf(current)
+    ? next
+    : current;
+}
+
+/**
+ * Groups children by the exact set of people recorded as their parents. Each
+ * group becomes one family junction, so full siblings share a joint while
+ * half-siblings hang from separate joints on the shared parent.
+ */
+export function groupChildrenByParents(
+  relationships: GraphRelationship[],
+): FamilyGroup[] {
+  const parentsByChild = new Map<string, Map<string, ParentType>>();
+  for (const relationship of relationships) {
+    if (relationship.type !== "parent") continue;
+    let parents = parentsByChild.get(relationship.target);
+    if (!parents) {
+      parents = new Map();
+      parentsByChild.set(relationship.target, parents);
+    }
+    parents.set(
+      relationship.source,
+      strongestParentType(parents.get(relationship.source), relationship.parentType),
+    );
+  }
+
+  const groups = new Map<string, FamilyGroup>();
+  for (const [childId, parents] of parentsByChild) {
+    if (!parents.size) continue;
+    const parentIds = [...parents.keys()].sort();
+    const key = parentIds.join("+");
+    let group = groups.get(key);
+    if (!group) {
+      group = { parentIds, childIds: [], parentTypes: new Map() };
+      groups.set(key, group);
+    }
+    for (const [parentId, type] of parents) {
+      group.parentTypes.set(
+        parentId,
+        strongestParentType(group.parentTypes.get(parentId), type),
+      );
+    }
+    group.childIds.push(childId);
+  }
+
+  return [...groups.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([, group]) => ({
+      parentIds: group.parentIds,
+      childIds: [...group.childIds].sort(),
+      parentTypes: group.parentTypes,
+    }));
 }
 
 function relationshipKey(relationship: GraphRelationship) {
@@ -118,7 +210,16 @@ export function buildGraphModel(
     degree.set(relationship.target, (degree.get(relationship.target) ?? 0) + 1);
   }
 
-  const nodes: GraphNode[] = [];
+  const familyGroups = groupChildrenByParents(relationships);
+  const junctions: GraphNode[] = familyGroups.map(group => ({
+    id: junctionNodeId(group.parentIds),
+    kind: "junction",
+    name: "",
+    degree: 0,
+    level: Math.max(...group.parentIds.map(id => generations.get(id) ?? 0)),
+  }));
+
+  const nodes: GraphNode[] = [...junctions];
   for (const person of people) {
     nodes.push({
       id: person.id,
@@ -132,23 +233,34 @@ export function buildGraphModel(
 
   const links: GraphLink[] = [];
   for (const relationship of relationships) {
-    if (relationship.type === "partner") {
-      links.push({
-        id: relationship.id,
-        source: relationship.source,
-        target: relationship.target,
-        kind: "partner",
-        status: relationship.status,
-      });
-      continue;
-    }
+    if (relationship.type !== "partner") continue;
     links.push({
       id: relationship.id,
       source: relationship.source,
       target: relationship.target,
-      kind: "parent",
-      parentType: relationship.parentType,
+      kind: "partner",
+      status: relationship.status,
     });
+  }
+  for (const group of familyGroups) {
+    const junctionId = junctionNodeId(group.parentIds);
+    for (const parentId of group.parentIds) {
+      links.push({
+        id: `${junctionId}:parent:${parentId}`,
+        source: parentId,
+        target: junctionId,
+        kind: "parent",
+        parentType: group.parentTypes.get(parentId),
+      });
+    }
+    for (const childId of group.childIds) {
+      links.push({
+        id: `${junctionId}:child:${childId}`,
+        source: junctionId,
+        target: childId,
+        kind: "child",
+      });
+    }
   }
 
   const mediaByOwner = new Map<string, GraphNode[]>();
@@ -201,6 +313,7 @@ export function buildGraphModel(
     generations,
     byId: new Map(nodes.map(node => [node.id, node])),
     people: nodes.filter(node => node.kind === "person"),
+    junctions,
     mediaByOwner,
   };
 }
@@ -279,6 +392,7 @@ export function fileCardSize(node: GraphNode): MediaCardSize {
 }
 
 export function nodeRadius(node: GraphNode) {
+  if (node.kind === "junction") return 6;
   if (node.kind === "file" || node.kind === "group") {
     const card = fileCardSize(node);
     return Math.max(card.width, card.height) / 2;

@@ -5,8 +5,11 @@ import {
   dedupeRelationships,
   fileCardSize,
   fileNodeId,
+  groupChildrenByParents,
   groupNodeId,
+  junctionNodeId,
   mediaAspect,
+  nodeIdOf,
   nodeRadius,
   type GraphNode,
 } from "./graph";
@@ -106,7 +109,7 @@ describe("relationship deduplication", () => {
       ],
     );
     const model = buildGraphModel(data, false);
-    expect(model.links.filter(link => link.kind === "parent")).toHaveLength(1);
+    expect(model.links.filter(link => link.kind === "child")).toHaveLength(1);
     expect(model.links.filter(link => link.kind === "partner")).toHaveLength(1);
     expect(dedupeRelationships(data.relationships)).toHaveLength(2);
   });
@@ -171,7 +174,10 @@ describe("buildGraphModel", () => {
   it("links every media node to its owner", () => {
     const model = buildGraphModel(data, true);
     const mediaLinks = model.links.filter(link => link.kind === "media");
-    expect(mediaLinks).toHaveLength(model.nodes.length - model.people.length);
+    const mediaNodes = model.nodes.filter(
+      node => node.kind === "file" || node.kind === "group",
+    );
+    expect(mediaLinks).toHaveLength(mediaNodes.length);
     expect(mediaLinks[0]).toMatchObject({
       source: "b",
       target: fileNodeId("doc"),
@@ -180,7 +186,8 @@ describe("buildGraphModel", () => {
 
   it("drops media nodes and their links when media is hidden", () => {
     const model = buildGraphModel(data, false);
-    expect(model.nodes.map(node => node.id)).toEqual(["a", "b"]);
+    expect(model.people.map(node => node.id)).toEqual(["a", "b"]);
+    expect(model.nodes.filter(node => node.kind === "file")).toHaveLength(0);
     expect(model.mediaByOwner.size).toBe(0);
     expect(model.links.filter(link => link.kind === "media")).toHaveLength(0);
   });
@@ -227,7 +234,7 @@ describe("buildGraphModel", () => {
     expect(groupNodes[0].id).toBe(groupNodeId("album-1"));
   });
 
-  it("keeps parent and partner links but creates no union nodes", () => {
+  it("joins co-parents and their children at one family junction", () => {
     const familyData = treeWith(
       ["a", "b", "c", "d"].map(id => person(id)),
       [
@@ -239,9 +246,119 @@ describe("buildGraphModel", () => {
       ],
     );
     const model = buildGraphModel(familyData, false);
-    expect(model.nodes.every(node => node.kind !== ("union" as never))).toBe(true);
+    const junction = junctionNodeId(["a", "b"]);
+    expect(model.junctions.map(node => node.id)).toEqual([junction]);
     expect(model.links.filter(link => link.kind === "partner")).toHaveLength(1);
-    expect(model.links.filter(link => link.kind === "parent")).toHaveLength(4);
+    expect(
+      model.links
+        .filter(link => link.kind === "parent")
+        .map(link => nodeIdOf(link.source)),
+    ).toEqual(["a", "b"]);
+    expect(
+      model.links
+        .filter(link => link.kind === "child")
+        .map(link => nodeIdOf(link.target)),
+    ).toEqual(["c", "d"]);
+    expect(
+      model.links
+        .filter(link => link.kind !== "partner")
+        .every(
+          link =>
+            link.kind === "media" ||
+            (link.kind === "parent"
+              ? nodeIdOf(link.target) === junction
+              : nodeIdOf(link.source) === junction),
+        ),
+    ).toBe(true);
+  });
+
+  it("gives half-siblings a junction per parent set", () => {
+    const model = buildGraphModel(
+      treeWith(
+        ["a", "b", "c", "d", "e"].map(id => person(id)),
+        [
+          parent("r1", "a", "c"),
+          parent("r2", "b", "c"),
+          parent("r3", "a", "e"),
+          parent("r4", "d", "e"),
+        ],
+      ),
+      false,
+    );
+    expect(model.junctions.map(node => node.id).sort()).toEqual(
+      [junctionNodeId(["a", "b"]), junctionNodeId(["a", "d"])].sort(),
+    );
+    expect(
+      model.links.filter(
+        link => link.kind === "parent" && nodeIdOf(link.source) === "a",
+      ),
+    ).toHaveLength(2);
+    expect(
+      model.links.filter(link => link.kind === "child").map(link => nodeIdOf(link.target)),
+    ).toEqual(["c", "e"]);
+  });
+
+  it("creates a junction for a single parent", () => {
+    const model = buildGraphModel(
+      treeWith([person("a"), person("b")], [parent("r1", "a", "b")]),
+      false,
+    );
+    const junction = junctionNodeId(["a"]);
+    expect(model.junctions.map(node => node.id)).toEqual([junction]);
+    expect(model.links).toHaveLength(2);
+    expect(model.links[0]).toMatchObject({
+      kind: "parent",
+      source: "a",
+      target: junction,
+    });
+    expect(model.links[1]).toMatchObject({
+      kind: "child",
+      source: junction,
+      target: "b",
+    });
+  });
+
+  it("keeps the strongest parent type on a shared arm", () => {
+    const adoptive = (id: string, source: string, target: string) => ({
+      id,
+      type: "parent" as const,
+      source,
+      target,
+      parentType: "adoptive" as const,
+    });
+    const model = buildGraphModel(
+      treeWith(
+        ["a", "b", "c", "d"].map(id => person(id)),
+        [
+          parent("r1", "a", "c"),
+          parent("r2", "b", "c"),
+          adoptive("r3", "a", "d"),
+          parent("r4", "b", "d"),
+        ],
+      ),
+      false,
+    );
+    const arm = model.links.find(
+      link => link.kind === "parent" && nodeIdOf(link.source) === "a",
+    );
+    expect(arm?.parentType).toBe("biological");
+  });
+
+  it("groups children by their exact parent set", () => {
+    const groups = groupChildrenByParents([
+      parent("r1", "a", "c"),
+      parent("r2", "b", "c"),
+      parent("r3", "b", "d"),
+    ]);
+    expect(groups).toHaveLength(2);
+    expect(groups[0]).toMatchObject({
+      parentIds: ["a", "b"],
+      childIds: ["c"],
+    });
+    expect(groups[1]).toMatchObject({
+      parentIds: ["b"],
+      childIds: ["d"],
+    });
   });
 });
 
@@ -365,9 +482,21 @@ describe("focused graph model", () => {
       false,
       new Set(["a", "b"]),
     );
-    expect(model.nodes.map(node => node.id).sort()).toEqual(["a", "b"]);
-    expect(model.links).toHaveLength(1);
-    expect(model.links[0].id).toBe("r1");
+    const junction = junctionNodeId(["a"]);
+    expect(model.nodes.map(node => node.id).sort()).toEqual(
+      ["a", "b", junction].sort(),
+    );
+    expect(model.links).toHaveLength(2);
+    expect(model.links[0]).toMatchObject({
+      kind: "parent",
+      source: "a",
+      target: junction,
+    });
+    expect(model.links[1]).toMatchObject({
+      kind: "child",
+      source: junction,
+      target: "b",
+    });
   });
 
   it("drops media whose owner is hidden", () => {

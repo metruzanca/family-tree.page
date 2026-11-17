@@ -25,11 +25,15 @@ import {
   type GraphNode,
 } from "~/lib/graph";
 
-/** Resting length for each kind of edge. Media springs stay short on purpose. */
+/**
+ * Resting length for each kind of edge. The two arms of a family junction add
+ * up to roughly the old parent-child distance. Media springs stay short.
+ */
 const LINK_DISTANCE: Record<GraphLink["kind"], number> = {
-  parent: 110,
-  partner: 70,
-  media: 38,
+  parent: 45,
+  child: 45,
+  partner: 65,
+  media: 32,
 };
 
 export type GraphHandle = {
@@ -86,7 +90,7 @@ export function GraphView(props: GraphViewProps) {
   const [paintVersion, setPaintVersion] = createSignal(0);
   const mediaNodes = createMemo(() =>
     model()
-      .nodes.filter(node => node.kind !== "person")
+      .nodes.filter(node => node.kind === "file" || node.kind === "group")
       .sort((a, b) => a.id.localeCompare(b.id)),
   );
   const images = new Map<string, HTMLImageElement>();
@@ -104,6 +108,12 @@ export function GraphView(props: GraphViewProps) {
     const node = model().byId.get(id);
     const anchor = node?.ownerId ?? id;
     const set = neighborsOf(model().links, anchor);
+    // A junction is a transparent step: hovering a parent should also light up
+    // the children on the far side, and the other way round.
+    for (const neighbour of [...set]) {
+      if (model().byId.get(neighbour)?.kind !== "junction") continue;
+      for (const next of neighborsOf(model().links, neighbour)) set.add(next);
+    }
     for (const peer of model().nodes) {
       if (peer.ownerId === anchor) set.add(peer.id);
     }
@@ -162,7 +172,7 @@ export function GraphView(props: GraphViewProps) {
     }
     for (let index = nodes.length - 1; index >= 0; index -= 1) {
       const node = nodes[index];
-      if (node.kind === "person") continue;
+      if (node.kind === "person" || node.kind === "junction") continue;
       if (node.x == null || node.y == null) continue;
       const card = fileCardSize(node);
       if (
@@ -386,7 +396,7 @@ export function GraphView(props: GraphViewProps) {
 
     const showLabel = isSelected || isHovered || globalScale > 0.7;
     if (showLabel) {
-      const fontSize = 11.5 / globalScale;
+      const fontSize = 10.5 / globalScale;
       context.font = `600 ${fontSize}px ui-sans-serif, system-ui, sans-serif`;
       context.textAlign = "center";
       context.textBaseline = "top";
@@ -636,21 +646,18 @@ export function GraphView(props: GraphViewProps) {
     return null;
   }
 
-  function linkArrowFor(link: GraphLink) {
-    return link.kind === "parent" ? 4 : 0;
-  }
-
   /**
    * Nodes collide on their painted extent, but a person also owns the label
    * under their circle. Reserving half the label width keeps two neighbours
    * from writing their names over each other once the simulation settles.
    */
   function collisionRadius(node: GraphNode) {
+    if (node.kind === "junction") return 8;
     const radius = nodeRadius(node);
     if (node.kind !== "person") return radius + 14;
     const label = props.nodeLabel ? props.nodeLabel(node) : node.name;
-    const labelWidth = Math.min(240, label.length * 6.2 + 16);
-    return Math.max(radius + 14, labelWidth / 2 + 8);
+    const labelWidth = Math.min(240, label.length * 7.2 + 16);
+    return Math.max(radius + 14, labelWidth / 2 + 10);
   }
 
   function drawMediaLayer(
@@ -728,13 +735,10 @@ export function GraphView(props: GraphViewProps) {
       .linkColor(linkColorFor)
       .linkWidth(linkWidthFor)
       .linkLineDash(linkDashFor)
-      .linkDirectionalArrowLength(linkArrowFor)
-      .linkDirectionalArrowRelPos(1)
-      .linkDirectionalArrowColor(linkColorFor)
       .linkVisibility((link: GraphLink) => link.kind !== "media")
       .warmupTicks(60)
-      .d3AlphaDecay(0.04)
-      .d3VelocityDecay(0.35)
+      .d3AlphaDecay(0.035)
+      .d3VelocityDecay(0.4)
       .cooldownTime(6000)
       .minZoom(0.2)
       .maxZoom(4.5)
@@ -743,13 +747,20 @@ export function GraphView(props: GraphViewProps) {
       .autoPauseRedraw(true);
 
     graph
-      .d3Force("charge", forceManyBody().strength(-450).distanceMax(1200))
+      .d3Force(
+        "charge",
+        forceManyBody<GraphNode>()
+          .strength(node => (node.kind === "junction" ? -40 : -260))
+          .distanceMax(1200),
+      )
       .d3Force(
         "link",
         forceLink<GraphNode, GraphLink>()
           .id(node => node.id)
           .distance(link => LINK_DISTANCE[link.kind])
-          .strength(link => (link.kind === "media" ? 1 : 0.7)),
+          .strength(link =>
+            link.kind === "partner" ? 0.8 : link.kind === "media" ? 1 : 1,
+          ),
       )
       .d3Force(
         "collide",
