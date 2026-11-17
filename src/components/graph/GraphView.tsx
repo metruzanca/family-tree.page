@@ -1,3 +1,4 @@
+import { forceCollide, forceLink, forceManyBody } from "d3-force";
 import {
   createEffect,
   createMemo,
@@ -12,7 +13,6 @@ import type { PresencePeer } from "~/lib/presence-protocol";
 import { presenceColor } from "~/lib/presence-color";
 import { formatFuzzyYearRange } from "~/lib/fuzzy-date";
 import { cx } from "~/lib/utils";
-import { forceCollide, forceLink, forceManyBody } from "d3-force";
 import {
   branchColor,
   buildGraphModel,
@@ -45,7 +45,8 @@ type GraphViewProps = {
   showMedia: boolean;
   /**
    * People to draw. Omitted or undefined draws the whole tree. Generations are
-   * always computed from the full tree, so expanding keeps rows in place.
+   * always computed from the full tree, so showing more relatives never
+   * changes the generation of the people already on screen.
    */
   visible?: ReadonlySet<string>;
   presence?: PresencePeer[];
