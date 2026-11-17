@@ -58,7 +58,7 @@ import { useToast } from "~/components/ui/Toast";
 import { uploadPersonFile } from "~/lib/upload";
 import { attemptAction, friendlyMessage } from "~/lib/action-result";
 import type { FuzzyDate } from "~/lib/fuzzy-date";
-import { fileNodeId, groupNodeId, type GenerationDirection } from "~/lib/graph";
+import { fileNodeId, groupNodeId } from "~/lib/graph";
 import {
   defaultFocusRadius,
   parseFocusRadius,
@@ -99,9 +99,6 @@ function TreePageInner() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [handle, setHandle] = createSignal<GraphHandle>();
   const [showMedia, setShowMedia] = createSignal(true);
-  const [generationDirection, setGenerationDirection] = createSignal<GenerationDirection>(
-    "oldest-top",
-  );
   const [searchOpen, setSearchOpen] = createSignal(false);
   const [addPersonOpen, setAddPersonOpen] = createSignal(false);
   const [editPersonOpen, setEditPersonOpen] = createSignal(false);
@@ -398,10 +395,8 @@ function TreePageInner() {
 
   onMount(() => {
     localStorage.removeItem("family-tree-layout");
+    localStorage.removeItem("family-tree-generation-direction");
     if (localStorage.getItem("family-tree-media") === "off") setShowMedia(false);
-    if (localStorage.getItem("family-tree-generation-direction") === "oldest-bottom") {
-      setGenerationDirection("oldest-bottom");
-    }
     const storedFocus = parseFocusRadius(localStorage.getItem(focusStorageKey()));
     if (storedFocus) setFocusRadius(storedFocus);
     setFocusPromptDismissed(localStorage.getItem(focusPromptKey()) === "off");
@@ -488,13 +483,6 @@ function TreePageInner() {
     const next = !showMedia();
     setShowMedia(next);
     localStorage.setItem("family-tree-media", next ? "on" : "off");
-  }
-
-  function flipGenerationDirection() {
-    const next =
-      generationDirection() === "oldest-top" ? "oldest-bottom" : "oldest-top";
-    setGenerationDirection(next);
-    localStorage.setItem("family-tree-generation-direction", next);
   }
 
   async function handleUpload(files: File[]) {
@@ -748,7 +736,6 @@ function TreePageInner() {
             showMedia={showMedia()}
             visible={focus().visible}
             fitPadding={canShowMore() || showFocusPrompt() ? 190 : 110}
-            generationDirection={generationDirection()}
             presence={presence.peers()}
             selfPeerId={presence.selfPeerId()}
             onSelect={handleGraphSelection}
@@ -799,7 +786,6 @@ function TreePageInner() {
             treeName={graph().tree.name}
             role={graph().role}
             showMedia={showMedia()}
-            generationDirection={generationDirection()}
             focus={{
               personName: viewerPerson()?.displayName ?? null,
               radius: effectiveFocusRadius(),
@@ -815,7 +801,6 @@ function TreePageInner() {
             }}
             resolveNode={nodeLabel}
             onToggleMedia={toggleMedia}
-            onFlipDirection={flipGenerationDirection}
             onSearch={() => setSearchOpen(true)}
             onFit={() => handle()?.fit()}
             onZoomIn={() => handle()?.zoomBy(1.25)}
@@ -929,11 +914,6 @@ function TreePageInner() {
             class="pointer-events-none absolute bottom-4 left-4 z-10 hidden items-center gap-3 rounded-full border border-white/10 bg-black/30 px-3 py-1.5 text-[0.65rem] text-white/45 backdrop-blur sm:flex"
             data-testid="tree-legend"
           >
-            <span class="rounded-full bg-white/10 px-2 py-0.5 text-[0.6rem] font-semibold uppercase tracking-wide text-white/60">
-              {generationDirection() === "oldest-top"
-                ? "Oldest at top"
-                : "Oldest at bottom"}
-            </span>
             <span class="flex items-center gap-1.5">
               <span class="h-1.5 w-4 rounded-full bg-[#66735f]" /> Parent
             </span>

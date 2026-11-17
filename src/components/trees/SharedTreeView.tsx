@@ -6,7 +6,7 @@ import { GraphSearch } from "~/components/graph/GraphSearch";
 import { PersonPanel } from "~/components/people/PersonPanel";
 import { FilePanel } from "~/components/files/FilePanel";
 import { MediaLightbox } from "~/components/files/MediaLightbox";
-import { fileNodeId, groupNodeId, type GenerationDirection } from "~/lib/graph";
+import { fileNodeId, groupNodeId } from "~/lib/graph";
 
 type SharedTreeViewProps = {
   graph: TreeGraph;
@@ -33,9 +33,6 @@ export function SharedTreeView(props: SharedTreeViewProps) {
   const [selectedGroupId, setSelectedGroupId] = createSignal<string | null>(null);
   const [searchOpen, setSearchOpen] = createSignal(false);
   const [showMedia, setShowMedia] = createSignal(true);
-  const [generationDirection, setGenerationDirection] = createSignal<GenerationDirection>(
-    "oldest-top",
-  );
 
   const selectedPerson = createMemo(
     () => props.graph.people.find(person => person.id === selectedPersonId()) ?? null,
@@ -122,7 +119,6 @@ export function SharedTreeView(props: SharedTreeViewProps) {
         role="viewer"
         selectedId={selectedNodeId()}
         showMedia={showMedia()}
-        generationDirection={generationDirection()}
         thumbUrlFor={props.thumbUrlFor}
         onSelect={focusPerson}
         onFileSelect={focusFile}
@@ -135,7 +131,6 @@ export function SharedTreeView(props: SharedTreeViewProps) {
         treeName={props.graph.tree.name}
         role="viewer"
         showMedia={showMedia()}
-        generationDirection={generationDirection()}
         focus={{
           personName: null,
           radius: "all",
@@ -151,11 +146,6 @@ export function SharedTreeView(props: SharedTreeViewProps) {
         backLabel={props.backLabel}
         badgeLabel={props.badgeLabel}
         onToggleMedia={() => setShowMedia(value => !value)}
-        onFlipDirection={() =>
-          setGenerationDirection(value =>
-            value === "oldest-top" ? "oldest-bottom" : "oldest-top",
-          )
-        }
         onSearch={() => setSearchOpen(true)}
         onFit={() => handle()?.fit()}
         onZoomIn={() => handle()?.zoomBy(1.25)}

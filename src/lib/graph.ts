@@ -7,8 +7,6 @@ import type {
 } from "~/api/people-server";
 import { analyzeRelationships } from "./relationships";
 
-export type GenerationDirection = "oldest-top" | "oldest-bottom";
-
 export type GraphNode = {
   id: string;
   kind: "person" | "file" | "group";

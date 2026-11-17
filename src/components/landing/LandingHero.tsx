@@ -167,7 +167,6 @@ export function LandingHero() {
                 role="viewer"
                 selectedId={selectedPersonId()}
                 showMedia={showMedia()}
-                generationDirection="oldest-top"
                 class="landing-graph !h-full"
                 thumbUrlFor={demoThumbUrl}
                 fitPadding={isNarrow ? 8 : 64}

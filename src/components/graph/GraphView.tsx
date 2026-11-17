@@ -12,6 +12,7 @@ import type { PresencePeer } from "~/lib/presence-protocol";
 import { presenceColor } from "~/lib/presence-color";
 import { formatFuzzyYearRange } from "~/lib/fuzzy-date";
 import { cx } from "~/lib/utils";
+import { forceCollide, forceLink, forceManyBody } from "d3-force";
 import {
   branchColor,
   buildGraphModel,
@@ -19,18 +20,17 @@ import {
   initialsOf,
   neighborsOf,
   nodeRadius,
-  type GenerationDirection,
+  type GraphLink,
   type GraphModel,
   type GraphNode,
 } from "~/lib/graph";
-import {
-  layoutGraph,
-  type GraphLayout,
-} from "~/lib/graph-layout";
-import {
-  routeEdges,
-  type EdgeSegment,
-} from "~/lib/edge-routing";
+
+/** Resting length for each kind of edge. Media springs stay short on purpose. */
+const LINK_DISTANCE: Record<GraphLink["kind"], number> = {
+  parent: 110,
+  partner: 70,
+  media: 38,
+};
 
 export type GraphHandle = {
   fit: () => void;
@@ -48,7 +48,6 @@ type GraphViewProps = {
    * always computed from the full tree, so expanding keeps rows in place.
    */
   visible?: ReadonlySet<string>;
-  generationDirection: GenerationDirection;
   presence?: PresencePeer[];
   selfPeerId?: string | null;
   /** Extra classes for the graph shell, for example a fixed height when embedded. */
@@ -70,7 +69,6 @@ export function GraphView(props: GraphViewProps) {
   let graph: any;
   let resizeObserver: ResizeObserver | undefined;
   let needsFit = true;
-  let previousDirection = props.generationDirection;
   let pressedNode: GraphNode | null = null;
   let pressStart = { x: 0, y: 0 };
   let pressDistance = 0;
@@ -79,15 +77,9 @@ export function GraphView(props: GraphViewProps) {
   let pointer = { x: 0, y: 0 };
   let suppressClickUntil = 0;
 
-  const [model, setModel] = createSignal<GraphModel>(
-    buildGraphModel(props.data, props.showMedia, props.visible),
-  );
-  const [layout, setLayout] = createSignal<GraphLayout>(
-    layoutGraph(model(), props.generationDirection),
-  );
-  const [segments, setSegments] = createSignal<EdgeSegment[]>(
-    routeEdges(model(), layout()),
-  );
+  const initialModel = buildGraphModel(props.data, props.showMedia, props.visible);
+  const [model, setModel] = createSignal<GraphModel>(initialModel);
+  let previousPersonIds = new Set(initialModel.people.map(node => node.id));
   const [hovered, setHovered] = createSignal<string | null>(null);
   const [ready, setReady] = createSignal(false);
   const [paintVersion, setPaintVersion] = createSignal(0);
@@ -130,13 +122,27 @@ export function GraphView(props: GraphViewProps) {
     graph.nodeCanvasObject(drawNode);
   }
 
-  function applyPositions(target: GraphModel, targetLayout: GraphLayout) {
+  function endpointId(endpoint: string | GraphNode) {
+    return typeof endpoint === "string" ? endpoint : endpoint.id;
+  }
+
+  /**
+   * force-graph re-seeds every node that has no coordinates. Carry the previous
+   * position over by id so a refresh, media toggle, or focus change keeps the
+   * people that stay on screen where they were and only the newcomers move.
+   */
+  function seedPositions(target: GraphModel) {
+    const current = new Map<string, GraphNode>();
+    for (const node of (graph?.graphData().nodes ?? []) as GraphNode[]) {
+      current.set(node.id, node);
+    }
     for (const node of target.nodes) {
-      const position = targetLayout.positions.get(node.id);
-      node.x = position?.x ?? 0;
-      node.y = position?.y ?? 0;
-      node.vx = 0;
-      node.vy = 0;
+      const previous = current.get(node.id);
+      if (!previous) continue;
+      node.x = previous.x;
+      node.y = previous.y;
+      node.vx = previous.vx;
+      node.vy = previous.vy;
     }
   }
 
@@ -377,7 +383,7 @@ export function GraphView(props: GraphViewProps) {
     context.strokeStyle = isSelected ? "#e3bb68" : isHovered ? "#f3eee3" : "#0b0e0a";
     context.stroke();
 
-    const showLabel = isSelected || isHovered || globalScale > 0.88;
+    const showLabel = isSelected || isHovered || globalScale > 0.7;
     if (showLabel) {
       const fontSize = 11.5 / globalScale;
       context.font = `600 ${fontSize}px ui-sans-serif, system-ui, sans-serif`;
@@ -601,57 +607,49 @@ export function GraphView(props: GraphViewProps) {
     drawPerson(node, context, globalScale);
   }
 
-  function strokeStyle(segment: EdgeSegment) {
-    if (segment.kind === "partner") {
-      return { color: colors.partner, width: 1.25, dash: [4, 5] };
-    }
-    if (segment.kind === "exception") {
-      return {
-        color: colors.edge,
-        width: 1.1,
-        dash:
-          segment.parentType && segment.parentType !== "biological" ? [6, 5] : null,
-      };
-    }
-    return {
-      color: colors.edge,
-      width: 1.25,
-      dash:
-        segment.parentType && segment.parentType !== "biological" ? [6, 5] : null,
-    };
+  function linkIsActive(link: GraphLink) {
+    const set = active();
+    if (!set) return true;
+    return set.has(endpointId(link.source)) || set.has(endpointId(link.target));
   }
 
-  function drawRoutesLayer(
-    context: CanvasRenderingContext2D,
-    globalScale: number,
-  ) {
-    const set = active();
-    for (const segment of segments()) {
-      const activeSegment = !set || segment.nodeIds.some(id => set.has(id));
-      const style = strokeStyle(segment);
-      context.save();
-      context.globalAlpha = activeSegment ? 1 : 0.08;
-      context.strokeStyle = style.color;
-      context.lineWidth = style.width / globalScale;
-      context.lineCap = "round";
-      context.lineJoin = "round";
-      context.setLineDash(style.dash ?? []);
-      context.beginPath();
-      context.moveTo(segment.a.x, segment.a.y);
-      context.lineTo(segment.b.x, segment.b.y);
-      context.stroke();
-      context.setLineDash([]);
-      if (segment.arrow) {
-        drawArrow(
-          context,
-          segment.b,
-          segment.a,
-          5 / globalScale,
-          style.color,
-        );
-      }
-      context.restore();
+  function linkColorFor(link: GraphLink) {
+    if (link.kind === "media") return "rgba(0,0,0,0)";
+    if (!linkIsActive(link)) return "rgba(102,115,95,0.12)";
+    return link.kind === "partner" ? colors.partner : colors.edge;
+  }
+
+  function linkWidthFor(link: GraphLink) {
+    return link.kind === "partner" ? 1.25 : 1.15;
+  }
+
+  function linkDashFor(link: GraphLink) {
+    if (link.kind === "partner") return [4, 5];
+    if (
+      link.kind === "parent" &&
+      link.parentType &&
+      link.parentType !== "biological"
+    ) {
+      return [6, 5];
     }
+    return null;
+  }
+
+  function linkArrowFor(link: GraphLink) {
+    return link.kind === "parent" ? 4 : 0;
+  }
+
+  /**
+   * Nodes collide on their painted extent, but a person also owns the label
+   * under their circle. Reserving half the label width keeps two neighbours
+   * from writing their names over each other once the simulation settles.
+   */
+  function collisionRadius(node: GraphNode) {
+    const radius = nodeRadius(node);
+    if (node.kind !== "person") return radius + 14;
+    const label = props.nodeLabel ? props.nodeLabel(node) : node.name;
+    const labelWidth = Math.min(240, label.length * 6.2 + 16);
+    return Math.max(radius + 14, labelWidth / 2 + 8);
   }
 
   function drawMediaLayer(
@@ -682,31 +680,6 @@ export function GraphView(props: GraphViewProps) {
     globalScale: number,
   ) {
     drawMediaLayer(context, globalScale);
-    drawRoutesLayer(context, globalScale);
-  }
-
-  function drawArrow(
-    context: CanvasRenderingContext2D,
-    tip: { x: number; y: number },
-    previous: { x: number; y: number },
-    size: number,
-    color: string,
-  ) {
-    const angle = Math.atan2(tip.y - previous.y, tip.x - previous.x);
-    const half = size * 0.55;
-    context.beginPath();
-    context.moveTo(tip.x, tip.y);
-    context.lineTo(
-      tip.x - Math.cos(angle) * size + Math.sin(angle) * half,
-      tip.y - Math.sin(angle) * size - Math.cos(angle) * half,
-    );
-    context.lineTo(
-      tip.x - Math.cos(angle) * size - Math.sin(angle) * half,
-      tip.y - Math.sin(angle) * size + Math.cos(angle) * half,
-    );
-    context.closePath();
-    context.fillStyle = color;
-    context.fill();
   }
 
   function focusNode(id: string) {
@@ -724,18 +697,10 @@ export function GraphView(props: GraphViewProps) {
     );
   }
 
-  function scheduleFit() {
-    requestAnimationFrame(() => {
-      if (!graph || !needsFit) return;
-      needsFit = false;
-      fit();
-    });
-  }
-
-  function syncGraph(target: GraphModel, targetLayout: GraphLayout) {
+  function syncGraph(target: GraphModel) {
     if (!graph) return;
-    applyPositions(target, targetLayout);
-    graph.graphData({ nodes: target.nodes, links: [] });
+    seedPositions(target);
+    graph.graphData({ nodes: target.nodes, links: target.links });
   }
 
   onMount(async () => {
@@ -759,15 +724,38 @@ export function GraphView(props: GraphViewProps) {
           fit();
         }
       })
-      .warmupTicks(0)
-      .cooldownTicks(0)
+      .linkColor(linkColorFor)
+      .linkWidth(linkWidthFor)
+      .linkLineDash(linkDashFor)
+      .linkDirectionalArrowLength(linkArrowFor)
+      .linkDirectionalArrowRelPos(1)
+      .linkDirectionalArrowColor(linkColorFor)
+      .linkVisibility((link: GraphLink) => link.kind !== "media")
+      .warmupTicks(60)
+      .d3AlphaDecay(0.04)
+      .d3VelocityDecay(0.35)
+      .cooldownTime(6000)
       .minZoom(0.2)
       .maxZoom(4.5)
       .enableNodeDrag(false)
       .enablePointerInteraction(false)
       .autoPauseRedraw(true);
 
-    syncGraph(model(), layout());
+    graph
+      .d3Force("charge", forceManyBody().strength(-450).distanceMax(1200))
+      .d3Force(
+        "link",
+        forceLink<GraphNode, GraphLink>()
+          .id(node => node.id)
+          .distance(link => LINK_DISTANCE[link.kind])
+          .strength(link => (link.kind === "media" ? 1 : 0.7)),
+      )
+      .d3Force(
+        "collide",
+        forceCollide<GraphNode>(collisionRadius).iterations(2),
+      );
+
+    syncGraph(model());
     if (import.meta.env.DEV) {
       (window as any).__familyTreeGraph = graph;
       (window as any).__familyTreeNodes = () =>
@@ -785,7 +773,6 @@ export function GraphView(props: GraphViewProps) {
       focus: focusNode,
       zoomBy: factor => graph.zoom(graph.zoom() * factor, 300),
     });
-    scheduleFit();
 
     resizeObserver = new ResizeObserver(entries => {
       const rect = entries[0]?.contentRect;
@@ -900,20 +887,15 @@ export function GraphView(props: GraphViewProps) {
   });
 
   createEffect(() => {
-    const direction = props.generationDirection;
-    const directionChanged = direction !== previousDirection;
-    previousDirection = direction;
     const nextModel = buildGraphModel(props.data, props.showMedia, props.visible);
-    const nextLayout = layoutGraph(nextModel, direction);
-    const nextSegments = routeEdges(nextModel, nextLayout);
+    const nextPersonIds = new Set(nextModel.people.map(node => node.id));
+    const peopleChanged =
+      nextPersonIds.size !== previousPersonIds.size ||
+      [...nextPersonIds].some(id => !previousPersonIds.has(id));
+    previousPersonIds = nextPersonIds;
     setModel(nextModel);
-    setLayout(nextLayout);
-    setSegments(nextSegments);
-    syncGraph(nextModel, nextLayout);
-    if (directionChanged) {
-      needsFit = true;
-      scheduleFit();
-    }
+    syncGraph(nextModel);
+    if (peopleChanged) needsFit = true;
   });
 
   createEffect(() => {
@@ -923,8 +905,6 @@ export function GraphView(props: GraphViewProps) {
     props.presence;
     props.selfPeerId;
     model();
-    layout();
-    segments();
     if (graph) graph.nodeCanvasObject(drawNode);
   });
 

@@ -1,7 +1,6 @@
 import { A } from "@solidjs/router";
 import { For, Show, type JSX } from "solid-js";
 import {
-  ArrowDownUp,
   ArrowLeft,
   CalendarDays,
   History,
@@ -17,7 +16,6 @@ import {
   ZoomIn,
   ZoomOut,
 } from "lucide-solid";
-import type { GenerationDirection } from "~/lib/graph";
 import { FOCUS_BANDS, type FocusRadius } from "~/lib/focus";
 import type { PresencePeer, PresenceStatus } from "~/lib/presence-protocol";
 import type { TreeRole } from "~/server/guards";
@@ -41,7 +39,6 @@ type ToolbarProps = {
   treeName: string;
   role: TreeRole;
   showMedia: boolean;
-  generationDirection: GenerationDirection;
   focus: {
     personName: string | null;
     radius: FocusRadius;
@@ -57,7 +54,6 @@ type ToolbarProps = {
   };
   resolveNode: (nodeId: string | null) => string | null;
   onToggleMedia: () => void;
-  onFlipDirection: () => void;
   onSearch: () => void;
   onFit: () => void;
   onZoomIn: () => void;
@@ -157,17 +153,6 @@ export function GraphToolbar(props: ToolbarProps) {
               </Show>
             </ToolButton>
             <ToolButton
-              testId="tree-toolbar-flip"
-              label={
-                props.generationDirection === "oldest-top"
-                  ? "Oldest at top. Flip so oldest is at the bottom"
-                  : "Oldest at bottom. Flip so oldest is at the top"
-              }
-              onClick={props.onFlipDirection}
-            >
-              <ArrowDownUp size={17} />
-            </ToolButton>
-            <ToolButton
               testId="tree-toolbar-zoom-out"
               label="Zoom out"
               shortcut="−"
@@ -233,13 +218,6 @@ export function GraphToolbar(props: ToolbarProps) {
                 <Show when={props.showMedia} fallback={<ImageOff />}>
                   <ImageIcon />
                 </Show>
-              </GlassItem>
-              <GlassItem
-                testId="tree-toolbar-more-flip"
-                label="Flip generations"
-                onSelect={props.onFlipDirection}
-              >
-                <ArrowDownUp />
               </GlassItem>
               <Show when={props.showFocus !== false}>
                 <GlassItem
