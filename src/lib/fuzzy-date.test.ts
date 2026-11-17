@@ -7,6 +7,7 @@ import {
   formatFuzzyDate,
   formatFuzzyYears,
   fuzzyDatesOverlap,
+  fuzzyOrderYear,
   fuzzyYearRange,
   isValidFuzzyDate,
   isValidPartialDate,
@@ -105,6 +106,36 @@ describe("fuzzy dates", () => {
     expect(compareFuzzyDates(exactFuzzyDate(1920), exactFuzzyDate(1987))).toBeLessThan(0);
     expect(compareFuzzyDates(exactFuzzyDate(1920), null)).toBeLessThan(0);
     expect(compareFuzzyDates(null, exactFuzzyDate(1920))).toBeGreaterThan(0);
+  });
+
+  it("picks one year for vertical ordering", () => {
+    expect(fuzzyOrderYear(exactFuzzyDate(1920))).toBe(1920);
+    expect(
+      fuzzyOrderYear({ start: { year: 1920, month: null, day: null }, qualifier: "about" }),
+    ).toBe(1920);
+    expect(
+      fuzzyOrderYear({ start: { year: 1900, month: null, day: null }, qualifier: "before" }),
+    ).toBe(1900);
+    expect(
+      fuzzyOrderYear({ start: { year: 1880, month: null, day: null }, qualifier: "after" }),
+    ).toBe(1880);
+    expect(
+      fuzzyOrderYear({
+        start: { year: 1890, month: null, day: null },
+        end: { year: 1900, month: null, day: null },
+        qualifier: "between",
+      }),
+    ).toBe(1895);
+    expect(
+      fuzzyOrderYear({
+        start: { year: 1890, month: null, day: null },
+        qualifier: "between",
+      }),
+    ).toBe(1890);
+    expect(fuzzyOrderYear(null)).toBeNull();
+    expect(
+      fuzzyOrderYear({ start: { year: null, month: null, day: null }, qualifier: "unknown" }),
+    ).toBeNull();
   });
 
   it("builds plausible year ranges for duplicate checks", () => {

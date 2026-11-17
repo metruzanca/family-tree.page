@@ -219,6 +219,21 @@ export function fuzzyYear(value: FuzzyDate | null | undefined): number | null {
   return value?.start.year ?? null;
 }
 
+/**
+ * A single representative year for vertical ordering. `between` dates use
+ * their midpoint, open qualifiers use their boundary, and a missing year
+ * returns null so callers can leave the item unranked.
+ */
+export function fuzzyOrderYear(value: FuzzyDate | null | undefined): number | null {
+  const start = value?.start.year ?? null;
+  if (start === null) return null;
+  if (value?.qualifier === "between") {
+    const end = value.end?.year ?? start;
+    return (start + end) / 2;
+  }
+  return start;
+}
+
 export function fuzzySortValue(value: FuzzyDate | null | undefined): number {
   if (!value || value.start.year === null) return Number.POSITIVE_INFINITY;
   return (
