@@ -33,7 +33,7 @@ const features = [
   {
     icon: Images,
     title: "Photos live in the tree",
-    body: "Portraits sit on the person. Albums, letters and documents hang off as satellite nodes you can open.",
+    body: "Portraits sit on the person. Albums, letters and documents gather in a ring around their owner, behind the people, so the tree stays readable.",
   },
   {
     icon: Lock,

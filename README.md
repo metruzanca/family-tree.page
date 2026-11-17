@@ -2,14 +2,14 @@
 
 A private, collaborative family tree built around an interactive graph of people, relationships, and the photographs and documents attached to them.
 
-The graph is the main view. People are nodes, parent and partner relationships are edges, and media appears as small satellite nodes. Each tree can have one owner and any number of editors and viewers, invited by link.
+The graph is the main view. People are nodes, parent and partner relationships are edges, and media sits on a ring behind the person who owns it. Each tree can have one owner and any number of editors and viewers, invited by link.
 
 ## Stack
 
 - SolidStart 2 + SolidJS
 - Drizzle ORM + PostgreSQL
 - Railway Storage Bucket (S3-compatible) for originals and thumbnails
-- `force-graph` + `d3-force` for the canvas graph
+- `force-graph` for canvas rendering, pan and zoom
 - Tailwind CSS v4
 - shadcn-solid components on Kobalte for dialogs, menus, selects, tabs and toasts
 - Zod for server input validation
@@ -25,11 +25,12 @@ The graph is the main view. People are nodes, parent and partner relationships a
 - Invites by copyable link or by email, with expiry and single use
 - People, parent-child relationships, and partnerships
 - Add a child with a second parent in one step, and keep the dialog open to add several children quickly
-- Deterministic generation layout with ordered rows and non-overlapping connectors
+- Tidy family clusters: partners and same-level co-parents sit together, children are ordered under their parents, and every subtree owns its own horizontal space
+- Parents always sit on the row above their children, with no node overlap
+- Connectors run through empty row gutters, so no line passes through a person or paints over another line
+- Media sits on a ring around its owner and is drawn behind the graph, so adding photos never moves a person
 - Cycle-safe generation rows that stay bounded when relationships contradict each other, with an in-app warning and `pnpm db:check`
-- Static generation bands: parents and children stay in ordered rows, with no node dragging
-- Partners are aligned on the same row and placed side by side
-- Parent pairs join at one small junction before branching to their children, so each child gets one parent-line arrow
+- Partner pairs stay side by side, and a parent pair joins at one junction before branching to its children
 - Direction flip for oldest-at-top or oldest-at-bottom layouts
 - Disconnected groups inside a tree get their own side-by-side space, so a new unconnected person never overlaps the rest of the tree
 - "This is me" links a member to their person, so the tree opens around their own branch instead of the whole family
