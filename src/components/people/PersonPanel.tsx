@@ -44,7 +44,8 @@ type PersonPanelProps = {
   onAddRelative: () => void;
   /** True when this person is the signed-in member's own place in the tree. */
   isViewer: boolean;
-  onClaimPerson: () => void;
+  /** Members other than the viewer who linked this person to their account. */
+  claimedBy?: string[];
   onSelectPerson: (id: string) => void;
   onSelectFile: (file: GraphFile) => void;
   onSelectGroup: (groupId: string) => void;
@@ -162,6 +163,15 @@ export function PersonPanel(props: PersonPanelProps) {
           <h2 class="truncate font-display text-2xl leading-tight tracking-tight">
             {props.person.displayName}
           </h2>
+          <Show when={props.claimedBy?.length}>
+            <p
+              class="mt-1 flex items-center gap-1.5 truncate text-xs text-muted-foreground"
+              data-testid="person-panel-claimed-by"
+            >
+              <UserCheck size={12} class="shrink-0" />
+              Claimed by {props.claimedBy!.join(", ")}
+            </p>
+          </Show>
           <Show when={formatYears(props.person.birthDate, props.person.deathDate)}>
             <p class="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
               <CalendarDays size={12} />
@@ -182,25 +192,12 @@ export function PersonPanel(props: PersonPanelProps) {
         </div>
       </div>
 
-      <Show when={!props.readOnly}>
+      <Show when={!props.readOnly && (props.isViewer || editable())}>
         <div
           class="flex flex-wrap items-center gap-2 border-y border-border px-5 py-2.5"
           data-testid="person-panel-actions"
         >
-          <Show
-            when={props.isViewer}
-            fallback={
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={props.onClaimPerson}
-                data-testid="person-panel-claim"
-              >
-                <UserCheck size={13} />
-                This is me
-              </Button>
-            }
-          >
+          <Show when={props.isViewer}>
             <span class="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-accent px-2.5 py-1 text-xs font-semibold text-primary">
               <UserCheck size={13} />
               This is you

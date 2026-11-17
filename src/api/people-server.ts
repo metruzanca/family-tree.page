@@ -13,6 +13,7 @@ import {
   personEvents,
   treeMembers,
   trees,
+  users,
   type FaceBox,
   type ParentChild,
   type Partnership,
@@ -140,11 +141,19 @@ export type GraphPersonEvent = {
   createdAt: Date;
 };
 
+export type TreeMemberClaim = {
+  userId: string;
+  displayName: string;
+  personId: string;
+};
+
 export type TreeGraph = {
   tree: { id: string; name: string; description: string | null };
   role: TreeRole;
   /** The person the signed-in member represents in this tree, when they claimed one. */
   viewerPersonId: string | null;
+  /** Other members who linked a person to their account, so profiles can show it. */
+  memberClaims?: TreeMemberClaim[];
   people: GraphPerson[];
   relationships: GraphRelationship[];
   files: GraphFile[];
@@ -318,11 +327,38 @@ export async function loadTreeGraph(tree: {
 
 export async function getTreeGraph(treeId: string): Promise<TreeGraph> {
   const access = await requireTreeMember(treeId);
-  const graph = await loadTreeGraph(access.tree);
+  const [graph, claimRows] = await Promise.all([
+    loadTreeGraph(access.tree),
+    db
+      .select({
+        userId: users.id,
+        displayName: users.displayName,
+        personId: treeMembers.personId,
+      })
+      .from(treeMembers)
+      .innerJoin(users, eq(users.id, treeMembers.userId))
+      .where(
+        and(
+          eq(treeMembers.treeId, treeId),
+          ne(treeMembers.userId, access.user.id),
+        ),
+      ),
+  ]);
   return {
     ...graph,
     role: access.role,
     viewerPersonId: access.personId,
+    memberClaims: claimRows.flatMap(claim =>
+      claim.personId
+        ? [
+            {
+              userId: claim.userId,
+              displayName: claim.displayName,
+              personId: claim.personId,
+            },
+          ]
+        : [],
+    ),
   };
 }
 
