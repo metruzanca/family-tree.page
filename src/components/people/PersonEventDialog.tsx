@@ -6,6 +6,7 @@ import { createPersonEvent, updatePersonEvent } from "~/api/people-server";
 import { getTreeGraph } from "~/api";
 import {
   PERSON_EVENT_OPTIONS,
+  personEventKey,
   type PersonEventKind,
 } from "~/lib/person-events";
 import { attemptAction } from "~/lib/action-result";
@@ -15,6 +16,7 @@ import { Field } from "../ui/Field";
 import { FuzzyDateField } from "../ui/FuzzyDateField";
 import { Modal } from "../ui/Modal";
 import { useToast } from "../ui/Toast";
+import { useI18n } from "~/i18n/LocaleProvider";
 
 type PersonEventDialogProps = {
   open: boolean;
@@ -25,6 +27,7 @@ type PersonEventDialogProps = {
 };
 
 export function PersonEventDialog(props: PersonEventDialogProps) {
+  const { t } = useI18n();
   const toast = useToast();
   const [form, setForm] = createStore({
     kind: "residence" as PersonEventKind,
@@ -84,7 +87,10 @@ export function PersonEventDialog(props: PersonEventDialogProps) {
     }
 
     await revalidate(getTreeGraph.key);
-    toast.show(props.event ? "Event updated." : "Event added.", "success");
+    toast.show(
+      props.event ? t("person.event.updated") : t("person.event.added"),
+      "success",
+    );
     props.onClose();
   }
 
@@ -92,8 +98,12 @@ export function PersonEventDialog(props: PersonEventDialogProps) {
     <Modal
       open={props.open}
       onClose={props.onClose}
-      title={props.event ? "Edit life event" : `Add a life event for ${props.person.firstName}`}
-      description="Residences, work, military service, migration, marriages, divorces, burial, and anything else worth keeping."
+      title={
+        props.event
+          ? t("person.event.editTitle")
+          : t("person.event.addTitle", { name: props.person.firstName })
+      }
+      description={t("person.event.description")}
       testId="person-event-form-dialog"
       footer={
         <>
@@ -103,7 +113,7 @@ export function PersonEventDialog(props: PersonEventDialogProps) {
             onClick={props.onClose}
             data-testid="person-event-form-cancel"
           >
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button
             type="submit"
@@ -111,14 +121,18 @@ export function PersonEventDialog(props: PersonEventDialogProps) {
             disabled={pending()}
             data-testid="person-event-form-submit"
           >
-            {pending() ? "Saving…" : props.event ? "Save changes" : "Add event"}
+            {pending()
+              ? t("person.form.saving")
+              : props.event
+                ? t("person.form.saveChanges")
+                : t("person.panel.addEvent")}
           </Button>
         </>
       }
     >
       <form id="person-event-form" class="space-y-4" onSubmit={submit} data-testid="person-event-form">
         <div class="grid gap-4 sm:grid-cols-2">
-          <Field label="Type" for="event-kind">
+          <Field label={t("person.event.type")} for="event-kind">
             <select
               id="event-kind"
               class="input"
@@ -129,19 +143,23 @@ export function PersonEventDialog(props: PersonEventDialogProps) {
               }
             >
               <For each={PERSON_EVENT_OPTIONS}>
-                {option => <option value={option.value}>{option.label}</option>}
+                {option => <option value={option.value}>{t(personEventKey(option.value))}</option>}
               </For>
             </select>
           </Field>
           <Field
-            label="Title"
+            label={t("person.event.title")}
             for="event-title"
-            hint={form.kind === "other" ? "Required for an other event." : "Optional."}
+            hint={
+              form.kind === "other"
+                ? t("person.event.titleRequired")
+                : t("person.event.titleOptional")
+            }
           >
             <input
               id="event-title"
               class="input"
-              placeholder="Opened the hardware store"
+              placeholder={t("person.event.titlePlaceholder")}
               value={form.title}
               maxlength={120}
               data-testid="person-event-form-title"
@@ -150,7 +168,7 @@ export function PersonEventDialog(props: PersonEventDialogProps) {
           </Field>
         </div>
 
-        <Field label="Date" for="event-date">
+        <Field label={t("person.event.date")} for="event-date">
           <FuzzyDateField
             id="event-date"
             testId="person-event-form-date"
@@ -159,7 +177,7 @@ export function PersonEventDialog(props: PersonEventDialogProps) {
           />
         </Field>
 
-        <Field label="Place" for="event-place">
+        <Field label={t("person.event.place")} for="event-place">
           <input
             id="event-place"
             class="input"
@@ -171,11 +189,11 @@ export function PersonEventDialog(props: PersonEventDialogProps) {
           />
         </Field>
 
-        <Field label="Notes" for="event-description">
+        <Field label={t("person.event.notes")} for="event-description">
           <textarea
             id="event-description"
             class="input min-h-24"
-            placeholder="Anything that gives this event context."
+            placeholder={t("person.event.notesPlaceholder")}
             value={form.description}
             maxlength={2000}
             data-testid="person-event-form-description"
@@ -184,7 +202,7 @@ export function PersonEventDialog(props: PersonEventDialogProps) {
         </Field>
 
         <p class="text-xs leading-relaxed text-muted-foreground">
-          Dates can be partial or approximate, so "about 1943" and "before 1900" are both fine.
+          {t("person.event.datesHint")}
         </p>
 
         {error() && (

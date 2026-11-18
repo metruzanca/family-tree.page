@@ -25,7 +25,7 @@ import type {
   TreeGraph,
 } from "~/api/people-server";
 import type { TreeRole } from "~/server/guards";
-import { personSexLabel } from "~/lib/person-sex";
+import type { PersonSex } from "~/lib/person-sex";
 import { Avatar } from "../ui/Avatar";
 import { Badge } from "../ui/badge";
 import { Button, buttonVariants } from "../ui/button";
@@ -33,13 +33,14 @@ import { IconButton } from "../ui/icon-button";
 import { Progress, ProgressGroup, ProgressLabel, ProgressValueLabel } from "../ui/progress";
 import { FileUploadButton } from "../files/FileUploadButton";
 import { PersonContactSection, PersonLinksSection } from "./PersonLinks";
-import { formatYears } from "~/lib/format";
-import { formatFuzzyDate } from "~/lib/fuzzy-date";
+import { formatFuzzyDate, formatFuzzyYears } from "~/lib/fuzzy-date";
 import {
   buildLifeTimeline,
-  personEventKindLabel,
+  personEventKey,
   type TimelineChildBirth,
 } from "~/lib/person-events";
+import { useI18n } from "~/i18n/LocaleProvider";
+import type { TranslationKey } from "~/i18n";
 
 type PersonPanelProps = {
   person: GraphPerson;
@@ -71,7 +72,15 @@ type PersonPanelProps = {
   thumbUrlFor?: (fileId: string) => string;
 };
 
+const SEX_KEYS: Record<PersonSex, TranslationKey> = {
+  female: "person.sex.female",
+  male: "person.sex.male",
+  other: "person.sex.other",
+  unknown: "common.unknown",
+};
+
 export function PersonPanel(props: PersonPanelProps) {
+  const { t, locale } = useI18n();
   const editable = () => props.role === "owner" || props.role === "editor";
   const people = createMemo(() => new Map(props.data.people.map(person => [person.id, person])));
   const groups = createMemo(() =>
@@ -168,7 +177,7 @@ export function PersonPanel(props: PersonPanelProps) {
       <div class="flex items-center justify-between px-4 pb-1 pt-2 sm:hidden">
         <span class="mx-auto h-1 w-10 rounded-full bg-border" />
         <IconButton
-          label="Close"
+          label={t("common.close")}
           onClick={props.onClose}
           class="!absolute right-2 top-2"
           data-testid="person-panel-close-mobile"
@@ -182,8 +191,8 @@ export function PersonPanel(props: PersonPanelProps) {
           <button
             type="button"
             class="shrink-0 cursor-zoom-in rounded-full transition hover:opacity-90 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-card"
-            title="Open portrait"
-            aria-label={`Open portrait of ${props.person.displayName}`}
+            title={t("person.panel.openPortrait")}
+            aria-label={t("person.panel.openPortraitOf", { name: props.person.displayName })}
             data-testid="person-panel-avatar"
             onClick={() => props.onSelectFile(avatarFile()!)}
           >
@@ -200,13 +209,13 @@ export function PersonPanel(props: PersonPanelProps) {
               data-testid="person-panel-claimed-by"
             >
               <UserCheck size={12} class="shrink-0" />
-              Claimed by {props.claimedBy!.join(", ")}
+              {t("person.panel.claimedBy", { names: props.claimedBy!.join(", ") })}
             </p>
           </Show>
-          <Show when={formatYears(props.person.birthDate, props.person.deathDate)}>
+          <Show when={formatFuzzyYears(props.person.birthDate, props.person.deathDate, locale())}>
             <p class="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
               <CalendarDays size={12} />
-              {formatYears(props.person.birthDate, props.person.deathDate)}
+              {formatFuzzyYears(props.person.birthDate, props.person.deathDate, locale())}
             </p>
           </Show>
           <Show when={props.person.birthPlace || props.person.deathPlace}>
@@ -221,12 +230,12 @@ export function PersonPanel(props: PersonPanelProps) {
               data-testid="person-panel-sex"
             >
               <UserRound size={12} />
-              {personSexLabel(props.person.sex)}
+              {t(SEX_KEYS[props.person.sex])}
             </p>
           </Show>
         </div>
         <div class="hidden sm:block">
-          <IconButton label="Close" onClick={props.onClose} data-testid="person-panel-close">
+          <IconButton label={t("common.close")} onClick={props.onClose} data-testid="person-panel-close">
             <X size={17} />
           </IconButton>
         </div>
@@ -240,7 +249,7 @@ export function PersonPanel(props: PersonPanelProps) {
           <Show when={props.isViewer}>
             <span class="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-accent px-2.5 py-1 text-xs font-semibold text-primary">
               <UserCheck size={13} />
-              This is you
+              {t("person.panel.thisIsYou")}
             </span>
           </Show>
           <Show when={editable()}>
@@ -251,7 +260,7 @@ export function PersonPanel(props: PersonPanelProps) {
               data-testid="person-panel-edit"
             >
               <Pencil size={13} />
-              Edit
+              {t("common.edit")}
             </Button>
             <FileUploadButton
               multiple
@@ -261,12 +270,12 @@ export function PersonPanel(props: PersonPanelProps) {
               testId="person-panel-upload"
             >
               <Upload size={13} />
-              {props.uploading ? "Uploading…" : "Add files"}
+              {props.uploading ? t("person.panel.uploading") : t("person.panel.addFiles")}
             </FileUploadButton>
           </Show>
           <Show when={editable()}>
             <IconButton
-              label="Delete person"
+              label={t("tree.delete.personConfirm")}
               class="ml-auto text-destructive"
               onClick={props.onDelete}
               data-testid="person-panel-delete"
@@ -281,7 +290,7 @@ export function PersonPanel(props: PersonPanelProps) {
         <div class="border-b border-border px-5 py-2.5" data-testid="person-panel-upload-progress">
           <Progress value={props.uploadProgress * 100} class="gap-1.5">
             <ProgressGroup class="text-xs text-muted-foreground">
-              <ProgressLabel>Uploading to this person</ProgressLabel>
+              <ProgressLabel>{t("person.panel.uploadProgress")}</ProgressLabel>
               <ProgressValueLabel />
             </ProgressGroup>
           </Progress>
@@ -291,7 +300,7 @@ export function PersonPanel(props: PersonPanelProps) {
       <div class="scroll-thin min-h-0 flex-1 overflow-y-auto px-5 py-4">
         <Show when={props.person.bio}>
           <section class="mb-5" data-testid="person-panel-about">
-            <h3 class="field-label">About</h3>
+            <h3 class="field-label">{t("person.panel.about")}</h3>
             <p class="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
               {props.person.bio}
             </p>
@@ -307,7 +316,7 @@ export function PersonPanel(props: PersonPanelProps) {
             </Show>
             <Show when={props.person.maidenName}>
               <Badge variant="secondary" class="px-2.5 py-1 text-xs normal-case">
-                Born {props.person.maidenName}
+                {t("person.panel.bornName", { name: props.person.maidenName ?? "" })}
               </Badge>
             </Show>
           </section>
@@ -326,7 +335,7 @@ export function PersonPanel(props: PersonPanelProps) {
 
         <section class="mb-5" data-testid="person-panel-events">
           <div class="flex items-center justify-between">
-            <h3 class="field-label">Life events</h3>
+            <h3 class="field-label">{t("person.panel.lifeEvents")}</h3>
             <Show when={editable()}>
               <button
                 type="button"
@@ -335,7 +344,7 @@ export function PersonPanel(props: PersonPanelProps) {
                 onClick={props.onAddEvent}
               >
                 <Plus size={12} />
-                Add event
+                {t("person.panel.addEvent")}
               </button>
             </Show>
           </div>
@@ -347,8 +356,8 @@ export function PersonPanel(props: PersonPanelProps) {
                 data-testid="person-panel-events-empty"
               >
                 {editable()
-                  ? "Add a residence, job, migration, marriage, or burial to build a timeline."
-                  : "No life events yet."}
+                  ? t("person.panel.eventsEmptyEditable")
+                  : t("person.panel.eventsEmpty")}
               </p>
             }
           >
@@ -374,33 +383,33 @@ export function PersonPanel(props: PersonPanelProps) {
         <section class="mb-5 space-y-4" data-testid="person-panel-relatives">
           <RelationGroup
             testId="parents"
-            title="Parents"
+            title={t("person.panel.parents")}
             entries={parents()}
             editable={editable()}
             onSelect={props.onSelectPerson}
             onRemove={props.onRemoveRelationship}
-            empty="No parents added yet."
+            empty={t("person.panel.parentsEmpty")}
           />
           <RelationGroup
             testId="partners"
-            title="Partners"
+            title={t("person.panel.partners")}
             entries={partners()}
             editable={editable()}
             onSelect={props.onSelectPerson}
             onRemove={props.onRemoveRelationship}
-            empty="No partners added yet."
+            empty={t("person.panel.partnersEmpty")}
             labelFor={entry =>
-              entry.relationship.type === "partner" ? partnerLabel(entry.relationship.status) : ""
+              entry.relationship.type === "partner" ? partnerLabel(entry.relationship.status, t) : ""
             }
           />
           <RelationGroup
             testId="children"
-            title="Children"
+            title={t("person.panel.children")}
             entries={children()}
             editable={editable()}
             onSelect={props.onSelectPerson}
             onRemove={props.onRemoveRelationship}
-            empty="No children added yet."
+            empty={t("person.panel.childrenEmpty")}
           />
           <Show when={editable()}>
             <button
@@ -410,14 +419,14 @@ export function PersonPanel(props: PersonPanelProps) {
               class="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-border py-2 text-xs font-semibold text-muted-foreground transition hover:border-primary/40 hover:text-foreground"
             >
               <Plus size={13} />
-              Connect another person
+              {t("person.panel.connectAnother")}
             </button>
           </Show>
         </section>
 
         <section data-testid="person-panel-media">
           <div class="flex items-center justify-between gap-2">
-            <h3 class="field-label">Photos and files</h3>
+            <h3 class="field-label">{t("person.panel.media")}</h3>
             <div class="flex items-center gap-2">
               <span class="text-[0.7rem] text-muted-foreground">{mediaCount()}</span>
               <Show when={!props.readOnly && mediaCount()}>
@@ -426,7 +435,7 @@ export function PersonPanel(props: PersonPanelProps) {
                   class="text-[0.7rem] font-semibold text-primary hover:underline"
                   data-testid="person-panel-view-all-media"
                 >
-                  View all
+                  {t("person.panel.viewAllMedia")}
                 </A>
               </Show>
             </div>
@@ -438,10 +447,9 @@ export function PersonPanel(props: PersonPanelProps) {
                 class="mt-2 rounded-xl border border-dashed border-border px-3 py-5 text-center text-xs leading-relaxed text-muted-foreground"
                 data-testid="person-panel-media-empty"
               >
-                No files yet.{" "}
                 {props.readOnly
-                  ? "There are no photos or files shared for this person."
-                  : `Add a portrait or a document about ${firstName(props.person)}.`}
+                  ? t("person.panel.mediaEmptyReadOnly")
+                  : t("person.panel.mediaEmptyEditable", { name: firstName(props.person) })}
               </p>
             }
           >
@@ -472,11 +480,11 @@ export function PersonPanel(props: PersonPanelProps) {
         <Show when={taggedPhotos().length}>
           <section class="mt-6" data-testid="person-panel-tagged-photos">
             <div class="flex items-center justify-between">
-              <h3 class="field-label">Also in photos</h3>
+              <h3 class="field-label">{t("person.panel.taggedPhotos")}</h3>
               <span class="text-[0.7rem] text-muted-foreground">{taggedPhotos().length}</span>
             </div>
             <p class="mt-1 text-[0.68rem] leading-relaxed text-muted-foreground">
-              Photos filed under someone else where {firstName(props.person)} is tagged.
+              {t("person.panel.taggedPhotosHint", { name: firstName(props.person) })}
             </p>
             <div class="mt-2 grid grid-cols-3 gap-2">
               <For each={taggedPhotos()}>
@@ -507,6 +515,7 @@ function RelationGroup(props: {
   empty: string;
   labelFor?: (entry: RelationEntry) => string;
 }) {
+  const { t } = useI18n();
   return (
     <div data-testid={`person-panel-relatives-${props.testId}`}>
       <h3 class="field-label">{props.title}</h3>
@@ -539,7 +548,7 @@ function RelationGroup(props: {
                   <button
                     type="button"
                     class="rounded-full p-1 text-muted-foreground opacity-60 transition hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
-                    aria-label="Remove relationship"
+                    aria-label={t("person.panel.removeRelationship")}
                     data-testid={`person-panel-relative-remove-${entry.person?.id ?? entry.relationship.id}`}
                     onClick={() => props.onRemove(entry.relationship)}
                   >
@@ -556,6 +565,7 @@ function RelationGroup(props: {
 }
 
 function GroupTile(props: { group: GraphFileGroup; onOpen: () => void }) {
+  const { t } = useI18n();
   const cover = () =>
     props.group.coverFileId ? `/api/files/${props.group.coverFileId}/thumb` : null;
   return (
@@ -563,7 +573,7 @@ function GroupTile(props: { group: GraphFileGroup; onOpen: () => void }) {
       type="button"
       class="group relative aspect-square overflow-hidden rounded-xl border border-border bg-background text-left"
       title={props.group.name}
-      aria-label={`Open ${props.group.name}`}
+      aria-label={t("person.panel.open", { name: props.group.name })}
       data-testid={`person-panel-group-${props.group.id}`}
       onClick={props.onOpen}
     >
@@ -598,6 +608,7 @@ function FileTile(props: {
   onAvatar: () => void;
   onDelete: () => void;
 }) {
+  const { t } = useI18n();
   return (
     <div
       class="group relative aspect-square overflow-hidden rounded-xl border border-border bg-background"
@@ -607,7 +618,7 @@ function FileTile(props: {
         type="button"
         class="h-full w-full"
         onClick={props.onPreview}
-        aria-label={`Open ${props.file.name}`}
+        aria-label={t("person.panel.open", { name: props.file.name })}
         data-testid={`person-panel-file-open-${props.file.id}`}
       >
         <Show
@@ -633,7 +644,7 @@ function FileTile(props: {
       </button>
       <Show when={props.file.isAvatar}>
         <span class="absolute left-1 top-1 rounded-full bg-black/60 px-1.5 py-0.5 text-[0.55rem] font-semibold uppercase tracking-wide text-white">
-          Portrait
+          {t("person.panel.portrait")}
         </span>
       </Show>
       <Show when={props.editable}>
@@ -641,8 +652,16 @@ function FileTile(props: {
           <button
             type="button"
             class="rounded-full bg-black/60 p-1.5 text-white hover:bg-black/80"
-            title={props.file.isAvatar ? "Remove portrait" : "Use as portrait"}
-            aria-label={props.file.isAvatar ? "Remove portrait" : "Use as portrait"}
+            title={
+              props.file.isAvatar
+                ? t("person.panel.removePortrait")
+                : t("person.panel.useAsPortrait")
+            }
+            aria-label={
+              props.file.isAvatar
+                ? t("person.panel.removePortrait")
+                : t("person.panel.useAsPortrait")
+            }
             data-testid={`person-panel-file-avatar-${props.file.id}`}
             onClick={props.onAvatar}
           >
@@ -651,8 +670,8 @@ function FileTile(props: {
           <button
             type="button"
             class="rounded-full bg-black/60 p-1.5 text-white hover:bg-destructive"
-            title="Delete file"
-            aria-label="Delete file"
+            title={t("tree.delete.fileConfirm")}
+            aria-label={t("tree.delete.fileConfirm")}
             data-testid={`person-panel-file-delete-${props.file.id}`}
             onClick={props.onDelete}
           >
@@ -665,12 +684,13 @@ function FileTile(props: {
 }
 
 function TaggedPhotoTile(props: { file: GraphFile; onOpen: () => void }) {
+  const { t } = useI18n();
   return (
     <button
       type="button"
       class="group relative aspect-square overflow-hidden rounded-xl border border-border bg-background"
       title={props.file.name}
-      aria-label={`Open ${props.file.name}`}
+      aria-label={t("person.panel.open", { name: props.file.name })}
       data-testid={`person-panel-tagged-photo-${props.file.id}`}
       onClick={props.onOpen}
     >
@@ -699,6 +719,7 @@ function LifeEventEntry(props: {
   onEdit: () => void;
   onDelete: () => void;
 }) {
+  const { t, locale } = useI18n();
   return (
     <li
       class="group rounded-xl border border-border bg-background/60 px-3 py-2.5"
@@ -708,14 +729,14 @@ function LifeEventEntry(props: {
         <Clock3 size={13} class="mt-0.5 shrink-0 text-muted-foreground" />
         <div class="min-w-0 flex-1">
           <p class="text-[0.66rem] font-semibold uppercase tracking-wide text-muted-foreground">
-            {formatFuzzyDate(props.event.date) || "Undated"}
+            {formatFuzzyDate(props.event.date, { locale: locale() }) || t("person.event.undated")}
           </p>
           <p class="mt-0.5 text-sm font-medium leading-snug">
-            {props.event.title ?? personEventKindLabel(props.event.kind)}
+            {props.event.title ?? t(personEventKey(props.event.kind))}
           </p>
           <Show when={props.event.title}>
             <p class="text-[0.66rem] text-muted-foreground">
-              {personEventKindLabel(props.event.kind)}
+              {t(personEventKey(props.event.kind))}
             </p>
           </Show>
           <Show when={props.event.place}>
@@ -735,8 +756,8 @@ function LifeEventEntry(props: {
             <button
               type="button"
               class="rounded-full p-1 text-muted-foreground transition hover:bg-primary/10 hover:text-foreground"
-              aria-label="Edit event"
-              title="Edit event"
+              aria-label={t("person.event.edit")}
+              title={t("person.event.edit")}
               data-testid={`person-panel-event-edit-${props.event.id}`}
               onClick={props.onEdit}
             >
@@ -745,8 +766,8 @@ function LifeEventEntry(props: {
             <button
               type="button"
               class="rounded-full p-1 text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"
-              aria-label="Delete event"
-              title="Delete event"
+              aria-label={t("tree.delete.eventConfirm")}
+              title={t("tree.delete.eventConfirm")}
               data-testid={`person-panel-event-delete-${props.event.id}`}
               onClick={props.onDelete}
             >
@@ -763,6 +784,7 @@ function ChildBirthEntry(props: {
   entry: TimelineChildBirth;
   onSelect: (id: string) => void;
 }) {
+  const { t, locale } = useI18n();
   return (
     <li
       class="rounded-xl border border-dashed border-border bg-background/40 px-3 py-2.5"
@@ -772,7 +794,7 @@ function ChildBirthEntry(props: {
         <Baby size={13} class="mt-0.5 shrink-0 text-muted-foreground" />
         <div class="min-w-0 flex-1">
           <p class="text-[0.66rem] font-semibold uppercase tracking-wide text-muted-foreground">
-            {formatFuzzyDate(props.entry.date) || "Undated"}
+            {formatFuzzyDate(props.entry.date, { locale: locale() }) || t("person.event.undated")}
           </p>
           <button
             type="button"
@@ -780,7 +802,7 @@ function ChildBirthEntry(props: {
             data-testid={`person-panel-child-birth-open-${props.entry.personId}`}
             onClick={() => props.onSelect(props.entry.personId)}
           >
-            Birth of {props.entry.name}
+            {t("person.event.childBirth", { name: props.entry.name })}
           </button>
           <Show when={props.entry.place}>
             <p class="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
@@ -789,7 +811,7 @@ function ChildBirthEntry(props: {
             </p>
           </Show>
           <p class="mt-1 text-[0.66rem] text-muted-foreground">
-            From this child&apos;s record
+            {t("person.panel.fromChildRecord")}
           </p>
         </div>
       </div>
@@ -797,20 +819,20 @@ function ChildBirthEntry(props: {
   );
 }
 
-function partnerLabel(status: string) {
+function partnerLabel(status: string, t: ReturnType<typeof useI18n>["t"]) {
   switch (status) {
     case "married":
-      return "Married";
+      return t("person.partner.married");
     case "divorced":
-      return "Divorced";
+      return t("person.partner.divorced");
     case "separated":
-      return "Separated";
+      return t("person.partner.separated");
     case "widowed":
-      return "Widowed";
+      return t("person.partner.widowed");
     case "unknown":
-      return "Partner";
+      return t("person.partner.unknown");
     default:
-      return "Partners";
+      return t("person.partner.partners");
   }
 }
 

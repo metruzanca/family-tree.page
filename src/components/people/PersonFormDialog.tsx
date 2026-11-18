@@ -29,6 +29,15 @@ import {
   type PersonLink,
 } from "~/lib/person-links";
 import { PersonLinkGlyph } from "./PersonLinks";
+import { useI18n } from "~/i18n/LocaleProvider";
+import type { TranslationKey } from "~/i18n";
+
+const SEX_KEYS: Record<PersonSex, TranslationKey> = {
+  female: "person.sex.female",
+  male: "person.sex.male",
+  other: "person.sex.other",
+  unknown: "common.unknown",
+};
 
 export type PersonFormState = {
   firstName: string;
@@ -69,6 +78,7 @@ export function PersonFormDialog(props: {
   person?: GraphPerson | null;
   onSaved?: (personId: string) => void;
 }) {
+  const { t } = useI18n();
   const toast = useToast();
   const [form, setForm] = createStore<PersonFormState>({ ...emptyForm });
   const [error, setError] = createSignal("");
@@ -189,7 +199,10 @@ export function PersonFormDialog(props: {
     }
     await revalidate([getTreeGraph.key, getTreeOverview.key, getMyTrees.key]);
     track(props.person ? "person_updated" : "person_created");
-    toast.show(props.person ? "Person updated." : "Person added.", "success");
+    toast.show(
+      props.person ? t("person.form.updated") : t("person.form.created"),
+      "success",
+    );
     if (!props.person && result.data) {
       props.onSaved?.(result.data.id);
     }
@@ -200,12 +213,12 @@ export function PersonFormDialog(props: {
     <Modal
       open={props.open}
       onClose={props.onClose}
-      title={props.person ? "Edit person" : "Add a person"}
+      title={props.person ? t("person.form.editTitle") : t("person.form.addTitle")}
       testId="person-form-dialog"
       description={
         props.person
-          ? "Update the details that appear on the tree and in their profile."
-          : "Start with a name. You can connect them to the rest of the family next."
+          ? t("person.form.editDescription")
+          : t("person.form.addDescription")
       }
       footer={
         <>
@@ -215,7 +228,7 @@ export function PersonFormDialog(props: {
             onClick={props.onClose}
             data-testid="person-form-cancel"
           >
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button
             type="submit"
@@ -223,14 +236,18 @@ export function PersonFormDialog(props: {
             disabled={pending()}
             data-testid="person-form-submit"
           >
-            {pending() ? "Saving…" : props.person ? "Save changes" : "Add person"}
+            {pending()
+              ? t("person.form.saving")
+              : props.person
+                ? t("person.form.saveChanges")
+                : t("person.form.submit")}
           </Button>
         </>
       }
     >
       <form id="person-form" class="space-y-4" onSubmit={submit} data-testid="person-form">
         <div class="grid gap-4 sm:grid-cols-2">
-          <Field label="First name" for="person-first">
+          <Field label={t("person.field.firstName")} for="person-first">
             <input
               id="person-first"
               class="input"
@@ -242,7 +259,7 @@ export function PersonFormDialog(props: {
               data-testid="person-form-first-name"
             />
           </Field>
-          <Field label="Last name" for="person-last">
+          <Field label={t("person.field.lastName")} for="person-last">
             <input
               id="person-last"
               class="input"
@@ -252,22 +269,22 @@ export function PersonFormDialog(props: {
               data-testid="person-form-last-name"
             />
           </Field>
-          <Field label="Nickname" for="person-nick">
+          <Field label={t("person.field.nickname")} for="person-nick">
             <input
               id="person-nick"
               class="input"
-              placeholder="Optional"
+              placeholder={t("common.optional")}
               value={form.nickname}
               onInput={event => setForm("nickname", event.currentTarget.value)}
               maxlength={80}
               data-testid="person-form-nickname"
             />
           </Field>
-          <Field label="Maiden name" for="person-maiden">
+          <Field label={t("person.field.maidenName")} for="person-maiden">
             <input
               id="person-maiden"
               class="input"
-              placeholder="Optional"
+              placeholder={t("common.optional")}
               value={form.maidenName}
               onInput={event => setForm("maidenName", event.currentTarget.value)}
               maxlength={80}
@@ -275,9 +292,9 @@ export function PersonFormDialog(props: {
             />
           </Field>
           <Field
-            label="Sex"
+            label={t("person.field.sex")}
             for="person-sex"
-            hint="Used for father and mother labels and GEDCOM."
+            hint={t("person.field.sexHint")}
           >
             <select
               id="person-sex"
@@ -289,11 +306,11 @@ export function PersonFormDialog(props: {
               data-testid="person-form-sex"
             >
               <For each={PERSON_SEX_OPTIONS}>
-                {option => <option value={option.value}>{option.label}</option>}
+                {option => <option value={option.value}>{t(SEX_KEYS[option.value])}</option>}
               </For>
             </select>
           </Field>
-          <Field label="Born" for="person-birth">
+          <Field label={t("person.field.born")} for="person-birth">
             <FuzzyDateField
               id="person-birth"
               testId="person-form-birth-date"
@@ -301,7 +318,7 @@ export function PersonFormDialog(props: {
               onChange={value => setForm("birthDate", value)}
             />
           </Field>
-          <Field label="Died" for="person-death">
+          <Field label={t("person.field.died")} for="person-death">
             <FuzzyDateField
               id="person-death"
               testId="person-form-death-date"
@@ -309,22 +326,22 @@ export function PersonFormDialog(props: {
               onChange={value => setForm("deathDate", value)}
             />
           </Field>
-          <Field label="Birthplace" for="person-birthplace">
+          <Field label={t("person.field.birthPlace")} for="person-birthplace">
             <input
               id="person-birthplace"
               class="input"
-              placeholder="Optional"
+              placeholder={t("common.optional")}
               value={form.birthPlace}
               onInput={event => setForm("birthPlace", event.currentTarget.value)}
               maxlength={160}
               data-testid="person-form-birthplace"
             />
           </Field>
-          <Field label="Resting place" for="person-deathplace">
+          <Field label={t("person.field.deathPlace")} for="person-deathplace">
             <input
               id="person-deathplace"
               class="input"
-              placeholder="Optional"
+              placeholder={t("common.optional")}
               value={form.deathPlace}
               onInput={event => setForm("deathPlace", event.currentTarget.value)}
               maxlength={160}
@@ -332,7 +349,11 @@ export function PersonFormDialog(props: {
             />
           </Field>
         </div>
-        <Field label="Life notes" for="person-bio" hint="Stories, occupations, places, anything worth remembering.">
+        <Field
+          label={t("person.field.bio")}
+          for="person-bio"
+          hint={t("person.field.bioHint")}
+        >
           <textarea
             id="person-bio"
             class="input min-h-24"
@@ -349,10 +370,9 @@ export function PersonFormDialog(props: {
         >
           <div class="flex items-start justify-between gap-3">
             <div>
-              <h3 class="field-label">Links</h3>
+              <h3 class="field-label">{t("person.links.title")}</h3>
               <p class="mt-0.5 text-[0.7rem] leading-relaxed text-muted-foreground">
-                Social profiles show as icons on the profile. Mark one personal
-                website with the house.
+                {t("person.form.linksHint")}
               </p>
             </div>
             <Button
@@ -364,7 +384,7 @@ export function PersonFormDialog(props: {
               data-testid="person-form-add-link"
             >
               <Plus size={13} />
-              Add link
+              {t("person.links.add")}
             </Button>
           </div>
 
@@ -375,7 +395,7 @@ export function PersonFormDialog(props: {
                 class="rounded-lg border border-dashed border-border px-3 py-3 text-center text-xs text-muted-foreground"
                 data-testid="person-form-links-empty"
               >
-                No links yet.
+                {t("person.links.empty")}
               </p>
             }
           >
@@ -400,7 +420,7 @@ export function PersonFormDialog(props: {
                         updateLinkUrl(index(), event.currentTarget.value)
                       }
                       maxlength={2048}
-                      aria-label="Link address"
+                      aria-label={t("person.links.address")}
                       data-testid={`person-form-link-url-${index()}`}
                     />
                     <Show
@@ -419,8 +439,8 @@ export function PersonFormDialog(props: {
                         aria-pressed={link.isHome}
                         aria-label={
                           link.isHome
-                            ? "Remove personal website"
-                            : "Use as personal website"
+                            ? t("person.links.removeHome")
+                            : t("person.links.useAsHome")
                         }
                         onClick={() => toggleHome(index())}
                         data-testid={`person-form-link-home-${index()}`}
@@ -431,7 +451,7 @@ export function PersonFormDialog(props: {
                     <button
                       type="button"
                       class="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-border text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"
-                      aria-label="Remove link"
+                      aria-label={t("person.links.remove")}
                       onClick={() => removeLink(index())}
                       data-testid={`person-form-link-remove-${index()}`}
                     >
@@ -445,15 +465,15 @@ export function PersonFormDialog(props: {
 
           <div class="grid gap-3 sm:grid-cols-2">
             <Field
-              label="Contact email"
+              label={t("person.field.contactEmail")}
               for="person-contact-email"
-              hint="Only tree members can see this."
+              hint={t("person.field.contactHint")}
             >
               <input
                 id="person-contact-email"
                 class="input"
                 type="email"
-                placeholder="Optional"
+                placeholder={t("common.optional")}
                 value={form.contactEmail}
                 onInput={event =>
                   setForm("contactEmail", event.currentTarget.value)
@@ -463,15 +483,15 @@ export function PersonFormDialog(props: {
               />
             </Field>
             <Field
-              label="Contact phone"
+              label={t("person.field.contactPhone")}
               for="person-contact-phone"
-              hint="Only tree members can see this."
+              hint={t("person.field.contactHint")}
             >
               <input
                 id="person-contact-phone"
                 class="input"
                 type="tel"
-                placeholder="Optional"
+                placeholder={t("common.optional")}
                 value={form.contactPhone}
                 onInput={event =>
                   setForm("contactPhone", event.currentTarget.value)

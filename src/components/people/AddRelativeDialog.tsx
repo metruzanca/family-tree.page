@@ -24,24 +24,26 @@ import { FuzzyDateField } from "../ui/FuzzyDateField";
 import { attemptAction } from "~/lib/action-result";
 import { track } from "~/lib/analytics";
 import { formatFuzzyYearRange, type FuzzyDate } from "~/lib/fuzzy-date";
+import { useI18n } from "~/i18n/LocaleProvider";
+import type { TranslationKey } from "~/i18n";
 
 type Relation = "parent" | "partner" | "child";
 
-const parentTypeOptions = [
-  { value: "biological", label: "Biological" },
-  { value: "adoptive", label: "Adoptive" },
-  { value: "foster", label: "Foster" },
-  { value: "step", label: "Step" },
-  { value: "unknown", label: "Unknown" },
+const PARENT_TYPE_OPTIONS: { value: string; key: TranslationKey }[] = [
+  { value: "biological", key: "person.parentType.biological" },
+  { value: "adoptive", key: "person.parentType.adoptive" },
+  { value: "foster", key: "person.parentType.foster" },
+  { value: "step", key: "person.parentType.step" },
+  { value: "unknown", key: "common.unknown" },
 ];
 
-const statusOptions = [
-  { value: "partnered", label: "Partners" },
-  { value: "married", label: "Married" },
-  { value: "divorced", label: "Divorced" },
-  { value: "separated", label: "Separated" },
-  { value: "widowed", label: "Widowed" },
-  { value: "unknown", label: "Unknown" },
+const STATUS_OPTIONS: { value: string; key: TranslationKey }[] = [
+  { value: "partnered", key: "person.partnership.partnered" },
+  { value: "married", key: "person.partnership.married" },
+  { value: "divorced", key: "person.partnership.divorced" },
+  { value: "separated", key: "person.partnership.separated" },
+  { value: "widowed", key: "person.partnership.widowed" },
+  { value: "unknown", key: "common.unknown" },
 ];
 
 export function AddRelativeDialog(props: {
@@ -54,6 +56,7 @@ export function AddRelativeDialog(props: {
   anchorParentCount: number;
   onAdded?: (personId: string) => void;
 }) {
+  const { t, locale } = useI18n();
   const toast = useToast();
   const [relation, setRelation] = createSignal<Relation>("parent");
   const [mode, setMode] = createSignal<"existing" | "new">("existing");
@@ -76,6 +79,13 @@ export function AddRelativeDialog(props: {
 
   const parentDisabled = () => props.anchorParentCount >= 2;
 
+  const parentTypeOptions = createMemo(() =>
+    PARENT_TYPE_OPTIONS.map(option => ({ value: option.value, label: t(option.key) })),
+  );
+  const statusOptions = createMemo(() =>
+    STATUS_OPTIONS.map(option => ({ value: option.value, label: t(option.key) })),
+  );
+
   const partnerIds = createMemo(() => {
     const anchorId = props.anchor?.id;
     const found = new Set<string>();
@@ -96,7 +106,7 @@ export function AddRelativeDialog(props: {
     const partners = candidates.filter(person => partnerIds().has(person.id));
     const others = candidates.filter(person => !partnerIds().has(person.id));
     return [
-      { value: "none", label: "No other parent" },
+      { value: "none", label: t("people.relative.noOtherParent") },
       ...[...partners, ...others].map(person => ({
         value: person.id,
         label: person.displayName,
@@ -166,7 +176,7 @@ export function AddRelativeDialog(props: {
     const anchor = props.anchor;
     if (!anchor || pending()) return;
     if (mode() === "existing" && !selectedId()) {
-      setError("Choose an existing person, or switch to New person.");
+      setError(t("people.relative.chooseExisting"));
       return;
     }
 
@@ -239,7 +249,9 @@ export function AddRelativeDialog(props: {
     await revalidate([getTreeGraph.key, getTreeOverview.key, getMyTrees.key]);
     track("relationship_added", { relation: relation(), mode: mode() });
     toast.show(
-      mode() === "new" ? "Person added and connected." : "People connected.",
+      mode() === "new"
+        ? t("people.relative.addedAndConnected")
+        : t("people.relative.connected"),
       "success",
     );
     if (keepOpen) {
@@ -254,8 +266,12 @@ export function AddRelativeDialog(props: {
     <Modal
       open={props.open}
       onClose={props.onClose}
-      title={props.anchor ? `Connect someone to ${props.anchor.firstName}` : "Add a relative"}
-      description="Choose how they are related, then pick an existing person or create a new one."
+      title={
+        props.anchor
+          ? t("people.relative.connectTitle", { name: props.anchor.firstName })
+          : t("people.relative.title")
+      }
+      description={t("people.relative.description")}
       testId="add-relative-dialog"
       footer={
         <>
@@ -265,7 +281,7 @@ export function AddRelativeDialog(props: {
             onClick={props.onClose}
             data-testid="add-relative-cancel"
           >
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button
             variant="secondary"
@@ -275,7 +291,7 @@ export function AddRelativeDialog(props: {
             disabled={pending()}
             data-testid="add-relative-submit-more"
           >
-            Connect and add more
+            {t("people.relative.connectMore")}
           </Button>
           <Button
             type="submit"
@@ -283,7 +299,7 @@ export function AddRelativeDialog(props: {
             disabled={pending()}
             data-testid="add-relative-submit"
           >
-            {pending() ? "Connecting…" : "Connect"}
+            {pending() ? t("people.relative.connecting") : t("people.relative.connect")}
           </Button>
         </>
       }
@@ -295,35 +311,39 @@ export function AddRelativeDialog(props: {
             active={relation() === "parent"}
             disabled={parentDisabled()}
             icon={<ArrowUp size={17} />}
-            label="Parent"
-            hint={parentDisabled() ? "Already has two parents" : "They came before"}
+            label={t("person.relation.parent")}
+            hint={
+              parentDisabled()
+                ? t("people.relative.parentFull")
+                : t("people.relative.parentHint")
+            }
             onClick={() => setRelation("parent")}
           />
           <RelationChoice
             testId="add-relative-relation-partner"
             active={relation() === "partner"}
             icon={<Heart size={17} />}
-            label="Partner"
-            hint="Married or together"
+            label={t("person.relation.partner")}
+            hint={t("people.relative.partnerHint")}
             onClick={() => setRelation("partner")}
           />
           <RelationChoice
             testId="add-relative-relation-child"
             active={relation() === "child"}
             icon={<ArrowDown size={17} />}
-            label="Child"
-            hint="They came after"
+            label={t("person.relation.child")}
+            hint={t("people.relative.childHint")}
             onClick={() => setRelation("child")}
           />
         </div>
 
         <Show when={relation() !== "partner"}>
-          <Field label="Relationship type" for="parent-type">
+          <Field label={t("people.relative.relationshipType")} for="parent-type">
             <Select
-              options={parentTypeOptions}
+              options={parentTypeOptions()}
               optionValue="value"
               optionTextValue="label"
-              value={parentTypeOptions.find(option => option.value === parentType())}
+              value={parentTypeOptions().find(option => option.value === parentType())}
               onChange={option => option && setParentType(option.value)}
               itemComponent={itemProps => (
                 <SelectItem item={itemProps.item}>{itemProps.item.rawValue.label}</SelectItem>
@@ -332,7 +352,7 @@ export function AddRelativeDialog(props: {
               <SelectTrigger
                 id="parent-type"
                 class="w-full"
-                aria-label="Relationship type"
+                aria-label={t("people.relative.relationshipType")}
                 data-testid="add-relative-parent-type"
               >
                 <SelectValue<{ value: string; label: string }>>
@@ -348,9 +368,9 @@ export function AddRelativeDialog(props: {
 
         <Show when={relation() === "child"}>
           <Field
-            label="Other parent"
+            label={t("people.relative.otherParent")}
             for="other-parent"
-            hint="Optional. Connects this child to both parents in one step."
+            hint={t("people.relative.otherParentHint")}
           >
             <Select
               options={otherParentOptions()}
@@ -365,7 +385,7 @@ export function AddRelativeDialog(props: {
               <SelectTrigger
                 id="other-parent"
                 class="w-full"
-                aria-label="Other parent"
+                aria-label={t("people.relative.otherParent")}
                 data-testid="add-relative-other-parent"
               >
                 <SelectValue<{ value: string; label: string }>>
@@ -380,12 +400,12 @@ export function AddRelativeDialog(props: {
         </Show>
 
         <Show when={relation() === "partner"}>
-          <Field label="Partnership" for="partner-status">
+          <Field label={t("people.relative.partnership")} for="partner-status">
             <Select
-              options={statusOptions}
+              options={statusOptions()}
               optionValue="value"
               optionTextValue="label"
-              value={statusOptions.find(option => option.value === status())}
+              value={statusOptions().find(option => option.value === status())}
               onChange={option => option && setStatus(option.value)}
               itemComponent={itemProps => (
                 <SelectItem item={itemProps.item}>{itemProps.item.rawValue.label}</SelectItem>
@@ -394,7 +414,7 @@ export function AddRelativeDialog(props: {
               <SelectTrigger
                 id="partner-status"
                 class="w-full"
-                aria-label="Partnership"
+                aria-label={t("people.relative.partnership")}
                 data-testid="add-relative-partner-status"
               >
                 <SelectValue<{ value: string; label: string }>>
@@ -416,7 +436,7 @@ export function AddRelativeDialog(props: {
             data-testid="add-relative-mode-existing"
             onClick={() => setMode("existing")}
           >
-            Existing person
+            {t("people.relative.modeExisting")}
           </button>
           <button
             type="button"
@@ -425,7 +445,7 @@ export function AddRelativeDialog(props: {
             data-testid="add-relative-mode-new"
             onClick={() => setMode("new")}
           >
-            New person
+            {t("people.relative.modeNew")}
           </button>
         </div>
 
@@ -436,7 +456,7 @@ export function AddRelativeDialog(props: {
               <input
                 id="relative-search"
                 class="input pl-9"
-                placeholder="Search people already in this tree"
+                placeholder={t("people.relative.searchPlaceholder")}
                 value={search()}
                 onInput={event => setSearch(event.currentTarget.value)}
                 data-testid="add-relative-search"
@@ -451,8 +471,8 @@ export function AddRelativeDialog(props: {
                     data-testid="add-relative-people-empty"
                   >
                     {props.people.length <= 1
-                      ? "There is nobody else in this tree yet. Switch to New person."
-                      : "No matching people."}
+                      ? t("people.relative.nobodyElse")
+                      : t("people.relative.noMatches")}
                   </p>
                 }
               >
@@ -471,7 +491,9 @@ export function AddRelativeDialog(props: {
                         <span class="block truncate text-sm font-medium">{person.displayName}</span>
                         <Show when={person.birthDate}>
                           <span class="block text-[0.7rem] text-muted-foreground">
-                            Born {formatFuzzyYearRange(person.birthDate, null)}
+                            {t("date.born", {
+                              years: formatFuzzyYearRange(person.birthDate, null, locale()),
+                            })}
                           </span>
                         </Show>
                       </span>
@@ -485,7 +507,7 @@ export function AddRelativeDialog(props: {
 
         <Show when={mode() === "new"}>
           <div class="grid gap-3 sm:grid-cols-2">
-            <Field label="First name" for="relative-first">
+            <Field label={t("person.field.firstName")} for="relative-first">
               <input
                 id="relative-first"
                 class="input"
@@ -495,7 +517,7 @@ export function AddRelativeDialog(props: {
                 data-testid="add-relative-first-name"
               />
             </Field>
-            <Field label="Last name" for="relative-last">
+            <Field label={t("person.field.lastName")} for="relative-last">
               <input
                 id="relative-last"
                 class="input"
@@ -504,7 +526,7 @@ export function AddRelativeDialog(props: {
                 data-testid="add-relative-last-name"
               />
             </Field>
-            <Field label="Born" for="relative-birth">
+            <Field label={t("person.field.born")} for="relative-birth">
               <FuzzyDateField
                 id="relative-birth"
                 testId="add-relative-birth-date"
@@ -512,7 +534,7 @@ export function AddRelativeDialog(props: {
                 onChange={value => setForm("birthDate", value)}
               />
             </Field>
-            <Field label="Died" for="relative-death">
+            <Field label={t("person.field.died")} for="relative-death">
               <FuzzyDateField
                 id="relative-death"
                 testId="add-relative-death-date"

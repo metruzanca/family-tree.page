@@ -2,6 +2,7 @@ import { For, Show } from "solid-js";
 import type { DuplicateCandidate } from "~/lib/duplicates";
 import { formatFuzzyYearRange } from "~/lib/fuzzy-date";
 import { Button } from "../ui/button";
+import { useI18n } from "~/i18n/LocaleProvider";
 
 export function DuplicateWarning(props: {
   candidates: DuplicateCandidate[];
@@ -10,14 +11,15 @@ export function DuplicateWarning(props: {
   onUseExisting?: (candidate: DuplicateCandidate) => void;
   pending?: boolean;
 }) {
+  const { t, locale } = useI18n();
   return (
     <div
       class="rounded-xl border border-warning/35 bg-warning/10 px-3.5 py-3"
       data-testid="duplicate-warning"
     >
-      <p class="text-sm font-semibold">Is this someone who is already here?</p>
+      <p class="text-sm font-semibold">{t("people.duplicate.title")}</p>
       <p class="mt-1 text-xs leading-relaxed text-muted-foreground">
-        We found a similar person. Check before adding a duplicate.
+        {t("people.duplicate.body")}
       </p>
       <ul class="mt-3 space-y-2">
         <For each={props.candidates}>
@@ -29,9 +31,9 @@ export function DuplicateWarning(props: {
               <div class="flex flex-wrap items-start justify-between gap-2">
                 <div class="min-w-0">
                   <p class="truncate text-sm font-medium">{candidate.displayName}</p>
-                  <Show when={formatFuzzyYearRange(candidate.birthDate, candidate.deathDate)}>
+                  <Show when={formatFuzzyYearRange(candidate.birthDate, candidate.deathDate, locale())}>
                     <p class="text-xs text-muted-foreground">
-                      {formatFuzzyYearRange(candidate.birthDate, candidate.deathDate)}
+                      {formatFuzzyYearRange(candidate.birthDate, candidate.deathDate, locale())}
                     </p>
                   </Show>
                   <p class="mt-0.5 text-[0.66rem] uppercase tracking-wide text-muted-foreground">
@@ -46,7 +48,7 @@ export function DuplicateWarning(props: {
                     data-testid={`duplicate-warning-use-${candidate.id}`}
                     onClick={() => props.onUseExisting?.(candidate)}
                   >
-                    Use this person
+                    {t("people.duplicate.use")}
                   </Button>
                 </Show>
               </div>
@@ -62,7 +64,7 @@ export function DuplicateWarning(props: {
           onClick={props.onCancel}
           data-testid="duplicate-warning-back"
         >
-          Go back
+          {t("people.duplicate.back")}
         </Button>
         <Button
           type="button"
@@ -71,7 +73,7 @@ export function DuplicateWarning(props: {
           onClick={props.onCreateAnyway}
           data-testid="duplicate-warning-add-anyway"
         >
-          Add anyway
+          {t("people.duplicate.addAnyway")}
         </Button>
       </div>
     </div>

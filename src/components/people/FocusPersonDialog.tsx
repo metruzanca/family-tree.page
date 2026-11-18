@@ -4,6 +4,7 @@ import type { GraphPerson } from "~/api/people-server";
 import { Avatar } from "../ui/Avatar";
 import { Modal } from "../ui/Modal";
 import { formatFuzzyYearRange } from "~/lib/fuzzy-date";
+import { useI18n } from "~/i18n/LocaleProvider";
 
 export function FocusPersonDialog(props: {
   open: boolean;
@@ -13,6 +14,7 @@ export function FocusPersonDialog(props: {
   pending: boolean;
   onSave: (personId: string | null) => void;
 }) {
+  const { t, locale } = useI18n();
   const [query, setQuery] = createSignal("");
 
   createEffect(() => {
@@ -38,12 +40,12 @@ export function FocusPersonDialog(props: {
     <Modal
       open={props.open}
       onClose={props.onClose}
-      title="Who are you in this tree?"
-      description="The tree opens around this person. Everyone can still see the whole family when they want to."
+      title={t("tree.focusPrompt.title")}
+      description={t("people.focus.description")}
       testId="focus-person-dialog"
       footer={
         <div class="flex w-full items-center justify-between gap-3 text-xs text-muted-foreground">
-          <span>This only changes what you see first.</span>
+          <span>{t("people.focus.note")}</span>
           <Show when={props.viewerPersonId}>
             <button
               type="button"
@@ -52,7 +54,7 @@ export function FocusPersonDialog(props: {
               data-testid="focus-person-clear"
               onClick={() => props.onSave(null)}
             >
-              Clear my link
+              {t("people.focus.clear")}
             </button>
           </Show>
         </div>
@@ -67,7 +69,7 @@ export function FocusPersonDialog(props: {
           class="input pl-10"
           value={query()}
           onInput={event => setQuery(event.currentTarget.value)}
-          placeholder="Search by name, nickname or maiden name"
+          placeholder={t("people.focus.searchPlaceholder")}
           data-testid="focus-person-search"
           autofocus
         />
@@ -95,9 +97,9 @@ export function FocusPersonDialog(props: {
                     {person.displayName}
                   </span>
                   <span class="block truncate text-xs text-muted-foreground">
-                    {formatFuzzyYearRange(person.birthDate, person.deathDate) ||
+                    {formatFuzzyYearRange(person.birthDate, person.deathDate, locale()) ||
                       person.bio?.slice(0, 60) ||
-                      "No dates yet"}
+                      t("people.focus.noDates")}
                   </span>
                 </span>
                 <Show when={isCurrent()}>
@@ -109,7 +111,7 @@ export function FocusPersonDialog(props: {
         </For>
         <Show when={!matches().length}>
           <p class="py-8 text-center text-sm text-muted-foreground" data-testid="focus-person-empty">
-            Nothing matches “{query()}”.
+            {t("people.focus.empty", { query: query() })}
           </p>
         </Show>
       </div>
