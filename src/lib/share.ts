@@ -119,11 +119,17 @@ export function sanitizeSharedGraph(
         })
     : [];
 
-  const events = graph.events.filter(
-    event =>
-      visiblePersonIds.has(event.personId) &&
-      (options.livingVisibility === "full" || !livingIds.has(event.personId)),
-  );
+  // A shared event is visible when either participant is. The panel only shows
+  // it to a person it involves, so a hidden living spouse never sees it.
+  const visibleEventParticipant = (event: (typeof graph.events)[number]) =>
+    [event.personId, event.partnerPersonId].some(
+      personId =>
+        personId !== null &&
+        visiblePersonIds.has(personId) &&
+        (options.livingVisibility === "full" || !livingIds.has(personId)),
+    );
+
+  const events = graph.events.filter(visibleEventParticipant);
 
   return {
     tree: graph.tree,

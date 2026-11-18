@@ -68,6 +68,7 @@ import type { FaceBox } from "~/lib/face-box";
 import { attemptAction, friendlyMessage } from "~/lib/action-result";
 import type { FuzzyDate } from "~/lib/fuzzy-date";
 import { fileNodeId, groupNodeId } from "~/lib/graph";
+import { eventPartnerOf } from "~/lib/person-events";
 import {
   defaultFocusRadius,
   parseFocusRadius,
@@ -150,6 +151,16 @@ function TreePageInner() {
       ? null
       : (data()?.people.find(person => person.id === selectedId()) ?? null),
   );
+  /** The other participant of the event being deleted, for a shared warning. */
+  const deleteEventPartner = createMemo(() => {
+    const event = deleteEventTarget();
+    const personId = selectedPerson()?.id;
+    if (!event || !personId) return null;
+    const otherId = eventPartnerOf(event, personId);
+    return otherId
+      ? (data()?.people.find(person => person.id === otherId) ?? null)
+      : null;
+  });
   const selectedFile = createMemo(
     () => data()?.files.find(file => file.id === selectedFileId()) ?? null,
   );
@@ -1217,6 +1228,8 @@ function TreePageInner() {
                 onClose={() => setEventDialogOpen(false)}
                 treeId={params.treeId}
                 person={person()}
+                people={data()?.people ?? []}
+                relationships={data()?.relationships ?? []}
                 event={eventTarget()}
               />
             )}
@@ -1228,7 +1241,13 @@ function TreePageInner() {
             title={t("tree.delete.title", {
               name: deleteEventTarget()?.title ?? t("tree.delete.eventName"),
             })}
-            message={t("tree.delete.eventMessage")}
+            message={
+              deleteEventPartner()
+                ? t("tree.delete.eventSharedMessage", {
+                    name: deleteEventPartner()!.displayName,
+                  })
+                : t("tree.delete.eventMessage")
+            }
             confirmLabel={t("tree.delete.eventConfirm")}
             danger
             pending={pendingDeleteEvent()}

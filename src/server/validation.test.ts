@@ -10,6 +10,7 @@ import {
   forgotPasswordSchema,
   inviteEmailSchema,
   parentChildSchema,
+  personEventInputSchema,
   personSchema,
   personUpdateSchema,
   recordFacesSchema,
@@ -337,5 +338,23 @@ describe("person links and contact", () => {
         contactEmail: "not-an-email",
       }).success,
     ).toBe(false);
+  });
+
+  it("keeps an event partner optional and defaults it to null", () => {
+    const withoutPartner = personEventInputSchema.parse({
+      kind: "marriage",
+      title: "Wedding",
+      date: null,
+    });
+    expect(withoutPartner.partnerPersonId).toBeNull();
+
+    const withPartner = personEventInputSchema.parse({
+      kind: "marriage",
+      title: "Wedding",
+      partnerPersonId: "00000000-0000-4000-8000-000000000000",
+    });
+    expect(withPartner.partnerPersonId).toBe(
+      "00000000-0000-4000-8000-000000000000",
+    );
   });
 });

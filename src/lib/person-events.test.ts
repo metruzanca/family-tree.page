@@ -3,6 +3,9 @@ import { exactFuzzyDate } from "./fuzzy-date";
 import {
   PERSON_EVENT_OPTIONS,
   buildLifeTimeline,
+  canonicalEventPair,
+  eventInvolvesPerson,
+  eventPartnerOf,
   personEventKindLabel,
   type ChildBirthSource,
   type PersonEventKind,
@@ -39,6 +42,52 @@ describe("person event kinds", () => {
     expect(values.at(-1)).toBe("other");
     expect(personEventKindLabel("marriage")).toBe("Marriage");
     expect(personEventKindLabel("divorce")).toBe("Divorce");
+  });
+});
+
+describe("shared events", () => {
+  const wedding = { personId: "ana", partnerPersonId: "bo" };
+
+  it("belongs to both participants", () => {
+    expect(eventInvolvesPerson(wedding, "ana")).toBe(true);
+    expect(eventInvolvesPerson(wedding, "bo")).toBe(true);
+    expect(eventInvolvesPerson(wedding, "cy")).toBe(false);
+  });
+
+  it("resolves the other participant from each side", () => {
+    expect(eventPartnerOf(wedding, "ana")).toBe("bo");
+    expect(eventPartnerOf(wedding, "bo")).toBe("ana");
+    expect(eventPartnerOf(wedding, "cy")).toBeNull();
+  });
+
+  it("treats an event without a partner as one person's own", () => {
+    const solo = { personId: "ana", partnerPersonId: null };
+    expect(eventPartnerOf(solo, "ana")).toBeNull();
+    expect(eventInvolvesPerson(solo, "bo")).toBe(false);
+  });
+
+  it("keeps the row's owner and partner when edited from either side", () => {
+    expect(
+      canonicalEventPair({ ownerId: "ana", viewerId: "ana", otherPersonId: "bo" }),
+    ).toEqual({ personId: "ana", partnerPersonId: "bo" });
+    expect(
+      canonicalEventPair({ ownerId: "ana", viewerId: "bo", otherPersonId: "ana" }),
+    ).toEqual({ personId: "ana", partnerPersonId: "bo" });
+  });
+
+  it("moves a shared event to the editor's timeline when the spouse changes", () => {
+    expect(
+      canonicalEventPair({ ownerId: "ana", viewerId: "bo", otherPersonId: "cy" }),
+    ).toEqual({ personId: "bo", partnerPersonId: "cy" });
+    expect(
+      canonicalEventPair({ ownerId: "ana", viewerId: "ana", otherPersonId: "cy" }),
+    ).toEqual({ personId: "ana", partnerPersonId: "cy" });
+  });
+
+  it("unshares an event when the partner is cleared", () => {
+    expect(
+      canonicalEventPair({ ownerId: "ana", viewerId: "bo", otherPersonId: null }),
+    ).toEqual({ personId: "ana", partnerPersonId: null });
   });
 });
 

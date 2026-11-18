@@ -523,8 +523,9 @@
                     {
                       "id": "9b2f4a1c-3d5e-4f6a-8b7c-1d2e3f4a5b6c",
                       "personId": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-                      "kind": "military",
-                      "title": "Army service",
+                      "partnerPersonId": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+                      "kind": "marriage",
+                      "title": null,
                       "place": "Springfield",
                       "date": {
                         "start": {
@@ -534,7 +535,7 @@
                         },
                         "qualifier": "about"
                       },
-                      "description": "Enlisted after the draft notice.",
+                      "description": "Married during the war.",
                       "createdAt": "2025-11-03T09:00:00.000Z",
                       "updatedAt": "2025-11-03T09:00:00.000Z"
                     }
@@ -1537,6 +1538,7 @@
         "required": [
           "id",
           "personId",
+          "partnerPersonId",
           "kind",
           "title",
           "place",
@@ -1552,6 +1554,13 @@
           },
           "personId": {
             "type": "string",
+            "format": "uuid"
+          },
+          "partnerPersonId": {
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "uuid"
           },
           "kind": {

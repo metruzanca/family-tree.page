@@ -135,11 +135,26 @@ const events: PersonEvent[] = [
     id: "c9bf9e57-1685-4c89-bafb-ff5af830be8a",
     treeId: tree.id,
     personId: abraham.id,
+    partnerPersonId: null,
     kind: "military",
     title: "Army service",
     place: "Springfield",
     date: { start: { year: 1941, month: null, day: null }, qualifier: "about" },
     description: "Enlisted after the draft notice.",
+    createdBy: null,
+    createdAt,
+    updatedAt,
+  },
+  {
+    id: "d0cae47a-3b1c-4b0b-8c1d-2e3f4a5b6c7d",
+    treeId: tree.id,
+    personId: abraham.id,
+    partnerPersonId: mona.id,
+    kind: "marriage",
+    title: null,
+    place: "Springfield",
+    date: exactFuzzyDate(1950),
+    description: null,
     createdBy: null,
     createdAt,
     updatedAt,
@@ -190,7 +205,7 @@ describe("API DTO contract", () => {
     expect(snapshot.tree.counts).toEqual({
       people: 3,
       relationships: 3,
-      events: 1,
+      events: 2,
       media: 1,
     });
     expect(snapshot.media[0].taggedPersonIds).toEqual([mona.id]);
@@ -206,6 +221,20 @@ describe("API DTO contract", () => {
     expect(detail!.parents.map(row => row.id).sort()).toEqual(
       [abraham.id, mona.id].sort(),
     );
+  });
+
+  it("includes a shared event on both participants", () => {
+    const marriageId = "d0cae47a-3b1c-4b0b-8c1d-2e3f4a5b6c7d";
+    const abrahamDetail = buildPersonDetail(data, abraham.id, origin);
+    const monaDetail = buildPersonDetail(data, mona.id, origin);
+
+    expect(abrahamDetail?.events.map(row => row.id)).toContain(marriageId);
+    expect(monaDetail?.events.map(row => row.id)).toContain(marriageId);
+    // The row keeps its canonical owner and partner; each viewer resolves the
+    // other side themselves.
+    expect(
+      abrahamDetail?.events.find(row => row.id === marriageId)?.partnerPersonId,
+    ).toBe(mona.id);
   });
 
   it("builds a relationship list that matches the OpenAPI schema", () => {

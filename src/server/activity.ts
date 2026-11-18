@@ -138,6 +138,7 @@ const EVENT_FIELDS: {
   labelKey: TranslationKey;
 }[] = [
   { key: "kind", label: "Type", labelKey: "tree.activity.field.type" },
+  { key: "partnerPersonId", label: "With", labelKey: "tree.activity.field.partner" },
   { key: "title", label: "Title", labelKey: "tree.activity.field.title" },
   { key: "place", label: "Place", labelKey: "tree.activity.field.place" },
   { key: "date", label: "Date", labelKey: "tree.activity.field.date" },
@@ -147,6 +148,7 @@ const EVENT_FIELDS: {
 export function personEventChanges(
   before: PersonEvent,
   after: PersonEventInput,
+  names: Map<string, string> = new Map(),
 ): ActivityChange[] {
   const changes: ActivityChange[] = [];
   for (const field of EVENT_FIELDS) {
@@ -156,17 +158,22 @@ export function personEventChanges(
     changes.push({
       label: field.label,
       labelKey: field.labelKey,
-      from: displayEventValue(field.key, from),
-      to: displayEventValue(field.key, to),
+      from: displayEventValue(field.key, from, names),
+      to: displayEventValue(field.key, to, names),
     });
   }
   return changes;
 }
 
-function displayEventValue(key: keyof PersonEventInput, value: unknown): string | null {
+function displayEventValue(
+  key: keyof PersonEventInput,
+  value: unknown,
+  names: Map<string, string>,
+): string | null {
   if (value === null || value === undefined || value === "") return null;
   if (key === "date") return formatFuzzyDate(value as FuzzyDate) || null;
   if (key === "kind") return personEventKindLabel(value as PersonEvent["kind"]);
+  if (key === "partnerPersonId") return names.get(String(value)) ?? null;
   const text = String(value);
   return text.length > 500 ? `${text.slice(0, 500)}…` : text;
 }

@@ -58,6 +58,58 @@ export type ChildBirthSource = {
   birthPlace?: string | null;
 };
 
+export type SharedEventLike = {
+  personId: string;
+  partnerPersonId?: string | null;
+};
+
+/** True when the person is either participant of a shared event. */
+export function eventInvolvesPerson(event: SharedEventLike, personId: string) {
+  return event.personId === personId || event.partnerPersonId === personId;
+}
+
+/**
+ * The other participant of a shared event, seen from one side. Returns null for
+ * one-person events and for events that do not involve the person at all.
+ */
+export function eventPartnerOf(
+  event: SharedEventLike,
+  personId: string,
+): string | null {
+  if (event.personId === personId) return event.partnerPersonId ?? null;
+  if (event.partnerPersonId === personId) return event.personId;
+  return null;
+}
+
+export type EventPair = {
+  personId: string;
+  partnerPersonId: string | null;
+};
+
+/**
+ * Translate an edit made from one participant's timeline into the row's
+ * canonical owner and partner columns. Editing from the partner side names the
+ * owner as the counterpart; choosing someone else moves the event to the
+ * editor's own timeline.
+ */
+export function canonicalEventPair(input: {
+  ownerId: string;
+  viewerId: string;
+  otherPersonId: string | null;
+}): EventPair {
+  const { ownerId, viewerId, otherPersonId } = input;
+  if (otherPersonId === null) {
+    return { personId: ownerId, partnerPersonId: null };
+  }
+  if (viewerId === ownerId) {
+    return { personId: ownerId, partnerPersonId: otherPersonId };
+  }
+  if (otherPersonId === ownerId) {
+    return { personId: ownerId, partnerPersonId: viewerId };
+  }
+  return { personId: viewerId, partnerPersonId: otherPersonId };
+}
+
 type TimelineEventInput = {
   date: FuzzyDate | null;
   createdAt: Date;

@@ -109,7 +109,7 @@ export function buildPersonDetail(
   });
 
   const events = data.events
-    .filter(row => row.personId === personId)
+    .filter(row => row.personId === personId || row.partnerPersonId === personId)
     .sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime())
     .map(toApiEvent);
 

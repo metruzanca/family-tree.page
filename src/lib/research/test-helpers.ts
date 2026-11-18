@@ -75,11 +75,13 @@ export function lifeEvent(
     place?: string | null;
     year?: number | null;
     description?: string | null;
+    partnerPersonId?: string | null;
   } = {},
 ): GraphPersonEvent {
   return {
     id,
     personId,
+    partnerPersonId: options.partnerPersonId ?? null,
     kind,
     title: options.title ?? null,
     place: options.place ?? null,

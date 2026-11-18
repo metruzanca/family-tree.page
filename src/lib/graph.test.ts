@@ -675,6 +675,7 @@ describe("graphModelKey", () => {
       {
         id: "e1",
         personId: "a",
+        partnerPersonId: null,
         kind: "residence",
         title: "Moved",
         place: null,

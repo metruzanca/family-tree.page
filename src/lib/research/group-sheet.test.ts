@@ -2,11 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   buildFamilyUnits,
   buildResearchIndex,
+  eventsOf,
   familiesForPerson,
   familyKey,
   sharedChildren,
 } from "./graph";
 import {
+  lifeEvent,
   parentRelationship,
   partnerRelationship,
   person,
@@ -89,5 +91,30 @@ describe("family groups", () => {
     expect(sharedChildren(index, "dad", "second-wife").map(child => child.id)).toEqual([
       "child-c",
     ]);
+  });
+
+  it("shows a shared marriage on both parents but lists it once per family", () => {
+    const index = buildResearchIndex(
+      treeGraph({
+        people: [
+          person("dad", "Robert", "Hale", 1900),
+          person("wife", "Mary", "Hale", 1902),
+        ],
+        relationships: [partnerRelationship("p1", "dad", "wife")],
+        events: [
+          lifeEvent("wedding", "dad", "marriage", {
+            partnerPersonId: "wife",
+            year: 1924,
+          }),
+        ],
+      }),
+    );
+
+    expect(eventsOf(index, "dad").map(event => event.id)).toEqual(["wedding"]);
+    expect(eventsOf(index, "wife").map(event => event.id)).toEqual(["wedding"]);
+    const unit = buildFamilyUnits(index).find(
+      family => family.key === familyKey(["dad", "wife"]),
+    );
+    expect(unit?.events.map(event => event.id)).toEqual(["wedding"]);
   });
 });

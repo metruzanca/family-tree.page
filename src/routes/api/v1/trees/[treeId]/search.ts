@@ -66,7 +66,12 @@ export const GET = apiHandler("people:read", async (event, context) => {
 
   const matchedEvents = data.events
     .filter(event => {
-      if (surname && !matchedPersonIds.has(event.personId)) return false;
+      if (surname) {
+        const participants = [event.personId, event.partnerPersonId].filter(
+          (id): id is string => Boolean(id),
+        );
+        if (!participants.some(id => matchedPersonIds.has(id))) return false;
+      }
       if (query) {
         const hit = [event.title, event.place, event.description].some(value =>
           includesText(value, query),

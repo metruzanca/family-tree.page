@@ -137,8 +137,13 @@ export function buildResearchIndex(graph: Pick<TreeGraph, "people" | "relationsh
   }
 
   const events = new Map<string, GraphPersonEvent[]>();
+  // A shared marriage or divorce belongs on both timelines.
   for (const event of graph.events) {
-    events.set(event.personId, [...(events.get(event.personId) ?? []), event]);
+    const participants = new Set([event.personId, event.partnerPersonId ?? null]);
+    for (const personId of participants) {
+      if (!personId || !peopleById.has(personId)) continue;
+      events.set(personId, [...(events.get(personId) ?? []), event]);
+    }
   }
   for (const [personId, list] of events) {
     events.set(
@@ -262,6 +267,23 @@ export function familiesForPerson(index: ResearchIndex, personId: string) {
   return all.filter(unit => unit.children.some(child => child.id === personId));
 }
 
+/** One shared event sits on both parents' timelines, so a family lists it once. */
+function familyEvents(...lists: GraphPersonEvent[][]): GraphPersonEvent[] {
+  const seen = new Set<string>();
+  const events: GraphPersonEvent[] = [];
+  for (const list of lists) {
+    for (const event of list) {
+      if (seen.has(event.id)) continue;
+      seen.add(event.id);
+      events.push(event);
+    }
+  }
+  return events.sort((left, right) => {
+    const dates = compareFuzzyDates(left.date, right.date);
+    return dates !== 0 ? dates : left.id.localeCompare(right.id);
+  });
+}
+
 export function buildFamilyUnits(index: ResearchIndex): FamilyUnit[] {
   const units: FamilyUnit[] = [];
   const covered = new Set<string>();
@@ -296,7 +318,7 @@ export function buildFamilyUnits(index: ResearchIndex): FamilyUnit[] {
         parents.length === 2
           ? partnershipBetween(index, parents[0].id, parents[1].id)
           : null,
-      events: parents.flatMap(parent => eventsOf(index, parent.id)),
+      events: familyEvents(...parents.map(parent => eventsOf(index, parent.id))),
     });
   }
 
@@ -317,7 +339,10 @@ export function buildFamilyUnits(index: ResearchIndex): FamilyUnit[] {
         parents: [person, partner.person],
         children: [],
         partnership: partner,
-        events: [...eventsOf(index, person.id), ...eventsOf(index, partner.person.id)],
+        events: familyEvents(
+          eventsOf(index, person.id),
+          eventsOf(index, partner.person.id),
+        ),
       });
     }
   }

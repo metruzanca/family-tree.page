@@ -61,6 +61,8 @@ export type ApiRelationship = ApiParentRelationship | ApiPartnerRelationship;
 export type ApiEvent = {
   id: string;
   personId: string;
+  /** The other person in a marriage or divorce, when recorded. */
+  partnerPersonId: string | null;
   kind: PersonEvent["kind"];
   title: string | null;
   place: string | null;
@@ -226,6 +228,7 @@ export function toApiEvent(row: PersonEvent): ApiEvent {
   return {
     id: row.id,
     personId: row.personId,
+    partnerPersonId: row.partnerPersonId ?? null,
     kind: row.kind,
     title: row.title,
     place: row.place,

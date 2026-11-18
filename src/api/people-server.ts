@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq, inArray, ne } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, ne, sql } from "drizzle-orm";
 import { db } from "../server/db";
 import {
   fileFaces,
@@ -50,7 +50,7 @@ import {
   personEventChanges,
   personName,
 } from "../server/activity";
-import { personEventKindLabel } from "../lib/person-events";
+import { canonicalEventPair, personEventKindLabel } from "../lib/person-events";
 import { notifyTreeChanged } from "../server/presence";
 import {
   findDuplicateCandidates,
@@ -144,6 +144,8 @@ export type GraphRelationship =
 export type GraphPersonEvent = {
   id: string;
   personId: string;
+  /** The other person in a marriage or divorce, when recorded. */
+  partnerPersonId: string | null;
   kind: PersonEvent["kind"];
   title: string | null;
   place: string | null;
@@ -330,6 +332,7 @@ export async function loadTreeGraph(tree: {
     events: eventRows.map(event => ({
       id: event.id,
       personId: event.personId,
+      partnerPersonId: event.partnerPersonId,
       kind: event.kind,
       title: event.title,
       place: event.place,
@@ -606,6 +609,22 @@ export async function deletePerson(input: {
           and(
             eq(fileFaces.treeId, access.tree.id),
             eq(fileFaces.personId, input.personId),
+          ),
+        );
+      // A shared marriage or divorce belongs to both people. Hand ownership to
+      // the survivor instead of letting the cascade erase their history too.
+      await tx
+        .update(personEvents)
+        .set({
+          personId: sql`${personEvents.partnerPersonId}`,
+          partnerPersonId: null,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(personEvents.treeId, access.tree.id),
+            eq(personEvents.personId, input.personId),
+            isNotNull(personEvents.partnerPersonId),
           ),
         );
       const deleted = await tx
@@ -1163,11 +1182,18 @@ export async function createPersonEvent(
     await assertPeopleInTree(access.tree.id, [parsed.personId]);
 
     const event = await db.transaction(async tx => {
+      await assertEventPartner(
+        tx,
+        access.tree.id,
+        parsed.personId,
+        parsed.partnerPersonId,
+      );
       const [created] = await tx
         .insert(personEvents)
         .values({
           treeId: access.tree.id,
           personId: parsed.personId,
+          partnerPersonId: parsed.partnerPersonId,
           kind: parsed.kind,
           title: parsed.title,
           place: parsed.place,
@@ -1176,7 +1202,13 @@ export async function createPersonEvent(
           createdBy: access.user.id,
         })
         .returning();
-      const names = await peopleNames(tx, access.tree.id, [parsed.personId]);
+      const names = await peopleNames(
+        tx,
+        access.tree.id,
+        [parsed.personId, parsed.partnerPersonId].filter(
+          (id): id is string => Boolean(id),
+        ),
+      );
       const label =
         parsed.kind === "other"
           ? (parsed.title ?? "an event")
@@ -1202,7 +1234,12 @@ export async function createPersonEvent(
 }
 
 export async function updatePersonEvent(
-  input: { treeId: string; eventId: string } & PersonEventInput,
+  input: {
+    treeId: string;
+    eventId: string;
+    /** The timeline the edit came from, when it may differ from the row owner. */
+    personId?: string;
+  } & PersonEventInput,
 ): Promise<ActionResult<undefined>> {
   return runAction("people.updatePersonEvent", async () => {
     const access = await requireTreeMember(input.treeId, "editor");
@@ -1220,9 +1257,39 @@ export async function updatePersonEvent(
         .limit(1);
       if (!before) throw new AppError(userMessage("person.error.eventNotFound"));
 
+      // `partnerPersonId` names the other person from the timeline that opened
+      // the editor. Translate it back to the row's owner and partner columns.
+      const contextPersonId = parsed.personId ?? before.personId;
+      const contextIsParticipant =
+        contextPersonId === before.personId ||
+        contextPersonId === before.partnerPersonId;
+      if (!contextIsParticipant) {
+        throw new AppError(userMessage("person.error.eventNotFound"));
+      }
+
+      const pair = canonicalEventPair({
+        ownerId: before.personId,
+        viewerId: contextPersonId,
+        otherPersonId: parsed.partnerPersonId,
+      });
+      const ownerId = pair.personId;
+      const partnerId = pair.partnerPersonId;
+
+      // An unchanged pair stays valid even if the partnership was removed
+      // later, so editing an old event never fails. Only a new choice must be
+      // someone the owner is currently connected to.
+      const pairChanged =
+        ownerId !== before.personId ||
+        (partnerId ?? null) !== (before.partnerPersonId ?? null);
+      if (pairChanged) {
+        await assertEventPartner(tx, access.tree.id, ownerId, partnerId);
+      }
+
       const [updated] = await tx
         .update(personEvents)
         .set({
+          personId: ownerId,
+          partnerPersonId: partnerId,
           kind: parsed.kind,
           title: parsed.title,
           place: parsed.place,
@@ -1239,9 +1306,22 @@ export async function updatePersonEvent(
         .returning();
       if (!updated) throw new AppError(userMessage("person.error.eventNotFound"));
 
-      const changes = personEventChanges(before, parsed);
+      const names = await peopleNames(
+        tx,
+        access.tree.id,
+        [
+          updated.personId,
+          updated.partnerPersonId,
+          before.personId,
+          before.partnerPersonId,
+        ].filter((id): id is string => Boolean(id)),
+      );
+      const changes = personEventChanges(
+        before,
+        { ...parsed, partnerPersonId: partnerId },
+        names,
+      );
       if (changes.length) {
-        const names = await peopleNames(tx, access.tree.id, [updated.personId]);
         const label =
           updated.kind === "other"
             ? (updated.title ?? "an event")
@@ -1323,13 +1403,48 @@ async function touchTree(treeId: string) {
   notifyTreeChanged(treeId);
 }
 
-async function assertPeopleInTree(treeId: string, personIds: string[]) {
+async function assertPeopleInTree(
+  treeId: string,
+  personIds: string[],
+  client: Transaction | typeof db = db,
+) {
   const unique = [...new Set(personIds)];
-  const rows = await db
+  const rows = await client
     .select({ id: people.id })
     .from(people)
     .where(and(eq(people.treeId, treeId), inArray(people.id, unique)));
   if (rows.length !== unique.length) throw new AppError(userMessage("person.error.notFound"));
+}
+
+/**
+ * A marriage or divorce may name a second person only when the two are already
+ * recorded as partners. This keeps the event's link honest and avoids creating
+ * relationships as a side effect of writing an event.
+ */
+async function assertEventPartner(
+  tx: Transaction,
+  treeId: string,
+  personId: string,
+  partnerPersonId: string | null,
+) {
+  if (!partnerPersonId) return;
+  if (partnerPersonId === personId) {
+    throw new AppError(userMessage("person.error.selfPartner"));
+  }
+  await assertPeopleInTree(treeId, [partnerPersonId], tx);
+  const [personAId, personBId] = [personId, partnerPersonId].sort();
+  const [row] = await tx
+    .select({ id: partnerships.id })
+    .from(partnerships)
+    .where(
+      and(
+        eq(partnerships.treeId, treeId),
+        eq(partnerships.personAId, personAId),
+        eq(partnerships.personBId, personBId),
+      ),
+    )
+    .limit(1);
+  if (!row) throw new AppError(userMessage("person.error.notPartner"));
 }
 
 async function lockTree(tx: Transaction, treeId: string) {

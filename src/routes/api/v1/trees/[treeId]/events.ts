@@ -13,7 +13,9 @@ export const GET = apiHandler("people:read", async (event, context) => {
 
   const data = await loadApiTreeData(tree);
   const events = data.events
-    .filter(row => (personId ? row.personId === personId : true))
+    .filter(row =>
+      personId ? row.personId === personId || row.partnerPersonId === personId : true,
+    )
     .filter(row => (kind ? row.kind === kind : true))
     .map(toApiEvent);
 

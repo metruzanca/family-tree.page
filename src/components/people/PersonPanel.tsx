@@ -36,6 +36,8 @@ import { PersonContactSection, PersonLinksSection } from "./PersonLinks";
 import { formatFuzzyDate, formatFuzzyYears } from "~/lib/fuzzy-date";
 import {
   buildLifeTimeline,
+  eventInvolvesPerson,
+  eventPartnerOf,
   personEventKey,
   type TimelineChildBirth,
 } from "~/lib/person-events";
@@ -120,7 +122,7 @@ export function PersonPanel(props: PersonPanelProps) {
     />
   );
   const events = createMemo(() =>
-    props.data.events.filter(event => event.personId === props.person.id),
+    props.data.events.filter(event => eventInvolvesPerson(event, props.person.id)),
   );
   const parents = createMemo(() =>
     props.data.relationships
@@ -367,9 +369,13 @@ export function PersonPanel(props: PersonPanelProps) {
                   entry.type === "event" ? (
                     <LifeEventEntry
                       event={entry.event}
+                      partner={people().get(
+                        eventPartnerOf(entry.event, props.person.id) ?? "",
+                      )}
                       editable={editable()}
                       onEdit={() => props.onEditEvent(entry.event)}
                       onDelete={() => props.onDeleteEvent(entry.event)}
+                      onSelectPartner={props.onSelectPerson}
                     />
                   ) : (
                     <ChildBirthEntry entry={entry} onSelect={props.onSelectPerson} />
@@ -715,9 +721,11 @@ function TaggedPhotoTile(props: { file: GraphFile; onOpen: () => void }) {
 
 function LifeEventEntry(props: {
   event: GraphPersonEvent;
+  partner: GraphPerson | undefined;
   editable: boolean;
   onEdit: () => void;
   onDelete: () => void;
+  onSelectPartner: (id: string) => void;
 }) {
   const { t, locale } = useI18n();
   return (
@@ -738,6 +746,19 @@ function LifeEventEntry(props: {
             <p class="text-[0.66rem] text-muted-foreground">
               {t(personEventKey(props.event.kind))}
             </p>
+          </Show>
+          <Show when={props.partner}>
+            {partner => (
+              <button
+                type="button"
+                class="mt-0.5 flex max-w-full items-center gap-1 truncate text-left text-xs text-muted-foreground transition hover:text-primary"
+                data-testid={`person-panel-event-partner-${props.event.id}`}
+                onClick={() => props.onSelectPartner(partner().id)}
+              >
+                <UserRound size={11} class="shrink-0" />
+                {t("person.event.with", { name: partner().displayName })}
+              </button>
+            )}
           </Show>
           <Show when={props.event.place}>
             <p class="mt-1 flex items-center gap-1 text-xs text-muted-foreground">

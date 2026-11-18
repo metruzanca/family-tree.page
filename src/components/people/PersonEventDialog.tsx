@@ -1,11 +1,16 @@
-import { For, createEffect, createSignal } from "solid-js";
+import { For, Show, createEffect, createMemo, createSignal } from "solid-js";
 import { createStore } from "solid-js/store";
 import { revalidate } from "@solidjs/router";
-import type { GraphPerson, GraphPersonEvent } from "~/api/people-server";
+import type {
+  GraphPerson,
+  GraphPersonEvent,
+  GraphRelationship,
+} from "~/api/people-server";
 import { createPersonEvent, updatePersonEvent } from "~/api/people-server";
 import { getTreeGraph } from "~/api";
 import {
   PERSON_EVENT_OPTIONS,
+  eventPartnerOf,
   personEventKey,
   type PersonEventKind,
 } from "~/lib/person-events";
@@ -15,6 +20,14 @@ import { Button } from "../ui/button";
 import { Field } from "../ui/Field";
 import { FuzzyDateField } from "../ui/FuzzyDateField";
 import { Modal } from "../ui/Modal";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectPortal,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/select";
 import { useToast } from "../ui/Toast";
 import { useI18n } from "~/i18n/LocaleProvider";
 
@@ -23,14 +36,19 @@ type PersonEventDialogProps = {
   onClose: () => void;
   treeId: string;
   person: GraphPerson;
+  people: GraphPerson[];
+  relationships: GraphRelationship[];
   event?: GraphPersonEvent | null;
 };
+
+type PartnerOption = { value: string; label: string };
 
 export function PersonEventDialog(props: PersonEventDialogProps) {
   const { t } = useI18n();
   const toast = useToast();
   const [form, setForm] = createStore({
     kind: "residence" as PersonEventKind,
+    partnerPersonId: "",
     title: "",
     place: "",
     date: null as FuzzyDate | null,
@@ -39,11 +57,49 @@ export function PersonEventDialog(props: PersonEventDialogProps) {
   const [pending, setPending] = createSignal(false);
   const [error, setError] = createSignal("");
 
+  const showsPartner = () => form.kind === "marriage" || form.kind === "divorce";
+
+  /** Only people already connected to this person as partners are offered. */
+  const partnerIds = createMemo(() => {
+    const found = new Set<string>();
+    for (const relationship of props.relationships) {
+      if (relationship.type !== "partner") continue;
+      if (relationship.source === props.person.id) found.add(relationship.target);
+      if (relationship.target === props.person.id) found.add(relationship.source);
+    }
+    return found;
+  });
+
+  const partnerOptions = createMemo<PartnerOption[]>(() => {
+    const current = form.partnerPersonId;
+    const recorded = props.people
+      // Keep a stale choice selectable so an old event can still be saved.
+      .filter(
+        person =>
+          person.id !== props.person.id &&
+          (partnerIds().has(person.id) || person.id === current),
+      )
+      .map(person => ({ value: person.id, label: person.displayName }))
+      .sort((left, right) => left.label.localeCompare(right.label));
+    return [{ value: "", label: t("person.event.noPartner") }, ...recorded];
+  });
+
+  const partnerOption = createMemo(
+    () =>
+      partnerOptions().find(option => option.value === form.partnerPersonId) ??
+      partnerOptions()[0],
+  );
+
   createEffect(() => {
     if (!props.open) return;
     const event = props.event;
     setForm({
       kind: event?.kind ?? "residence",
+      // The editor names the other participant, not the row's stored partner,
+      // so a shared event reads correctly from either timeline.
+      partnerPersonId: event
+        ? (eventPartnerOf(event, props.person.id) ?? "")
+        : "",
       title: event?.title ?? "",
       place: event?.place ?? "",
       date: event?.date ?? null,
@@ -51,6 +107,18 @@ export function PersonEventDialog(props: PersonEventDialogProps) {
     });
     setError("");
   });
+
+  function changeKind(kind: PersonEventKind) {
+    setForm("kind", kind);
+    if (kind !== "marriage" && kind !== "divorce") {
+      setForm("partnerPersonId", "");
+      return;
+    }
+    // One recorded partner is almost always the intended spouse.
+    if (!form.partnerPersonId && partnerIds().size === 1) {
+      setForm("partnerPersonId", [...partnerIds()][0]);
+    }
+  }
 
   async function submit(event: SubmitEvent) {
     event.preventDefault();
@@ -64,6 +132,8 @@ export function PersonEventDialog(props: PersonEventDialogProps) {
       place: form.place,
       date: form.date,
       description: form.description,
+      partnerPersonId:
+        showsPartner() && form.partnerPersonId ? form.partnerPersonId : null,
     };
 
     const result = await attemptAction(() =>
@@ -71,6 +141,7 @@ export function PersonEventDialog(props: PersonEventDialogProps) {
         ? updatePersonEvent({
             treeId: props.treeId,
             eventId: props.event.id,
+            personId: props.person.id,
             ...payload,
           })
         : createPersonEvent({
@@ -139,7 +210,7 @@ export function PersonEventDialog(props: PersonEventDialogProps) {
               value={form.kind}
               data-testid="person-event-form-kind"
               onChange={event =>
-                setForm("kind", event.currentTarget.value as PersonEventKind)
+                changeKind(event.currentTarget.value as PersonEventKind)
               }
             >
               <For each={PERSON_EVENT_OPTIONS}>
@@ -167,6 +238,51 @@ export function PersonEventDialog(props: PersonEventDialogProps) {
             />
           </Field>
         </div>
+
+        <Show when={showsPartner()}>
+          <Field
+            label={
+              form.kind === "divorce"
+                ? t("person.event.formerSpouse")
+                : t("person.event.spouse")
+            }
+            for="event-partner"
+            hint={
+              partnerIds().size
+                ? t("person.event.partnerHint")
+                : t("person.event.noPartnersHint")
+            }
+          >
+            <Select
+              options={partnerOptions()}
+              optionValue="value"
+              optionTextValue="label"
+              value={partnerOption()}
+              onChange={option => option && setForm("partnerPersonId", option.value)}
+              itemComponent={itemProps => (
+                <SelectItem item={itemProps.item}>{itemProps.item.rawValue.label}</SelectItem>
+              )}
+            >
+              <SelectTrigger
+                id="event-partner"
+                class="w-full"
+                aria-label={
+                  form.kind === "divorce"
+                    ? t("person.event.formerSpouse")
+                    : t("person.event.spouse")
+                }
+                data-testid="person-event-form-partner"
+              >
+                <SelectValue<PartnerOption>>
+                  {state => state.selectedOption().label}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectPortal>
+                <SelectContent />
+              </SelectPortal>
+            </Select>
+          </Field>
+        </Show>
 
         <Field label={t("person.event.date")} for="event-date">
           <FuzzyDateField

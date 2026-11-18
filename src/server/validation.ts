@@ -360,6 +360,13 @@ export const personEventInputSchema = z
     place: optionalText(160),
     date: optionalFuzzyDate,
     description: optionalText(2000),
+    /** The other person in a marriage or divorce, when recorded. */
+    partnerPersonId: z
+      .string()
+      .uuid()
+      .nullable()
+      .optional()
+      .transform(value => value ?? null),
   })
   .superRefine((value, context) => {
     if (!value.title && !value.date && !value.place) {
@@ -388,6 +395,12 @@ export const personEventUpdateSchema = personEventInputSchema.and(
   z.object({
     treeId: z.string().uuid(),
     eventId: z.string().uuid(),
+    /**
+     * The timeline this edit came from. A shared event can be edited from
+     * either participant, and `partnerPersonId` names the other person from
+     * that side.
+     */
+    personId: z.string().uuid().optional(),
   }),
 );
 

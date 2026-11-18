@@ -81,6 +81,7 @@ function graph(overrides: Partial<TreeGraphData> = {}): TreeGraphData {
       {
         id: "event-1",
         personId: "living",
+        partnerPersonId: null,
         kind: "residence",
         title: "Moved",
         place: null,
@@ -91,6 +92,7 @@ function graph(overrides: Partial<TreeGraphData> = {}): TreeGraphData {
       {
         id: "event-2",
         personId: "dead",
+        partnerPersonId: null,
         kind: "burial",
         title: "Buried",
         place: null,
@@ -160,6 +162,33 @@ describe("sanitizeSharedGraph", () => {
     expect(living.birthPlace).toBe("Springfield");
     expect(living.avatarFileId).toBe("avatar-living");
     expect(shared.events).toHaveLength(2);
+  });
+
+  it("keeps a shared event when its deceased participant is still visible", () => {
+    const data = graph({
+      events: [
+        {
+          id: "shared",
+          personId: "living",
+          partnerPersonId: "dead",
+          kind: "marriage",
+          title: null,
+          place: null,
+          date: null,
+          description: null,
+          createdAt: new Date("2020-01-01T00:00:00Z"),
+        },
+      ],
+    });
+
+    for (const livingVisibility of ["name", "hidden"] as const) {
+      const shared = sanitizeSharedGraph(data, {
+        livingVisibility,
+        includeMedia: false,
+        thumbUrl: thumb,
+      });
+      expect(shared.events.map(event => event.id)).toEqual(["shared"]);
+    }
   });
 
   it("never shares files waiting in the tree inbox", () => {

@@ -307,6 +307,13 @@ export const people = pgTable(
   ],
 );
 
+/**
+ * A life event. Marriages and divorces name a second participant so one row
+ * appears on both timelines. `personId` stays the owner of the row; the
+ * partner reference is single-column so deleting that person clears the link
+ * instead of deleting the shared event, and code checks that both people
+ * belong to `treeId` before writing.
+ */
 export const personEvents = pgTable(
   "person_events",
   {
@@ -315,6 +322,10 @@ export const personEvents = pgTable(
       .notNull()
       .references(() => trees.id, { onDelete: "cascade" }),
     personId: uuid("person_id").notNull(),
+    /** The other person in a marriage or divorce, when recorded. */
+    partnerPersonId: uuid("partner_person_id").references(() => people.id, {
+      onDelete: "set null",
+    }),
     kind: personEventKind("kind").notNull().default("other"),
     title: text("title"),
     place: text("place"),
@@ -327,6 +338,7 @@ export const personEvents = pgTable(
   t => [
     index("person_events_tree_idx").on(t.treeId),
     index("person_events_person_idx").on(t.personId),
+    index("person_events_partner_idx").on(t.partnerPersonId),
     foreignKey({
       columns: [t.personId, t.treeId],
       foreignColumns: [people.id, people.treeId],
