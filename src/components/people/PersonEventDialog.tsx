@@ -93,7 +93,7 @@ export function PersonEventDialog(props: PersonEventDialogProps) {
       open={props.open}
       onClose={props.onClose}
       title={props.event ? "Edit life event" : `Add a life event for ${props.person.firstName}`}
-      description="Residences, work, military service, migration, burial, and anything else worth keeping."
+      description="Residences, work, military service, migration, marriages, divorces, burial, and anything else worth keeping."
       testId="person-event-form-dialog"
       footer={
         <>

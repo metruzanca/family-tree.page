@@ -192,6 +192,8 @@ export const personEventKindSchema = z.enum([
   "military",
   "immigration",
   "emigration",
+  "marriage",
+  "divorce",
   "burial",
   "other",
 ]);

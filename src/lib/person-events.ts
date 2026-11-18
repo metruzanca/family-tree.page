@@ -5,6 +5,8 @@ export const PERSON_EVENT_KINDS = [
   "military",
   "immigration",
   "emigration",
+  "marriage",
+  "divorce",
   "burial",
   "other",
 ] as const;
@@ -18,6 +20,8 @@ export const PERSON_EVENT_OPTIONS: { value: PersonEventKind; label: string }[] =
   { value: "military", label: "Military service" },
   { value: "immigration", label: "Immigration" },
   { value: "emigration", label: "Emigration" },
+  { value: "marriage", label: "Marriage" },
+  { value: "divorce", label: "Divorce" },
   { value: "burial", label: "Burial" },
   { value: "other", label: "Other" },
 ];

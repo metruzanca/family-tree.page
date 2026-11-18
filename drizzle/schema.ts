@@ -51,6 +51,8 @@ export const personEventKind = pgEnum("person_event_kind", [
   "military",
   "immigration",
   "emigration",
+  "marriage",
+  "divorce",
   "burial",
   "other",
 ]);
