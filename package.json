@@ -19,6 +19,7 @@
     "db:seed": "tsx scripts/assert-local-db.ts && tsx scripts/seed.ts",
     "db:pull": "tsx scripts/db-pull.ts",
     "db:check": "tsx scripts/db-check.ts",
+    "icons:generate": "tsx scripts/generate-simple-icons.ts",
     "usage:report": "tsx scripts/usage-report.ts",
     "abuse:report": "tsx scripts/abuse-report.ts",
     "maintenance:run": "tsx scripts/maintenance.ts",
