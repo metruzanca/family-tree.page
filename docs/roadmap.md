@@ -96,19 +96,18 @@ Scope:
 - Place authority: canonical place plus hierarchy, with a merge step for variants.
 - Saved searches, a "changed since" digest, and comments on a person.
 
-## 8. Read-only API and OpenAPI contract
+## 8. API follow-ups
 
-A versioned read-only API lets the tree feed scripts, a personal site, or another research tool without changing the graph UI.
+Shipped: read-only `/api/v1` endpoints, tree-scoped hashed tokens with scopes and expiry, cursor pagination, ETags, JSON export, media downloads, the OpenAPI 3.1 contract at `/api/v1/openapi.json`, the `/docs/api` page, and `pnpm openapi:check` in CI.
 
-Scope:
+Remaining:
 
-- Personal access tokens scoped to one tree, hashed at rest and revocable, with `lastUsedAt` and optional expiry. Only an owner can mint one, and the token exposes living relatives in full by design. The public share feed stays redacted separately.
-- `/api/v1` endpoints for trees, people, relationships, events, media metadata, search, changes since a cursor, and JSON or NDJSON export.
-- `GET /api/v1/me` so an integration can confirm its tree and scopes.
-- Cursor pagination ordered by `(updatedAt, id)`, `ETag` and `If-None-Match`, and a changes feed. Deletes cascade today, so a reliable incremental feed needs tombstones.
-- An OpenAPI 3.1 contract checked in before the handlers, served at `/api/v1/openapi.json`, and rendered at `/docs/api`. Redocly lint, example validation, and fixture response validation run in CI as `pnpm openapi:check`.
-- GEDCOM 5.5.1 export first, then GEDCOM 7, sharing the JSON serializer. Export stable ids so a round trip matches instead of duplicating.
-- No write scopes in v1.
+- GEDCOM 5.5.1 export first, then GEDCOM 7, sharing the JSON serializer. Export stable ids so a round trip matches instead of duplicating. Then GEDCOM import with preview, diff, and the duplicate detector as the review step.
+- A public share JSON feed under the existing share token, with the living-person redaction in `src/lib/share.ts`.
+- Write scopes with conflict handling and an explicit merge policy. Reads were deliberately first.
+- Webhooks for `person.created`, `export.completed`, and similar events, after the pull API settles.
+- A strict delta feed with tombstones. The current `/changes` feed is derived from activity and cannot replay every child-row change.
+- A shared rate-limit store when the app runs more than one replica. The current token buckets are in-process.
 
 ## 9. Smaller follow-ups
 

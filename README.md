@@ -52,6 +52,7 @@ The graph is the main view. People are nodes, parent and partner relationships a
 - Duplicate person warnings before adding a similar name or birth year
 - Read-only `/demo` that runs the real tree workspace on sample data
 - Public read-only share links with living-person privacy, optional thumbnails, expiry, and revocation
+- A read-only developer API with tree-scoped tokens, cursor pagination, ETags, and an OpenAPI 3.1 contract at `/docs/api`
 - Nightly PostgreSQL and media backups to a second private bucket, with checksum verification and a one-command restore
 - Optional Sentry error tracking with PII scrubbing
 - Optional Umami analytics with page views and product events, enabled by environment variables
@@ -612,6 +613,26 @@ Account settings has three exits for your own data:
 
 Account settings also shows storage and people usage against your limits, with a link to ask for more. The published policy is at `/privacy` and the terms are at `/terms`. See [Privacy and GDPR](#privacy-and-gdpr) for the engineering side.
 
+## Developer API
+
+Every tree can issue read-only bearer tokens from tree settings, under **Sharing**. A token is bound to one tree, stored only as a SHA-256 hash, and shown once. It reads the whole tree, including living relatives, so only an owner can create one. Tokens can expire and can be revoked immediately; leaving a tree disables its token on the next request.
+
+The API lives under `/api/v1`:
+
+- `GET /me` describes the token, its scopes, and its tree.
+- `GET /trees` and `GET /trees/:treeId` return tree metadata and counts.
+- `GET /trees/:treeId/people` accepts `q`, `surname`, `limit`, and `cursor`.
+- `GET /trees/:treeId/people/:personId` returns the person, immediate family, partners, events, and media.
+- `GET /trees/:treeId/relationships`, `/events`, `/search`, and `/changes` cover the rest of the tree.
+- `GET /trees/:treeId/export.json` returns a complete snapshot. Media is referenced by URL, not embedded.
+- `GET /trees/:treeId/media/:fileId/thumb` and `/download` serve binaries with the same token.
+
+Lists use an opaque cursor over `(updatedAt, id)`. Tree metadata, relationships, and exports support `ETag` with `If-None-Match`. Requests are limited to 120 per minute per token and exports to 10 per hour. The limiter is in-process, matching the single-replica presence design.
+
+The contract is `openapi/roots-v1.json`, served at `/api/v1/openapi.json` and rendered at `/docs/api`. `pnpm openapi:check` runs Redocly lint and validates every documented example; the contract test in `src/server/api/contract.test.ts` validates real DTO output against the schemas. CI runs both, so a handler change cannot drift from the published contract.
+
+The changes feed is derived from the human activity log. It reports creates, updates, deletes, and restores, but it is not a byte-level diff; clients that need a consistent snapshot should fetch the export. Browser clients on another origin need that origin added to `API_ALLOWED_ORIGINS`.
+
 ## Deleting a tree
 
 Deleting a tree is deliberately slower than leaving one. The controls live in the **Danger** tab of tree settings.
@@ -652,7 +673,9 @@ This is a reading aid, not access control. The whole graph is still sent to ever
 - Backups live in a second Railway bucket in the same region and are not encrypted by the app. Backups run daily, so enable PostgreSQL point-in-time recovery for the gap between dumps.
 - Dates are Gregorian and structured. Seasons and free-text dates such as "spring 1918" are not represented; use an event note for those.
 - Focus is a presentation aid, not access control. The whole tree is still loaded for every member, and anyone can reveal all branches with one click.
-- No GEDCOM import or export, printable chart export, OCR, or face recognition yet. Face detection and manual linking ship, but names are never suggested. See [docs/roadmap.md](docs/roadmap.md) for the deferred work.
+- The API is read-only. There are no write scopes, webhooks, or GEDCOM import or export yet. See [docs/roadmap.md](docs/roadmap.md) for the deferred work.
+- The API changes feed is derived from tree activity, not a strict per-row delta with tombstones. Use `export.json` when a client needs a guaranteed snapshot.
+- No printable chart export, OCR, or face recognition yet. Face detection and manual linking ship, but names are never suggested.
 
 ## Roadmap
 
