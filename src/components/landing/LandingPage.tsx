@@ -22,63 +22,66 @@ import { buttonVariants } from "~/components/ui/button";
 import { Card } from "~/components/ui/card";
 import { IconButton } from "~/components/ui/icon-button";
 import { useTheme } from "~/components/ui/Theme";
+import type { TranslationKey } from "~/i18n";
+import { useI18n } from "~/i18n/LocaleProvider";
+import { LocaleSwitcher } from "~/i18n/LocaleSwitcher";
 import { LandingHero } from "./LandingHero";
 
-const features = [
+const features: { icon: typeof Network; title: TranslationKey; body: TranslationKey }[] = [
   {
     icon: Network,
-    title: "A real graph, not a list",
-    body: "People are nodes, parent and partner links are edges, and every branch stays visible at a glance.",
+    title: "landing.feature.graph.title",
+    body: "landing.feature.graph.body",
   },
   {
     icon: Images,
-    title: "Photos live in the tree",
-    body: "Portraits sit on the person. Albums, letters and documents gather in a ring around their owner, behind the people, so the tree stays readable.",
+    title: "landing.feature.photos.title",
+    body: "landing.feature.photos.body",
   },
   {
     icon: Lock,
-    title: "Private by default",
-    body: "One owner, any number of editors and viewers. Invite by single-use link or email, and nothing is public.",
+    title: "landing.feature.private.title",
+    body: "landing.feature.private.body",
   },
   {
     icon: Rows3,
-    title: "Generation-aware layouts",
-    body: "Parents above children, partners on the same row, and a flip for oldest at top or bottom.",
+    title: "landing.feature.generations.title",
+    body: "landing.feature.generations.body",
   },
   {
     icon: CalendarDays,
-    title: "Birthdays and anniversaries",
-    body: "A calendar for every tree, with optional email reminders a week before, the day before, and the morning of.",
+    title: "landing.feature.calendar.title",
+    body: "landing.feature.calendar.body",
   },
   {
     icon: Users,
-    title: "See who is looking",
-    body: "Live presence shows who else has the tree open and which person or file they are viewing right now.",
+    title: "landing.feature.presence.title",
+    body: "landing.feature.presence.body",
   },
   {
     icon: Search,
-    title: "Find anyone fast",
-    body: "Search people and files, highlight their neighbours, then zoom straight to the branch you need.",
+    title: "landing.feature.search.title",
+    body: "landing.feature.search.body",
   },
   {
     icon: Smartphone,
-    title: "Made for phones",
-    body: "A person sheet, touch gestures, and a search fallback that works when a whole tree will not fit.",
+    title: "landing.feature.mobile.title",
+    body: "landing.feature.mobile.body",
   },
 ];
 
-const steps = [
+const steps: { title: TranslationKey; body: TranslationKey }[] = [
   {
-    title: "Add the people you remember",
-    body: "Start with yourself, a parent, or the person whose stories you want to keep.",
+    title: "landing.step.add.title",
+    body: "landing.step.add.body",
   },
   {
-    title: "Connect the branches",
-    body: "Add parents, partners and children. Add a child and a second parent in one step.",
+    title: "landing.step.connect.title",
+    body: "landing.step.connect.body",
   },
   {
-    title: "Invite a relative",
-    body: "Send a link. Editors can add people and photos, viewers can read and explore.",
+    title: "landing.step.invite.title",
+    body: "landing.step.invite.body",
   },
 ];
 
@@ -89,6 +92,7 @@ const licenseUrl = `${repoUrl}/blob/main/LICENSE`;
 
 export function LandingPage() {
   const { theme, toggle } = useTheme();
+  const { t } = useI18n();
 
   return (
     <div class="page-shell min-h-[100dvh]">
@@ -101,19 +105,20 @@ export function LandingPage() {
               href="#features"
               class="rounded-full px-3 py-1.5 transition hover:bg-accent/70 hover:text-foreground"
             >
-              Features
+              {t("landing.nav.features")}
             </a>
             <a
               href="#open-source"
               class="rounded-full px-3 py-1.5 transition hover:bg-accent/70 hover:text-foreground"
             >
-              Open source
+              {t("landing.nav.openSource")}
             </a>
           </nav>
 
           <div class="ml-auto flex items-center gap-1.5">
+            <LocaleSwitcher variant="text" />
             <IconButton
-              label={theme() === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+              label={t(theme() === "dark" ? "header.lightTheme" : "header.darkTheme")}
               onClick={toggle}
             >
               <Show when={theme() === "dark"} fallback={<Moon size={18} />}>
@@ -124,10 +129,10 @@ export function LandingPage() {
               href="/login"
               class={buttonVariants({ variant: "ghost", size: "sm", class: "hidden sm:inline-flex" })}
             >
-              Sign in
+              {t("auth.signIn")}
             </A>
             <A href="/register" class={buttonVariants({ size: "sm" })}>
-              Start free
+              {t("landing.nav.startFree")}
             </A>
           </div>
         </div>
@@ -141,13 +146,12 @@ export function LandingPage() {
           class="mx-auto max-w-6xl scroll-mt-24 px-4 py-16 sm:px-6 sm:py-20"
         >
           <div class="max-w-2xl">
-            <p class="eyebrow">What is inside</p>
+            <p class="eyebrow">{t("landing.features.eyebrow")}</p>
             <h2 class="mt-3 font-display text-3xl tracking-tight sm:text-4xl">
-              A tree you can actually wander.
+              {t("landing.features.title")}
             </h2>
             <p class="mt-3 text-sm leading-relaxed text-muted-foreground sm:text-base">
-              The graph is the main view, not a list. People, partners, children and media all live
-              in one connected picture, so the shape of a family stays visible.
+              {t("landing.features.body")}
             </p>
           </div>
 
@@ -158,9 +162,9 @@ export function LandingPage() {
                   <span class="grid size-10 place-items-center rounded-xl bg-accent text-accent-foreground">
                     <Dynamic component={feature.icon} size={19} />
                   </span>
-                  <h3 class="mt-4 text-sm font-semibold">{feature.title}</h3>
+                  <h3 class="mt-4 text-sm font-semibold">{t(feature.title)}</h3>
                   <p class="mt-1.5 text-[0.82rem] leading-relaxed text-muted-foreground">
-                    {feature.body}
+                    {t(feature.body)}
                   </p>
                 </Card>
               )}
@@ -179,10 +183,10 @@ export function LandingPage() {
                     </span>
                     <div>
                       <h3 class="font-display text-xl leading-tight tracking-tight">
-                        {step.title}
+                        {t(step.title)}
                       </h3>
                       <p class="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-                        {step.body}
+                        {t(step.body)}
                       </p>
                     </div>
                   </div>
@@ -200,14 +204,13 @@ export function LandingPage() {
             <div class="pointer-events-none absolute -left-20 -top-24 size-72 rounded-full bg-gold/15 blur-3xl" />
             <div class="relative">
               <p class="text-[0.66rem] font-semibold uppercase tracking-[0.18em] text-gold">
-                Free and open source
+                {t("landing.openSource.eyebrow")}
               </p>
               <h2 class="mt-3 font-display text-3xl leading-[1.1] tracking-tight sm:text-4xl">
-                Free to use. Open to read.
+                {t("landing.openSource.title")}
               </h2>
               <p class="mt-4 max-w-lg text-sm leading-relaxed text-[#b9c2b0]">
-                The whole app is MIT licensed. Run it on Railway, keep your data in your own
-                Postgres, and change anything you like. No paywall, no locked features.
+                {t("landing.openSource.body")}
               </p>
               <div class="mt-7 flex flex-wrap items-center gap-3">
                 <a
@@ -220,7 +223,7 @@ export function LandingPage() {
                   })}
                 >
                   <GithubMark size={16} />
-                  View the source
+                  {t("landing.openSource.viewSource")}
                   <ArrowUpRight size={15} />
                 </a>
                 <a
@@ -235,7 +238,7 @@ export function LandingPage() {
                   })}
                 >
                   <Scale size={16} />
-                  MIT license
+                  {t("landing.openSource.license")}
                 </a>
               </div>
             </div>
@@ -246,11 +249,11 @@ export function LandingPage() {
                 <span class="size-2 rounded-full bg-gold" />
                 <span class="size-2 rounded-full bg-[#8fa98f]" />
                 <span class="ml-2 text-[0.65rem] uppercase tracking-[0.12em] text-white/35">
-                  terminal
+                  {t("landing.openSource.terminal")}
                 </span>
               </div>
               <div class="scroll-thin overflow-x-auto px-4 py-4 font-mono text-[0.72rem] leading-6 whitespace-nowrap text-white/70">
-                <p class="text-white/30"># clone and run it yourself</p>
+                <p class="text-white/30">{t("landing.openSource.terminalComment")}</p>
                 <p>
                   <span class="text-gold">git clone</span> git@github.com:metruzanca/family-tree.page.git
                 </p>
@@ -283,22 +286,21 @@ export function LandingPage() {
             <Sprout size={26} />
           </div>
           <h2 class="mt-6 font-display text-4xl tracking-tight sm:text-5xl">
-            Plant your first tree.
+            {t("trees.empty.title")}
           </h2>
           <p class="mx-auto mt-3 max-w-md text-sm leading-relaxed text-muted-foreground sm:text-base">
-            Add the people you remember, connect the branches, then invite a relative to help fill
-            in the rest.
+            {t("landing.cta.body")}
           </p>
           <div class="mt-7 flex flex-wrap items-center justify-center gap-3">
             <A href="/register" class={buttonVariants({ size: "lg" })}>
-              Create an account
+              {t("auth.createAccount")}
               <ArrowRight size={16} />
             </A>
             <A href="/login" class={buttonVariants({ variant: "secondary", size: "lg" })}>
-              Sign in
+              {t("auth.signIn")}
             </A>
           </div>
-          <p class="mt-4 text-xs text-muted-foreground">Free to use. No credit card needed.</p>
+          <p class="mt-4 text-xs text-muted-foreground">{t("landing.cta.footnote")}</p>
         </section>
       </main>
 
@@ -308,31 +310,30 @@ export function LandingPage() {
             <BrandMark href="/" />
             <nav class="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-muted-foreground">
               <a href="#features" class="transition hover:text-foreground">
-                Features
+                {t("landing.nav.features")}
               </a>
               <a href="#open-source" class="transition hover:text-foreground">
-                Open source
+                {t("landing.nav.openSource")}
               </a>
               <a href={repoUrl} target="_blank" rel="noreferrer" class="transition hover:text-foreground">
                 GitHub
               </a>
               <A href="/privacy" class="transition hover:text-foreground">
-                Privacy
+                {t("legal.nav.privacy")}
               </A>
               <A href="/terms" class="transition hover:text-foreground">
-                Terms
+                {t("legal.nav.terms")}
               </A>
               <A href="/login" class="transition hover:text-foreground">
-                Sign in
+                {t("auth.signIn")}
               </A>
               <A href="/register" class="transition hover:text-foreground">
-                Start free
+                {t("landing.nav.startFree")}
               </A>
             </nav>
           </div>
           <p class="text-[0.68rem] leading-relaxed text-muted-foreground">
-            Fictional demo data inspired by The Simpsons. Not affiliated with its rights
-            holders. Portraits and photographs are original SVG approximations.
+            {t("landing.footer.disclaimer")}
           </p>
         </div>
       </footer>

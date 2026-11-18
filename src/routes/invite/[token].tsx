@@ -9,8 +9,11 @@ import { Button, buttonVariants } from "~/components/ui/button";
 import { Card } from "~/components/ui/card";
 import { Skeleton } from "~/components/ui/skeleton";
 import { useToast } from "~/components/ui/Toast";
+import { useI18n } from "~/i18n/LocaleProvider";
+import { LocaleSwitcher } from "~/i18n/LocaleSwitcher";
+import { Trans } from "~/i18n/Trans";
 import { attemptAction } from "~/lib/action-result";
-import { formatDate, roleLabel } from "~/lib/format";
+import { formatDate, roleKey } from "~/lib/format";
 import { track } from "~/lib/analytics";
 
 export const route = {
@@ -18,12 +21,13 @@ export const route = {
 };
 
 export default function InvitePage() {
+  const { t } = useI18n();
   return (
     <AppErrorBoundary
-      title="We could not check this invite"
-      message="The link may still be good. Try again, or ask the tree owner for a new one."
+      title={t("invite.error.title")}
+      message={t("invite.error.message")}
       revalidateKeys={[getInvitePreview.key, getUser.key]}
-      back={{ href: "/trees", label: "Go to your trees" }}
+      back={{ href: "/trees", label: t("auth.verify.goToTrees") }}
     >
       <InviteInner />
     </AppErrorBoundary>
@@ -34,6 +38,7 @@ function InviteInner() {
   const params = useParams<{ token: string }>();
   const navigate = useNavigate();
   const toast = useToast();
+  const { t, locale } = useI18n();
   const preview = createAsync(() => getInvitePreview(params.token));
   const user = createAsync(() => getUser());
   const [pending, setPending] = createSignal(false);
@@ -50,7 +55,7 @@ function InviteInner() {
     }
     await revalidate([getMyTrees.key, getInvitePreview.key]);
     track("invite_accepted");
-    toast.show("You joined the tree.", "success");
+    toast.show(t("invite.valid.joined"), "success");
     navigate(`/trees/${result.data.treeId}`);
   }
 
@@ -58,11 +63,14 @@ function InviteInner() {
     <main class="page-shell flex min-h-[100dvh] flex-col">
       <div class="flex items-center justify-between px-5 py-5 sm:px-8">
         <BrandMark />
-        <Show when={user()}>
-          <A href="/trees" class={buttonVariants({ variant: "ghost", size: "sm" })}>
-            Your trees
-          </A>
-        </Show>
+        <div class="flex items-center gap-2">
+          <LocaleSwitcher variant="text" />
+          <Show when={user()}>
+            <A href="/trees" class={buttonVariants({ variant: "ghost", size: "sm" })}>
+              {t("auth.yourTrees")}
+            </A>
+          </Show>
+        </div>
       </div>
       <div class="flex flex-1 items-center justify-center px-4 pb-16">
         <Card class="w-full max-w-lg items-center gap-0 p-7 text-center sm:p-10">
@@ -76,24 +84,43 @@ function InviteInner() {
                         <Leaf size={28} />
                       </div>
                       <p class="mt-6 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
-                        You are invited
+                        {t("invite.valid.eyebrow")}
                       </p>
                       <h1 class="mt-2 font-display text-4xl tracking-tight">
                         {(valid() as any).treeName}
                       </h1>
                       <p class="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-muted-foreground">
-                        {(valid() as any).inviterName} invited you to join as{" "}
-                        <span class="font-semibold text-foreground">{roleLabel((valid() as any).role)}</span>.
+                        <Trans
+                          key="invite.valid.invitedBy"
+                          components={{
+                            name: <>{(valid() as any).inviterName}</>,
+                            role: (
+                              <span class="font-semibold text-foreground">
+                                {t(roleKey((valid() as any).role))}
+                              </span>
+                            ),
+                          }}
+                        />
                       </p>
                       <Show when={(valid() as any).email}>
                         <p class="mt-2 text-xs text-muted-foreground">
-                          Sent to{" "}
-                          <span class="font-medium text-foreground">{(valid() as any).email}</span>
+                          <Trans
+                            key="invite.valid.sentTo"
+                            components={{
+                              email: (
+                                <span class="font-medium text-foreground">
+                                  {(valid() as any).email}
+                                </span>
+                              ),
+                            }}
+                          />
                         </p>
                       </Show>
                       <div class="mt-6 flex items-center justify-center gap-2 text-xs text-muted-foreground">
                         <Clock size={13} />
-                        Expires {formatDate((valid() as any).expiresAt)}
+                        {t("tree.settings.share.expiresIn", {
+                          when: formatDate((valid() as any).expiresAt, locale()),
+                        })}
                       </div>
 
                       <Show
@@ -104,25 +131,27 @@ function InviteInner() {
                               href={`/login?redirectTo=${encodeURIComponent(redirectTo())}`}
                               class={buttonVariants({ class: "w-full" })}
                             >
-                              Sign in to join
+                              {t("invite.valid.signIn")}
                               <ArrowRight size={16} />
                             </A>
                             <A
                               href={`/register?redirectTo=${encodeURIComponent(redirectTo())}`}
                               class={buttonVariants({ variant: "secondary", class: "w-full" })}
                             >
-                              Create an account
+                              {t("auth.createAccount")}
                             </A>
                           </div>
                         }
                       >
                         <Button class="mt-8 w-full" onClick={join} disabled={pending()}>
-                          {pending() ? "Joining…" : `Join ${(valid() as any).treeName}`}
+                          {pending()
+                            ? t("invite.valid.joining")
+                            : t("invite.valid.join", { name: (valid() as any).treeName })}
                         </Button>
                       </Show>
                       <p class="mt-5 flex items-center justify-center gap-1.5 text-[0.7rem] text-muted-foreground">
                         <LockKeyhole size={12} />
-                        This link works once. The tree stays private to its members.
+                        {t("invite.valid.once")}
                       </p>
                     </>
                   )}
@@ -131,19 +160,21 @@ function InviteInner() {
                   <div class="mx-auto grid h-16 w-16 place-items-center rounded-3xl bg-background text-muted-foreground">
                     <Clock size={28} />
                   </div>
-                  <h1 class="mt-6 font-display text-3xl tracking-tight">This invite is not usable</h1>
+                  <h1 class="mt-6 font-display text-3xl tracking-tight">
+                    {t("invite.invalid.title")}
+                  </h1>
                   <p class="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-muted-foreground">
                     {invite().status === "used"
-                      ? "This link has already been used."
+                      ? t("invite.invalid.used")
                       : invite().status === "expired"
-                        ? "This invite has expired."
+                        ? t("invite.invalid.expired")
                         : invite().status === "revoked"
-                          ? "The tree owner revoked this invite."
-                          : "This invite link does not exist."}
+                          ? t("invite.invalid.revoked")
+                          : t("invite.invalid.missing")}
                   </p>
-                  <p class="mt-2 text-xs text-muted-foreground">Ask the tree owner for a new link.</p>
+                  <p class="mt-2 text-xs text-muted-foreground">{t("invite.invalid.askOwner")}</p>
                   <A href={user() ? "/trees" : "/login"} class={buttonVariants({ variant: "secondary", class: "mt-7" })}>
-                    {user() ? "Go to your trees" : "Sign in"}
+                    {user() ? t("auth.verify.goToTrees") : t("auth.signIn")}
                   </A>
                 </Match>
               </Switch>

@@ -3,6 +3,7 @@ import { A } from "@solidjs/router";
 import { CalendarDays, MapPin, X } from "lucide-solid";
 import type { GraphPerson, GraphRelationship, TreeGraph } from "~/api/people-server";
 import { buttonVariants } from "~/components/ui/button";
+import { useI18n } from "~/i18n/LocaleProvider";
 import { formatYears } from "~/lib/format";
 import { demoPersonAvatar } from "./demo-tree";
 
@@ -19,6 +20,7 @@ type Relation = {
 };
 
 export function LandingPersonCard(props: LandingPersonCardProps) {
+  const { t, locale } = useI18n();
   const peopleById = createMemo(
     () => new Map(props.data.people.map(person => [person.id, person])),
   );
@@ -56,6 +58,23 @@ export function LandingPersonCard(props: LandingPersonCardProps) {
     onCleanup(() => document.removeEventListener("keydown", onKeyDown));
   });
 
+  function partnerLabel(status: string) {
+    switch (status) {
+      case "married":
+        return t("person.partnership.married");
+      case "divorced":
+        return t("person.partnership.divorced");
+      case "separated":
+        return t("person.partnership.separated");
+      case "widowed":
+        return t("person.partnership.widowed");
+      case "partnered":
+        return t("person.partnership.partnered");
+      default:
+        return t("person.partner.unknown");
+    }
+  }
+
   return (
     <>
       <div
@@ -65,7 +84,7 @@ export function LandingPersonCard(props: LandingPersonCardProps) {
       />
       <aside
         class="fixed inset-x-0 bottom-0 z-50 flex max-h-[84dvh] flex-col overflow-hidden rounded-t-3xl border border-border bg-card text-card-foreground shadow-2xl sm:absolute sm:inset-x-auto sm:bottom-3 sm:right-3 sm:top-16 sm:max-h-none sm:w-[21rem] sm:rounded-3xl"
-        aria-label={`${props.person.displayName} profile`}
+        aria-label={t("landing.person.profileAria", { name: props.person.displayName })}
       >
         <div class="flex items-start gap-3 border-b border-border px-5 pb-4 pt-5">
           <Portrait person={props.person} size={62} />
@@ -73,10 +92,10 @@ export function LandingPersonCard(props: LandingPersonCardProps) {
             <h2 class="font-display text-xl leading-tight tracking-tight">
               {props.person.displayName}
             </h2>
-            <Show when={formatYears(props.person.birthDate, props.person.deathDate)}>
+            <Show when={formatYears(props.person.birthDate, props.person.deathDate, locale())}>
               <p class="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
                 <CalendarDays size={12} />
-                {formatYears(props.person.birthDate, props.person.deathDate)}
+                {formatYears(props.person.birthDate, props.person.deathDate, locale())}
               </p>
             </Show>
             <Show when={props.person.birthPlace ?? props.person.deathPlace}>
@@ -89,7 +108,7 @@ export function LandingPersonCard(props: LandingPersonCardProps) {
           <button
             type="button"
             class="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
-            aria-label="Close profile"
+            aria-label={t("landing.person.close")}
             onClick={props.onClose}
           >
             <X size={16} />
@@ -105,35 +124,35 @@ export function LandingPersonCard(props: LandingPersonCardProps) {
 
           <div class="mt-5 space-y-4">
             <RelationGroup
-              title="Parents"
+              title={t("person.panel.parents")}
               entries={relations().parents}
               onSelect={props.onSelectPerson}
-              empty="No parents in this slice."
+              empty={t("landing.person.noParents")}
             />
             <RelationGroup
-              title="Partners"
+              title={t("person.panel.partners")}
               entries={relations().partners}
               onSelect={props.onSelectPerson}
-              empty="No partners in this slice."
+              empty={t("landing.person.noPartners")}
               labelFor={entry =>
                 entry.relationship.type === "partner" ? partnerLabel(entry.relationship.status) : ""
               }
             />
             <RelationGroup
-              title="Children"
+              title={t("person.panel.children")}
               entries={relations().children}
               onSelect={props.onSelectPerson}
-              empty="No children in this slice."
+              empty={t("landing.person.noChildren")}
             />
           </div>
         </div>
 
         <div class="border-t border-border px-5 py-3">
           <A href="/register" class={buttonVariants({ size: "sm", class: "w-full" })}>
-            Start a tree like this
+            {t("landing.person.startTree")}
           </A>
           <p class="mt-2 text-center text-[0.65rem] leading-relaxed text-muted-foreground">
-            Demo family, fictional stories.
+            {t("landing.person.demoNote")}
           </p>
         </div>
       </aside>
@@ -199,19 +218,3 @@ function Portrait(props: { person: GraphPerson; size: number }) {
   );
 }
 
-function partnerLabel(status: string) {
-  switch (status) {
-    case "married":
-      return "Married";
-    case "divorced":
-      return "Divorced";
-    case "separated":
-      return "Separated";
-    case "widowed":
-      return "Widowed";
-    case "partnered":
-      return "Partners";
-    default:
-      return "Partner";
-  }
-}

@@ -1,12 +1,18 @@
 import { A } from "@solidjs/router";
 import type { JSX } from "solid-js";
 import { BrandMark } from "~/components/app/AppHeader";
+import { useI18n } from "~/i18n/LocaleProvider";
+import { LocaleSwitcher } from "~/i18n/LocaleSwitcher";
+import { formatDate } from "~/lib/format";
 
 export function LegalPage(props: {
   title: string;
   updated: string;
   children: JSX.Element;
 }) {
+  const { t, locale } = useI18n();
+  const updated = () => formatDate(props.updated, locale()) || props.updated;
+
   return (
     <div class="page-shell min-h-[100dvh]">
       <header class="border-b border-border/80 bg-background/85">
@@ -14,39 +20,48 @@ export function LegalPage(props: {
           <BrandMark href="/" />
           <nav class="ml-auto flex items-center gap-4 text-xs text-muted-foreground">
             <A href="/privacy" class="transition hover:text-foreground">
-              Privacy
+              {t("legal.nav.privacy")}
             </A>
             <A href="/terms" class="transition hover:text-foreground">
-              Terms
+              {t("legal.nav.terms")}
             </A>
             <A href="/" class="transition hover:text-foreground">
-              Home
+              {t("common.home")}
             </A>
+            <LocaleSwitcher variant="text" />
           </nav>
         </div>
       </header>
 
       <main class="mx-auto max-w-3xl px-4 py-12 sm:px-6 sm:py-16">
-        <p class="eyebrow">Legal</p>
+        <p class="eyebrow">{t("legal.eyebrow")}</p>
         <h1 class="mt-3 font-display text-4xl leading-tight tracking-tight sm:text-5xl">
           {props.title}
         </h1>
-        <p class="mt-3 text-xs text-muted-foreground">Last updated {props.updated}</p>
+        <p class="mt-3 text-xs text-muted-foreground">
+          {t("legal.updated", { date: updated() })}
+        </p>
+        <p
+          class="mt-3 rounded-xl border border-border bg-muted/40 px-3 py-2 text-xs leading-relaxed text-muted-foreground"
+          data-testid="legal-language-notice"
+        >
+          {t("legal.englishOnly")}
+        </p>
         <div class="mt-10 space-y-10">{props.children}</div>
       </main>
 
       <footer class="border-t border-border bg-background/60">
         <div class="mx-auto flex max-w-4xl flex-col gap-3 px-4 py-8 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <p>family-tree, a private, collaborative family graph.</p>
+          <p>{t("legal.footer.tagline")}</p>
           <nav class="flex flex-wrap items-center gap-4">
             <A href="/privacy" class="transition hover:text-foreground">
-              Privacy
+              {t("legal.nav.privacy")}
             </A>
             <A href="/terms" class="transition hover:text-foreground">
-              Terms
+              {t("legal.nav.terms")}
             </A>
             <A href="/login" class="transition hover:text-foreground">
-              Sign in
+              {t("auth.signIn")}
             </A>
           </nav>
         </div>

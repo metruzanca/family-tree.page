@@ -1,6 +1,8 @@
 import { A } from "@solidjs/router";
 import { ArrowRight } from "lucide-solid";
 import { SharedTreeView } from "~/components/trees/SharedTreeView";
+import { useI18n } from "~/i18n/LocaleProvider";
+import { Trans } from "~/i18n/Trans";
 import {
   demoMediaById,
   demoThumbUrl,
@@ -8,13 +10,15 @@ import {
 } from "~/components/landing/demo-tree";
 
 export default function DemoPage() {
+  const { t } = useI18n();
+
   return (
     <div class="relative" data-testid="demo-page">
       <SharedTreeView
         graph={demoTree}
         backHref="/"
-        backLabel="Home"
-        badgeLabel="Demo"
+        backLabel={t("common.home")}
+        badgeLabel={t("demo.badge")}
         allowDownload={false}
         thumbUrlFor={demoThumbUrl}
         fileUrlFor={file => demoMediaById[file.id]?.fullUrl ?? demoThumbUrl(file.id)}
@@ -25,15 +29,19 @@ export default function DemoPage() {
           data-testid="demo-banner"
         >
           <p class="text-center text-xs leading-relaxed sm:text-left">
-            <span class="font-semibold text-white">This is a live demo.</span> Everything is
-            read-only. Start a tree to add your own family.
+            <Trans
+              key="demo.banner.notice"
+              components={{
+                live: <span class="font-semibold text-white">{t("demo.banner.live")}</span>,
+              }}
+            />
           </p>
           <A
             href="/register"
             class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-gold px-3.5 py-1.5 text-xs font-semibold text-[#161a12] transition hover:brightness-105"
             data-testid="demo-banner-signup"
           >
-            Start your tree
+            {t("demo.banner.start")}
             <ArrowRight size={13} />
           </A>
         </div>

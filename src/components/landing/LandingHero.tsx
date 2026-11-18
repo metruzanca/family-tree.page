@@ -14,6 +14,9 @@ import {
 } from "lucide-solid";
 import { GraphView, type GraphHandle } from "~/components/graph/GraphView";
 import { buttonVariants } from "~/components/ui/button";
+import type { TranslationKey } from "~/i18n";
+import { useI18n } from "~/i18n/LocaleProvider";
+import { Trans } from "~/i18n/Trans";
 import { LandingLightbox } from "./LandingLightbox";
 import { LandingPersonCard } from "./LandingPersonCard";
 import {
@@ -32,7 +35,15 @@ type LightboxState = {
   initialId?: string | null;
 };
 
+const bullets: TranslationKey[] = [
+  "landing.hero.bulletFree",
+  "landing.hero.bulletMit",
+  "landing.hero.bulletPrivate",
+  "landing.hero.bulletMobile",
+];
+
 export function LandingHero() {
+  const { t } = useI18n();
   const isNarrow =
     typeof window !== "undefined" && window.matchMedia("(max-width: 639px)").matches;
   const [selectedPersonId, setSelectedPersonId] = createSignal<string | null>(null);
@@ -96,18 +107,20 @@ export function LandingHero() {
           <div class="relative z-10 flex flex-col justify-center px-6 py-10 sm:px-10 lg:py-14 xl:px-14">
             <p class="inline-flex items-center gap-2 self-start rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[0.66rem] font-semibold uppercase tracking-[0.16em] text-[#cfd6c6]">
               <span class="size-1.5 rounded-full bg-gold" />
-              Private family trees
+              {t("landing.hero.badge")}
             </p>
 
             <h1 class="mt-5 max-w-xl font-display text-[2.35rem] leading-[1.04] tracking-tight sm:text-5xl xl:text-6xl">
-              Every family has a shape.{" "}
-              <span class="text-gold">Map yours together.</span>
+              <Trans
+                key="landing.hero.title"
+                components={{
+                  accent: <span class="text-gold">{t("landing.hero.titleAccent")}</span>,
+                }}
+              />
             </h1>
 
             <p class="mt-5 max-w-lg text-sm leading-relaxed text-[#b9c2b0] sm:text-base">
-              A private, collaborative family tree built as a living graph. Add people, connect
-              parents and partners, and attach the photographs and documents that hold the stories
-              together.
+              {t("landing.hero.body")}
             </p>
 
             <div class="mt-7 flex flex-wrap items-center gap-3">
@@ -118,7 +131,7 @@ export function LandingHero() {
                   class: "bg-gold text-gold-foreground shadow-sm hover:bg-gold/90",
                 })}
               >
-                Start your family tree
+                {t("auth.register.title")}
                 <ArrowRight size={16} />
               </A>
               <A
@@ -130,30 +143,28 @@ export function LandingHero() {
                     "border-white/15 bg-white/5 text-[#f5efe2] hover:border-white/25 hover:bg-white/10",
                 })}
               >
-                Sign in
+                {t("auth.signIn")}
               </A>
               <A
                 href="/demo"
                 class="inline-flex items-center gap-1.5 px-1 text-sm font-semibold text-[#b9c4b0] underline decoration-white/20 underline-offset-4 transition hover:text-white"
                 data-testid="landing-hero-demo"
               >
-                Open the full demo
+                {t("landing.hero.demo")}
                 <ArrowUpRight size={14} />
               </A>
             </div>
 
             <p class="mt-4 text-xs leading-relaxed text-[#8d9a85]">
-              Free to use and open source. Your tree stays private to the people you invite.
+              {t("landing.hero.note")}
             </p>
 
             <ul class="mt-8 grid max-w-md grid-cols-2 gap-x-4 gap-y-2.5 text-xs text-[#b9c2b0]">
-              <For
-                each={["Free to use", "MIT licensed", "Private by default", "Works on mobile"]}
-              >
+              <For each={bullets}>
                 {item => (
                   <li class="flex items-center gap-2">
                     <Check size={14} class="shrink-0 text-gold" />
-                    {item}
+                    {t(item)}
                   </li>
                 )}
               </For>
@@ -184,20 +195,20 @@ export function LandingHero() {
             <div class="pointer-events-none absolute inset-x-0 top-0 z-20 flex flex-wrap items-start gap-2 p-3 sm:p-4">
               <div class="pointer-events-auto flex items-center gap-2 rounded-full border border-white/10 bg-black/35 px-3 py-2 text-[0.64rem] font-semibold uppercase tracking-[0.12em] text-white/70 backdrop-blur-md">
                 <span class="size-1.5 animate-pulse rounded-full bg-gold" />
-                Live demo
+                {t("landing.hero.live")}
                 <span class="hidden text-white/40 sm:inline">The Simpsons</span>
               </div>
 
               <div class="pointer-events-auto ml-auto flex items-center gap-1.5">
                 <ChromeButton
-                  label="Browse people"
+                  label={t("landing.hero.browsePeople")}
                   active={peopleOpen()}
                   onClick={() => setPeopleOpen(value => !value)}
                 >
                   <Users size={16} />
                 </ChromeButton>
                 <ChromeButton
-                  label={showMedia() ? "Hide photos" : "Show photos"}
+                  label={t(showMedia() ? "landing.hero.hidePhotos" : "landing.hero.showPhotos")}
                   active={showMedia()}
                   onClick={toggleMedia}
                 >
@@ -205,13 +216,13 @@ export function LandingHero() {
                     <Images size={16} />
                   </Show>
                 </ChromeButton>
-                <ChromeButton label="Zoom out" onClick={() => handle()?.zoomBy(0.8)}>
+                <ChromeButton label={t("graph.toolbar.zoomOut")} onClick={() => handle()?.zoomBy(0.8)}>
                   <ZoomOut size={16} />
                 </ChromeButton>
-                <ChromeButton label="Zoom in" onClick={() => handle()?.zoomBy(1.25)}>
+                <ChromeButton label={t("graph.toolbar.zoomIn")} onClick={() => handle()?.zoomBy(1.25)}>
                   <ZoomIn size={16} />
                 </ChromeButton>
-                <ChromeButton label="Fit tree" onClick={() => handle()?.fit()}>
+                <ChromeButton label={t("graph.toolbar.fit")} onClick={() => handle()?.fit()}>
                   <Maximize2 size={16} />
                 </ChromeButton>
               </div>
@@ -221,12 +232,12 @@ export function LandingHero() {
               <div class="absolute inset-x-3 bottom-14 z-30 overflow-hidden rounded-2xl border border-white/10 bg-[#141811]/95 text-white shadow-2xl backdrop-blur-xl sm:inset-x-auto sm:bottom-auto sm:right-3 sm:top-20 sm:w-72">
                 <div class="flex items-center justify-between border-b border-white/10 px-3 py-2">
                   <p class="text-[0.64rem] font-semibold uppercase tracking-[0.14em] text-white/45">
-                    People
+                    {t("media.view.people")}
                   </p>
                   <button
                     type="button"
                     class="grid size-6 place-items-center rounded-full text-white/45 transition hover:bg-white/10 hover:text-white"
-                    aria-label="Close people list"
+                    aria-label={t("landing.hero.closePeople")}
                     onClick={() => setPeopleOpen(false)}
                   >
                     <X size={13} />

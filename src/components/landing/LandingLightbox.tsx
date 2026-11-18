@@ -3,6 +3,7 @@ import { Portal } from "solid-js/web";
 import { A } from "@solidjs/router";
 import { ChevronLeft, ChevronRight, FileText, X } from "lucide-solid";
 import { buttonVariants } from "~/components/ui/button";
+import { useI18n } from "~/i18n/LocaleProvider";
 import type { DemoMedia } from "./demo-tree";
 
 type LandingLightboxProps = {
@@ -13,6 +14,7 @@ type LandingLightboxProps = {
 };
 
 export function LandingLightbox(props: LandingLightboxProps) {
+  const { t } = useI18n();
   const initialIndex = () => {
     const found = props.files.findIndex(file => file.id === props.initialId);
     return found >= 0 ? found : 0;
@@ -59,7 +61,7 @@ export function LandingLightbox(props: LandingLightboxProps) {
           <button
             type="button"
             class="grid size-10 shrink-0 place-items-center rounded-full bg-white/10 text-white/75 transition hover:bg-white/20 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
-            aria-label="Close preview"
+            aria-label={t("landing.lightbox.close")}
             onClick={props.onClose}
           >
             <X size={18} />
@@ -86,7 +88,7 @@ export function LandingLightbox(props: LandingLightboxProps) {
             <button
               type="button"
               class="absolute left-3 top-1/2 grid size-11 -translate-y-1/2 place-items-center rounded-full bg-black/45 text-white/75 backdrop-blur transition hover:bg-black/70 hover:text-white sm:left-6"
-              aria-label="Previous photo"
+              aria-label={t("landing.lightbox.previous")}
               onClick={previous}
             >
               <ChevronLeft size={22} />
@@ -94,7 +96,7 @@ export function LandingLightbox(props: LandingLightboxProps) {
             <button
               type="button"
               class="absolute right-3 top-1/2 grid size-11 -translate-y-1/2 place-items-center rounded-full bg-black/45 text-white/75 backdrop-blur transition hover:bg-black/70 hover:text-white sm:right-6"
-              aria-label="Next photo"
+              aria-label={t("landing.lightbox.next")}
               onClick={next}
             >
               <ChevronRight size={22} />
@@ -118,7 +120,10 @@ export function LandingLightbox(props: LandingLightboxProps) {
               </p>
               <Show when={hasMany()}>
                 <p class="mt-1.5 text-[0.7rem] text-white/40">
-                  {index() + 1} of {props.files.length}
+                  {t("landing.lightbox.counter", {
+                    current: index() + 1,
+                    total: props.files.length,
+                  })}
                 </p>
               </Show>
             </div>
@@ -129,7 +134,7 @@ export function LandingLightbox(props: LandingLightboxProps) {
                 class: "shrink-0 bg-gold text-gold-foreground hover:bg-gold/90",
               })}
             >
-              Start your own tree
+              {t("landing.cta.startTree")}
             </A>
           </div>
 
@@ -144,7 +149,7 @@ export function LandingLightbox(props: LandingLightboxProps) {
                         ? "border-gold opacity-100"
                         : "border-white/10 opacity-50 hover:opacity-90"
                     }`}
-                    aria-label={`Show ${file.name}`}
+                    aria-label={t("media.lightbox.show", { name: file.name })}
                     onClick={() => setIndex(fileIndex())}
                   >
                     <img src={file.thumbUrl} alt="" class="h-full w-full object-cover" />
