@@ -2,25 +2,18 @@
 
 Deferred work beyond v0.1.0. None of this is shipped yet. The order is a suggestion, not a commitment.
 
-## 1. GEDCOM import
+## 1. GEDCOM import follow-ups
 
-GEDCOM 5.5.1 export is shipped: names, dates, places, life events, notes, media references, families, and `_ROOTS_ID` for round trips. Import is the remaining half, and it is where data quality is won or lost.
+GEDCOM 5.5.1 export is shipped, and so is import into a new tree: a browser-side preview, a server-side reparse, one transaction, warnings for missing references and unreadable dates, and quota enforcement. The remaining work is the harder half.
 
 Scope:
 
-- Parse GEDCOM 5.5.1 first, with GEDCOM 7 as a follow-up.
-- Preview every import with a per-record report, and never merge silently.
-- On conflict, offer keep, replace, or merge per person, and reuse the duplicate detector as the review step.
-- Map GEDCOM date approximations back to fuzzy dates without losing qualifiers.
-- Map `FAM` records to partnerships and parent-child links. Sex is recorded now, so use it for `HUSB` and `WIFE` where possible and flag same-sex or unknown couples for review.
-- Keep the operation resumable, because large files can exceed a single request.
-- Decide whether media is matched by file name, embedded, or skipped.
-
-Open questions:
-
-- How to represent same-sex couples, since GEDCOM 5.5.1 has only `HUSB` and `WIFE`.
-- How to map custom life events to the standard event tags and back.
-- Whether an import creates a new tree or merges into an existing one.
+- Import into an existing tree with a per-record review, and reuse the duplicate detector instead of guessing.
+- GEDCOM 7, after 5.5.1.
+- Source and citation records, then import `SOUR` and `REPO` instead of skipping them.
+- Media by file name or an uploaded bundle. GEDCOM references files; it does not contain them.
+- Resumable processing for very large files, beyond the current 5 MB and 5,000 people limits.
+- Merge family records that differ only by a missing partner, and review same-sex role handling, since GEDCOM 5.5.1 has only `HUSB` and `WIFE`.
 
 ## 2. Printable charts and tree posters
 
@@ -103,7 +96,7 @@ Shipped: read-only `/api/v1` endpoints, tree-scoped hashed tokens with scopes an
 
 Remaining:
 
-- GEDCOM 7 export, sharing the existing serializer. GEDCOM 5.5.1 export is shipped; import is tracked in item 1.
+- GEDCOM 7 export and import. GEDCOM 5.5.1 export and new-tree import are shipped; the remaining interop work is tracked in item 1.
 - A public share JSON feed under the existing share token, with the living-person redaction in `src/lib/share.ts`.
 - Write scopes with conflict handling and an explicit merge policy. Reads were deliberately first.
 - Webhooks for `person.created`, `export.completed`, and similar events, after the pull API settles.
