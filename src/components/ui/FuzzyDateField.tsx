@@ -27,6 +27,8 @@ type FuzzyDateFieldProps = {
   testId?: string;
   compact?: boolean;
   disabled?: boolean;
+  /** Focuses the first date part when the surrounding dialog opens. */
+  autofocus?: boolean;
 };
 
 export function FuzzyDateField(props: FuzzyDateFieldProps) {
@@ -125,6 +127,7 @@ export function FuzzyDateField(props: FuzzyDateFieldProps) {
           parts={start()}
           compact={props.compact}
           disabled={props.disabled}
+          autofocus={props.autofocus}
           onChange={(field, raw) => updatePart("start", field, raw)}
         />
 
@@ -167,6 +170,7 @@ function DatePartsInputs(props: {
   testId?: string;
   compact?: boolean;
   disabled?: boolean;
+  autofocus?: boolean;
   onChange: (field: keyof PartialDate, raw: string) => void;
 }) {
   const { t, locale } = useI18n();
@@ -195,6 +199,7 @@ function DatePartsInputs(props: {
         inputmode="numeric"
         value={props.parts.year ?? ""}
         disabled={props.disabled}
+        autofocus={props.autofocus}
         aria-label={t("date.year")}
         data-testid={props.testId}
         onInput={event => props.onChange("year", event.currentTarget.value)}

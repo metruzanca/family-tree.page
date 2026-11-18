@@ -39,6 +39,21 @@ const SEX_KEYS: Record<PersonSex, TranslationKey> = {
   unknown: "common.unknown",
 };
 
+/** A field the dialog can focus when it opens, used by "fix this gap" actions. */
+export type PersonFormField =
+  | "firstName"
+  | "lastName"
+  | "nickname"
+  | "maidenName"
+  | "sex"
+  | "birthDate"
+  | "deathDate"
+  | "birthPlace"
+  | "deathPlace"
+  | "bio"
+  | "contactEmail"
+  | "contactPhone";
+
 export type PersonFormState = {
   firstName: string;
   lastName: string;
@@ -77,6 +92,8 @@ export function PersonFormDialog(props: {
   treeId: string;
   person?: GraphPerson | null;
   onSaved?: (personId: string) => void;
+  /** Moves focus to a field on open; defaults to the first name. */
+  focusField?: PersonFormField;
 }) {
   const { t } = useI18n();
   const toast = useToast();
@@ -85,6 +102,9 @@ export function PersonFormDialog(props: {
   const [pending, setPending] = createSignal(false);
   const [duplicates, setDuplicates] = createSignal<DuplicateCandidate[]>([]);
   const [allowDuplicate, setAllowDuplicate] = createSignal(false);
+
+  const autofocus = (field: PersonFormField) =>
+    props.focusField ? props.focusField === field : field === "firstName";
 
   createEffect(() => {
     if (!props.open) return;
@@ -255,7 +275,7 @@ export function PersonFormDialog(props: {
               onInput={event => setForm("firstName", event.currentTarget.value)}
               maxlength={80}
               required
-              autofocus
+              autofocus={autofocus("firstName")}
               data-testid="person-form-first-name"
             />
           </Field>
@@ -266,6 +286,7 @@ export function PersonFormDialog(props: {
               value={form.lastName}
               onInput={event => setForm("lastName", event.currentTarget.value)}
               maxlength={80}
+              autofocus={autofocus("lastName")}
               data-testid="person-form-last-name"
             />
           </Field>
@@ -277,6 +298,7 @@ export function PersonFormDialog(props: {
               value={form.nickname}
               onInput={event => setForm("nickname", event.currentTarget.value)}
               maxlength={80}
+              autofocus={autofocus("nickname")}
               data-testid="person-form-nickname"
             />
           </Field>
@@ -288,6 +310,7 @@ export function PersonFormDialog(props: {
               value={form.maidenName}
               onInput={event => setForm("maidenName", event.currentTarget.value)}
               maxlength={80}
+              autofocus={autofocus("maidenName")}
               data-testid="person-form-maiden-name"
             />
           </Field>
@@ -303,6 +326,7 @@ export function PersonFormDialog(props: {
               onChange={event =>
                 setForm("sex", event.currentTarget.value as PersonSex)
               }
+              autofocus={autofocus("sex")}
               data-testid="person-form-sex"
             >
               <For each={PERSON_SEX_OPTIONS}>
@@ -316,6 +340,7 @@ export function PersonFormDialog(props: {
               testId="person-form-birth-date"
               value={form.birthDate}
               onChange={value => setForm("birthDate", value)}
+              autofocus={autofocus("birthDate")}
             />
           </Field>
           <Field label={t("person.field.died")} for="person-death">
@@ -324,6 +349,7 @@ export function PersonFormDialog(props: {
               testId="person-form-death-date"
               value={form.deathDate}
               onChange={value => setForm("deathDate", value)}
+              autofocus={autofocus("deathDate")}
             />
           </Field>
           <Field label={t("person.field.birthPlace")} for="person-birthplace">
@@ -334,6 +360,7 @@ export function PersonFormDialog(props: {
               value={form.birthPlace}
               onInput={event => setForm("birthPlace", event.currentTarget.value)}
               maxlength={160}
+              autofocus={autofocus("birthPlace")}
               data-testid="person-form-birthplace"
             />
           </Field>
@@ -345,6 +372,7 @@ export function PersonFormDialog(props: {
               value={form.deathPlace}
               onInput={event => setForm("deathPlace", event.currentTarget.value)}
               maxlength={160}
+              autofocus={autofocus("deathPlace")}
               data-testid="person-form-deathplace"
             />
           </Field>
@@ -360,6 +388,7 @@ export function PersonFormDialog(props: {
             value={form.bio}
             onInput={event => setForm("bio", event.currentTarget.value)}
             maxlength={4000}
+            autofocus={autofocus("bio")}
             data-testid="person-form-bio"
           />
         </Field>
@@ -479,6 +508,7 @@ export function PersonFormDialog(props: {
                   setForm("contactEmail", event.currentTarget.value)
                 }
                 maxlength={254}
+                autofocus={autofocus("contactEmail")}
                 data-testid="person-form-contact-email"
               />
             </Field>
@@ -497,6 +527,7 @@ export function PersonFormDialog(props: {
                   setForm("contactPhone", event.currentTarget.value)
                 }
                 maxlength={50}
+                autofocus={autofocus("contactPhone")}
                 data-testid="person-form-contact-phone"
               />
             </Field>
