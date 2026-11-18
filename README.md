@@ -233,6 +233,8 @@ All views live in `src/lib/research/` as pure functions with tests, and the comp
 
 People record sex as female, male, other, or unknown. The pedigree labels a known male parent as father and a known female parent as mother, and falls back to parent for other or unknown. Relationship labels stay neutral, so the desk never guesses at aunt or uncle. GEDCOM export uses the same field for `SEX` and, when a couple is one male and one female, for `HUSB` and `WIFE`.
 
+The full researcher feature guide, including GEDCOM and the API, is in [docs/research.md](docs/research.md).
+
 ## How dates work
 
 Date fields are stored as a small JSON value rather than a SQL `date`, so partial and approximate dates survive:
