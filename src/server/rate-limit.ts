@@ -29,6 +29,38 @@ export function checkAccountRateLimit(
   return bucket.count <= limit;
 }
 
+export type ApiRateLimit = {
+  allowed: boolean;
+  limit: number;
+  remaining: number;
+  resetAt: number;
+};
+
+/** A per-token ceiling for the public API, separate from the account limit. */
+export function checkApiRateLimit(
+  tokenId: string,
+  limit = 120,
+  windowMs = 60_000,
+): ApiRateLimit {
+  const now = Date.now();
+  const key = `api:${tokenId}`;
+  const bucket = buckets.get(key);
+
+  if (!bucket || bucket.resetAt <= now) {
+    buckets.set(key, { count: 1, resetAt: now + windowMs });
+    if (buckets.size > MAX_BUCKETS) prune(now);
+    return { allowed: true, limit, remaining: limit - 1, resetAt: now + windowMs };
+  }
+
+  bucket.count += 1;
+  return {
+    allowed: bucket.count <= limit,
+    limit,
+    remaining: Math.max(0, limit - bucket.count),
+    resetAt: bucket.resetAt,
+  };
+}
+
 function prune(now: number) {
   for (const [key, bucket] of buckets) {
     if (bucket.resetAt <= now) buckets.delete(key);

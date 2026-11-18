@@ -1,0 +1,1291 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Roots Family Tree API",
+    "version": "1.0.0",
+    "summary": "Read-only access to one family tree.",
+    "description": "A versioned, read-only API for exporting and searching one family tree. Tokens are created by a tree owner in tree settings and are bound to that tree. A token exposes the whole tree, including living relatives, so issue tokens only to people you trust. Requests are limited to 120 per minute per token. Lists use opaque cursors ordered by updatedAt and id. Breaking changes go to a new major version; v1 only grows additively.",
+    "license": {
+      "name": "MIT",
+      "identifier": "MIT"
+    }
+  },
+  "servers": [
+    {
+      "url": "/api/v1",
+      "description": "The server that served this document"
+    }
+  ],
+  "tags": [
+    { "name": "Meta", "description": "Token and version information." },
+    { "name": "Trees", "description": "Tree metadata and counts." },
+    { "name": "People", "description": "People, their family, and their life events." },
+    { "name": "Relationships", "description": "Parent and partner links." },
+    { "name": "Events", "description": "Life events across the tree." },
+    { "name": "Search", "description": "Search names, notes, places, events, and media." },
+    { "name": "Changes", "description": "A polling feed of tree changes." },
+    { "name": "Media", "description": "Photo and document thumbnails and downloads." },
+    { "name": "Export", "description": "A complete JSON snapshot." }
+  ],
+  "security": [{ "bearerAuth": [] }],
+  "paths": {
+    "/me": {
+      "get": {
+        "tags": ["Meta"],
+        "operationId": "getMe",
+        "summary": "Describe the current token",
+        "description": "Returns the token name, scopes, expiry, and the tree it can read. Use this to confirm an integration is pointed at the right tree.",
+        "responses": {
+          "200": {
+            "description": "The token and its tree.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/MeResponse" },
+                "example": {
+                  "apiVersion": "v1",
+                  "token": {
+                    "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+                    "name": "Research notebook",
+                    "prefix": "rt_ab12cd34",
+                    "scopes": ["tree:read", "people:read", "media:read", "changes:read", "export:read"],
+                    "createdAt": "2026-01-01T00:00:00.000Z",
+                    "expiresAt": null,
+                    "lastUsedAt": null
+                  },
+                  "user": {
+                    "id": "9b2f4a1c-3d5e-4f6a-8b7c-1d2e3f4a5b6c",
+                    "displayName": "Sam Zanca"
+                  },
+                  "tree": {
+                    "id": "3c7e9a1b-2d4f-4e6a-9b8c-0d1e2f3a4b5c",
+                    "name": "The Simpson family"
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    },
+    "/trees": {
+      "get": {
+        "tags": ["Trees"],
+        "operationId": "listTrees",
+        "summary": "List the trees this token can read",
+        "description": "A token is bound to one tree, so this list always contains exactly one item. It exists so a client can discover the tree id instead of hard-coding it.",
+        "responses": {
+          "200": {
+            "description": "The token's tree.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/TreesResponse" },
+                "example": {
+                  "data": [
+                    {
+                      "id": "3c7e9a1b-2d4f-4e6a-9b8c-0d1e2f3a4b5c",
+                      "name": "The Simpson family",
+                      "description": "Three generations around one couple.",
+                      "createdAt": "2025-11-01T12:00:00.000Z",
+                      "updatedAt": "2026-01-02T08:30:00.000Z",
+                      "counts": { "people": 12, "relationships": 13, "events": 4, "media": 3 }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    },
+    "/trees/{treeId}": {
+      "get": {
+        "tags": ["Trees"],
+        "operationId": "getTree",
+        "summary": "Get one tree",
+        "description": "Returns the tree name, description, timestamps, and counts. Supports ETag revalidation.",
+        "parameters": [{ "$ref": "#/components/parameters/TreeId" }],
+        "responses": {
+          "200": {
+            "description": "The tree.",
+            "headers": {
+              "ETag": {
+                "description": "Weak entity tag for conditional requests.",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Tree" },
+                "example": {
+                  "id": "3c7e9a1b-2d4f-4e6a-9b8c-0d1e2f3a4b5c",
+                  "name": "The Simpson family",
+                  "description": "Three generations around one couple.",
+                  "createdAt": "2025-11-01T12:00:00.000Z",
+                  "updatedAt": "2026-01-02T08:30:00.000Z",
+                  "counts": { "people": 12, "relationships": 13, "events": 4, "media": 3 }
+                }
+              }
+            }
+          },
+          "304": { "$ref": "#/components/responses/NotModified" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    },
+    "/trees/{treeId}/people": {
+      "get": {
+        "tags": ["People"],
+        "operationId": "listPeople",
+        "summary": "List people",
+        "description": "Cursor paginated, ordered by updatedAt and then id. Use the returned nextCursor until hasMore is false. Filter by a name fragment or a surname.",
+        "parameters": [
+          { "$ref": "#/components/parameters/TreeId" },
+          { "$ref": "#/components/parameters/Limit" },
+          { "$ref": "#/components/parameters/Cursor" },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Case-insensitive fragment of a full name, maiden name, or nickname.",
+            "schema": { "type": "string", "maxLength": 100 }
+          },
+          {
+            "name": "surname",
+            "in": "query",
+            "description": "Case-insensitive surname fragment, matching last name or maiden name.",
+            "schema": { "type": "string", "maxLength": 80 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of people.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/PeoplePage" },
+                "example": {
+                  "data": [
+                    {
+                      "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+                      "firstName": "Abraham",
+                      "lastName": "Simpson",
+                      "fullName": "Abraham Simpson",
+                      "maidenName": null,
+                      "nickname": "Abe",
+                      "birthDate": {
+                        "start": { "year": 1920, "month": 5, "day": 19 },
+                        "qualifier": "exact"
+                      },
+                      "deathDate": null,
+                      "birthPlace": "Springfield",
+                      "deathPlace": null,
+                      "bio": "Talks to his hat and keeps a drawer of things he will need later.",
+                      "living": true,
+                      "avatar": null,
+                      "createdAt": "2025-11-01T12:00:00.000Z",
+                      "updatedAt": "2026-01-02T08:30:00.000Z"
+                    }
+                  ],
+                  "nextCursor": null,
+                  "hasMore": false
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    },
+    "/trees/{treeId}/people/{personId}": {
+      "get": {
+        "tags": ["People"],
+        "operationId": "getPerson",
+        "summary": "Get one person with their immediate family",
+        "description": "Returns the person, parents, children, partners, life events, and media. Partners include the partnership record.",
+        "parameters": [
+          { "$ref": "#/components/parameters/TreeId" },
+          { "$ref": "#/components/parameters/PersonId" }
+        ],
+        "responses": {
+          "200": {
+            "description": "The person and their family.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/PersonDetail" },
+                "example": {
+                  "person": {
+                    "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+                    "firstName": "Abraham",
+                    "lastName": "Simpson",
+                    "fullName": "Abraham Simpson",
+                    "maidenName": null,
+                    "nickname": "Abe",
+                    "birthDate": {
+                      "start": { "year": 1920, "month": 5, "day": 19 },
+                      "qualifier": "exact"
+                    },
+                    "deathDate": null,
+                    "birthPlace": "Springfield",
+                    "deathPlace": null,
+                    "bio": "Talks to his hat.",
+                    "living": true,
+                    "avatar": null,
+                    "createdAt": "2025-11-01T12:00:00.000Z",
+                    "updatedAt": "2026-01-02T08:30:00.000Z"
+                  },
+                  "parents": [],
+                  "children": [],
+                  "partners": [],
+                  "events": [],
+                  "media": []
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    },
+    "/trees/{treeId}/relationships": {
+      "get": {
+        "tags": ["Relationships"],
+        "operationId": "listRelationships",
+        "summary": "List parent and partner relationships",
+        "description": "Returns every relationship in the tree, optionally filtered by type. Parent records include the parent type; partner records include the partnership status and dates.",
+        "parameters": [
+          { "$ref": "#/components/parameters/TreeId" },
+          {
+            "name": "type",
+            "in": "query",
+            "description": "Return only one kind of relationship.",
+            "schema": { "type": "string", "enum": ["parent", "partner"] }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The relationships.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/RelationshipsResponse" },
+                "example": {
+                  "data": [
+                    {
+                      "id": "6a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+                      "type": "parent",
+                      "parentId": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+                      "childId": "3c7e9a1b-2d4f-4e6a-9b8c-0d1e2f3a4b5c",
+                      "parentType": "biological",
+                      "createdAt": "2025-11-01T12:05:00.000Z"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    },
+    "/trees/{treeId}/events": {
+      "get": {
+        "tags": ["Events"],
+        "operationId": "listEvents",
+        "summary": "List life events",
+        "description": "Cursor paginated, ordered by updatedAt and id. Filter by person or event kind.",
+        "parameters": [
+          { "$ref": "#/components/parameters/TreeId" },
+          { "$ref": "#/components/parameters/Limit" },
+          { "$ref": "#/components/parameters/Cursor" },
+          {
+            "name": "personId",
+            "in": "query",
+            "description": "Only events for this person.",
+            "schema": { "type": "string", "format": "uuid" }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "description": "Only events of this kind.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "residence",
+                "occupation",
+                "education",
+                "military",
+                "immigration",
+                "emigration",
+                "marriage",
+                "divorce",
+                "burial",
+                "other"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of events.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/EventsPage" },
+                "example": {
+                  "data": [
+                    {
+                      "id": "9b2f4a1c-3d5e-4f6a-8b7c-1d2e3f4a5b6c",
+                      "personId": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+                      "kind": "military",
+                      "title": "Army service",
+                      "place": "Springfield",
+                      "date": {
+                        "start": { "year": 1941, "month": null, "day": null },
+                        "qualifier": "about"
+                      },
+                      "description": "Enlisted after the draft notice.",
+                      "createdAt": "2025-11-03T09:00:00.000Z",
+                      "updatedAt": "2025-11-03T09:00:00.000Z"
+                    }
+                  ],
+                  "nextCursor": null,
+                  "hasMore": false
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    },
+    "/trees/{treeId}/search": {
+      "get": {
+        "tags": ["Search"],
+        "operationId": "searchTree",
+        "summary": "Search names, notes, places, events, and media",
+        "description": "At least one of q, place, or surname is required. Results are grouped by kind and capped per group.",
+        "parameters": [
+          { "$ref": "#/components/parameters/TreeId" },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Free text matched against names, maiden names, nicknames, biographies, event titles, event places, event notes, and file names.",
+            "schema": { "type": "string", "maxLength": 100 }
+          },
+          {
+            "name": "place",
+            "in": "query",
+            "description": "Case-insensitive place fragment matched against birth places, death places, and event places.",
+            "schema": { "type": "string", "maxLength": 100 }
+          },
+          {
+            "name": "surname",
+            "in": "query",
+            "description": "Case-insensitive surname fragment matched against last names and maiden names.",
+            "schema": { "type": "string", "maxLength": 80 }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum results per group.",
+            "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 20 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Grouped search results.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SearchResponse" },
+                "example": {
+                  "query": { "q": "Simpson", "place": null, "surname": null },
+                  "people": [],
+                  "events": [],
+                  "media": [],
+                  "counts": { "people": 7, "events": 2, "media": 1 }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    },
+    "/trees/{treeId}/changes": {
+      "get": {
+        "tags": ["Changes"],
+        "operationId": "listChanges",
+        "summary": "Poll tree changes",
+        "description": "A change log derived from the human activity feed, ordered by time. Pass the latest createdAt as since on the next poll, or follow nextCursor within one page. It is not a byte-level diff; fetch the export when you need a complete consistent snapshot.",
+        "parameters": [
+          { "$ref": "#/components/parameters/TreeId" },
+          { "$ref": "#/components/parameters/Limit" },
+          { "$ref": "#/components/parameters/Cursor" },
+          {
+            "name": "since",
+            "in": "query",
+            "description": "Only changes after this ISO timestamp.",
+            "schema": { "type": "string", "format": "date-time" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of changes.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ChangesPage" },
+                "example": {
+                  "since": "2026-01-01T00:00:00.000Z",
+                  "data": [
+                    {
+                      "id": "9b2f4a1c-3d5e-4f6a-8b7c-1d2e3f4a5b6c",
+                      "action": "person.updated",
+                      "op": "update",
+                      "entityType": "person",
+                      "entityId": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+                      "personId": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+                      "actorName": "Sam Zanca",
+                      "summary": "Updated Abraham Simpson",
+                      "createdAt": "2026-01-02T08:30:00.000Z"
+                    }
+                  ],
+                  "nextCursor": null,
+                  "hasMore": false
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    },
+    "/trees/{treeId}/export.json": {
+      "get": {
+        "tags": ["Export"],
+        "operationId": "exportTree",
+        "summary": "Export the whole tree as JSON",
+        "description": "A complete snapshot of people, relationships, events, and media metadata. Media binaries are referenced by URL, not embedded. Limited to 10 exports per hour per token. Supports ETag revalidation. Add download=1 for a Content-Disposition attachment.",
+        "parameters": [
+          { "$ref": "#/components/parameters/TreeId" },
+          {
+            "name": "download",
+            "in": "query",
+            "description": "Set to 1 to send a Content-Disposition attachment.",
+            "schema": { "type": "string", "enum": ["1"] }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The snapshot.",
+            "headers": {
+              "ETag": {
+                "description": "Strong entity tag for conditional requests.",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ExportSnapshot" },
+                "example": {
+                  "schemaVersion": "1.0.0",
+                  "generatedAt": "2026-01-02T09:00:00.000Z",
+                  "tree": {
+                    "id": "3c7e9a1b-2d4f-4e6a-9b8c-0d1e2f3a4b5c",
+                    "name": "The Simpson family",
+                    "description": "Three generations around one couple.",
+                    "createdAt": "2025-11-01T12:00:00.000Z",
+                    "updatedAt": "2026-01-02T08:30:00.000Z",
+                    "counts": { "people": 1, "relationships": 0, "events": 0, "media": 0 }
+                  },
+                  "people": [
+                    {
+                      "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+                      "firstName": "Abraham",
+                      "lastName": "Simpson",
+                      "fullName": "Abraham Simpson",
+                      "maidenName": null,
+                      "nickname": "Abe",
+                      "birthDate": {
+                        "start": { "year": 1920, "month": 5, "day": 19 },
+                        "qualifier": "exact"
+                      },
+                      "deathDate": null,
+                      "birthPlace": "Springfield",
+                      "deathPlace": null,
+                      "bio": null,
+                      "living": true,
+                      "avatar": null,
+                      "createdAt": "2025-11-01T12:00:00.000Z",
+                      "updatedAt": "2026-01-02T08:30:00.000Z"
+                    }
+                  ],
+                  "relationships": [],
+                  "events": [],
+                  "media": []
+                }
+              }
+            }
+          },
+          "304": { "$ref": "#/components/responses/NotModified" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    },
+    "/trees/{treeId}/media/{fileId}/thumb": {
+      "get": {
+        "tags": ["Media"],
+        "operationId": "getMediaThumb",
+        "summary": "Download a thumbnail",
+        "description": "Streams the generated thumbnail. Only ready files in this tree are available. Use the thumbUrl in person, search, and export responses.",
+        "parameters": [
+          { "$ref": "#/components/parameters/TreeId" },
+          { "$ref": "#/components/parameters/FileId" }
+        ],
+        "responses": {
+          "200": {
+            "description": "The thumbnail image.",
+            "content": {
+              "image/webp": { "schema": { "type": "string", "format": "binary" } },
+              "image/jpeg": { "schema": { "type": "string", "format": "binary" } }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    },
+    "/trees/{treeId}/media/{fileId}/download": {
+      "get": {
+        "tags": ["Media"],
+        "operationId": "downloadMedia",
+        "summary": "Download the original file",
+        "description": "Redirects to a short-lived signed URL for the original file. Add inline=1 for an image the browser may render in place.",
+        "parameters": [
+          { "$ref": "#/components/parameters/TreeId" },
+          { "$ref": "#/components/parameters/FileId" },
+          {
+            "name": "inline",
+            "in": "query",
+            "description": "Set to 1 to request an inline image response.",
+            "schema": { "type": "string", "enum": ["1"] }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "A signed storage URL.",
+            "headers": {
+              "Location": {
+                "description": "The short-lived signed URL.",
+                "schema": { "type": "string", "format": "uri" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "opaque",
+        "description": "A tree-scoped token created in tree settings. Send it as Authorization: Bearer <token>. The token exposes living relatives in full."
+      }
+    },
+    "parameters": {
+      "TreeId": {
+        "name": "treeId",
+        "in": "path",
+        "required": true,
+        "description": "The tree the token belongs to.",
+        "schema": { "type": "string", "format": "uuid" }
+      },
+      "PersonId": {
+        "name": "personId",
+        "in": "path",
+        "required": true,
+        "description": "A person in this tree.",
+        "schema": { "type": "string", "format": "uuid" }
+      },
+      "FileId": {
+        "name": "fileId",
+        "in": "path",
+        "required": true,
+        "description": "A ready file in this tree.",
+        "schema": { "type": "string", "format": "uuid" }
+      },
+      "Limit": {
+        "name": "limit",
+        "in": "query",
+        "description": "Page size.",
+        "schema": { "type": "integer", "minimum": 1, "maximum": 200, "default": 50 }
+      },
+      "Cursor": {
+        "name": "cursor",
+        "in": "query",
+        "description": "The nextCursor from the previous page.",
+        "schema": { "type": "string" }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "The request was invalid.",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" },
+            "example": {
+              "ok": false,
+              "error": "limit must be a positive integer.",
+              "code": "invalid_limit"
+            }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "The token is missing, invalid, revoked, or expired.",
+        "headers": {
+          "WWW-Authenticate": {
+            "description": "Bearer error details.",
+            "schema": { "type": "string" }
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" },
+            "example": {
+              "ok": false,
+              "error": "That API token is not valid.",
+              "code": "invalid_token"
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "The token does not have the required scope.",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" },
+            "example": {
+              "ok": false,
+              "error": "This token does not have the export:read scope.",
+              "code": "insufficient_scope"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "The resource is not available to this token.",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" },
+            "example": {
+              "ok": false,
+              "error": "That person is not in this tree.",
+              "code": "not_found"
+            }
+          }
+        }
+      },
+      "RateLimited": {
+        "description": "Too many requests for this token.",
+        "headers": {
+          "Retry-After": {
+            "description": "Seconds to wait before retrying.",
+            "schema": { "type": "integer" }
+          },
+          "X-RateLimit-Limit": {
+            "description": "The request ceiling for this token.",
+            "schema": { "type": "integer" }
+          },
+          "X-RateLimit-Remaining": {
+            "description": "Requests left in the current window.",
+            "schema": { "type": "integer" }
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" },
+            "example": {
+              "ok": false,
+              "error": "Too many requests. Try again shortly.",
+              "code": "rate_limited"
+            }
+          }
+        }
+      },
+      "NotModified": {
+        "description": "The cached copy is still current.",
+        "headers": {
+          "ETag": {
+            "description": "The current entity tag.",
+            "schema": { "type": "string" }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "required": ["ok", "error", "code"],
+        "properties": {
+          "ok": { "type": "boolean", "const": false },
+          "error": { "type": "string" },
+          "code": { "type": "string" },
+          "reference": {
+            "type": "string",
+            "description": "A short id that appears in server logs for a 500."
+          }
+        }
+      },
+      "PartialDate": {
+        "type": "object",
+        "required": ["year", "month", "day"],
+        "properties": {
+          "year": { "type": ["integer", "null"], "minimum": 1, "maximum": 9999 },
+          "month": { "type": ["integer", "null"], "minimum": 1, "maximum": 12 },
+          "day": { "type": ["integer", "null"], "minimum": 1, "maximum": 31 }
+        }
+      },
+      "FuzzyDate": {
+        "type": "object",
+        "required": ["start", "qualifier"],
+        "properties": {
+          "start": { "$ref": "#/components/schemas/PartialDate" },
+          "end": {
+            "anyOf": [
+              { "$ref": "#/components/schemas/PartialDate" },
+              { "type": "null" }
+            ]
+          },
+          "qualifier": {
+            "type": "string",
+            "enum": ["exact", "about", "before", "after", "between", "unknown"]
+          }
+        }
+      },
+      "MediaLinks": {
+        "type": "object",
+        "required": ["fileId", "thumbUrl", "downloadUrl"],
+        "properties": {
+          "fileId": { "type": "string", "format": "uuid" },
+          "thumbUrl": { "type": ["string", "null"], "format": "uri" },
+          "downloadUrl": { "type": "string", "format": "uri" }
+        }
+      },
+      "Person": {
+        "type": "object",
+        "required": [
+          "id",
+          "firstName",
+          "lastName",
+          "fullName",
+          "maidenName",
+          "nickname",
+          "birthDate",
+          "deathDate",
+          "birthPlace",
+          "deathPlace",
+          "bio",
+          "living",
+          "avatar",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "firstName": { "type": "string" },
+          "lastName": { "type": "string" },
+          "fullName": { "type": "string" },
+          "maidenName": { "type": ["string", "null"] },
+          "nickname": { "type": ["string", "null"] },
+          "birthDate": {
+            "anyOf": [
+              { "$ref": "#/components/schemas/FuzzyDate" },
+              { "type": "null" }
+            ]
+          },
+          "deathDate": {
+            "anyOf": [
+              { "$ref": "#/components/schemas/FuzzyDate" },
+              { "type": "null" }
+            ]
+          },
+          "birthPlace": { "type": ["string", "null"] },
+          "deathPlace": { "type": ["string", "null"] },
+          "bio": { "type": ["string", "null"] },
+          "living": {
+            "type": "boolean",
+            "description": "True when no death date is recorded. The token sees living people in full."
+          },
+          "avatar": {
+            "anyOf": [
+              { "$ref": "#/components/schemas/MediaLinks" },
+              { "type": "null" }
+            ]
+          },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "ParentRelationship": {
+        "type": "object",
+        "required": ["id", "type", "parentId", "childId", "parentType", "createdAt"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "type": { "type": "string", "const": "parent" },
+          "parentId": { "type": "string", "format": "uuid" },
+          "childId": { "type": "string", "format": "uuid" },
+          "parentType": {
+            "type": "string",
+            "enum": ["biological", "adoptive", "foster", "step", "unknown"]
+          },
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "PartnerRelationship": {
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "personAId",
+          "personBId",
+          "status",
+          "startDate",
+          "endDate",
+          "createdAt"
+        ],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "type": { "type": "string", "const": "partner" },
+          "personAId": { "type": "string", "format": "uuid" },
+          "personBId": { "type": "string", "format": "uuid" },
+          "status": {
+            "type": "string",
+            "enum": ["married", "partnered", "divorced", "separated", "widowed", "unknown"]
+          },
+          "startDate": {
+            "anyOf": [
+              { "$ref": "#/components/schemas/FuzzyDate" },
+              { "type": "null" }
+            ]
+          },
+          "endDate": {
+            "anyOf": [
+              { "$ref": "#/components/schemas/FuzzyDate" },
+              { "type": "null" }
+            ]
+          },
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Relationship": {
+        "oneOf": [
+          { "$ref": "#/components/schemas/ParentRelationship" },
+          { "$ref": "#/components/schemas/PartnerRelationship" }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "parent": "#/components/schemas/ParentRelationship",
+            "partner": "#/components/schemas/PartnerRelationship"
+          }
+        }
+      },
+      "Event": {
+        "type": "object",
+        "required": [
+          "id",
+          "personId",
+          "kind",
+          "title",
+          "place",
+          "date",
+          "description",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "personId": { "type": "string", "format": "uuid" },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "residence",
+              "occupation",
+              "education",
+              "military",
+              "immigration",
+              "emigration",
+              "marriage",
+              "divorce",
+              "burial",
+              "other"
+            ]
+          },
+          "title": { "type": ["string", "null"] },
+          "place": { "type": ["string", "null"] },
+          "date": {
+            "anyOf": [
+              { "$ref": "#/components/schemas/FuzzyDate" },
+              { "type": "null" }
+            ]
+          },
+          "description": { "type": ["string", "null"] },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "EventWithPerson": {
+        "allOf": [
+          { "$ref": "#/components/schemas/Event" },
+          {
+            "type": "object",
+            "properties": {
+              "personName": { "type": ["string", "null"] }
+            }
+          }
+        ]
+      },
+      "Media": {
+        "type": "object",
+        "required": [
+          "id",
+          "personId",
+          "groupId",
+          "name",
+          "mimeType",
+          "kind",
+          "sizeBytes",
+          "width",
+          "height",
+          "takenAt",
+          "isAvatar",
+          "taggedPersonIds",
+          "thumbUrl",
+          "downloadUrl",
+          "createdAt"
+        ],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "personId": { "type": "string", "format": "uuid" },
+          "groupId": { "type": ["string", "null"], "format": "uuid" },
+          "name": { "type": "string" },
+          "mimeType": { "type": "string" },
+          "kind": { "type": "string", "enum": ["image", "document", "other"] },
+          "sizeBytes": { "type": "integer", "minimum": 0 },
+          "width": { "type": ["integer", "null"] },
+          "height": { "type": ["integer", "null"] },
+          "takenAt": {
+            "anyOf": [
+              { "$ref": "#/components/schemas/FuzzyDate" },
+              { "type": "null" }
+            ]
+          },
+          "isAvatar": { "type": "boolean" },
+          "taggedPersonIds": {
+            "type": "array",
+            "items": { "type": "string", "format": "uuid" }
+          },
+          "thumbUrl": { "type": ["string", "null"], "format": "uri" },
+          "downloadUrl": { "type": "string", "format": "uri" },
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "MediaWithPerson": {
+        "allOf": [
+          { "$ref": "#/components/schemas/Media" },
+          {
+            "type": "object",
+            "properties": {
+              "personName": { "type": ["string", "null"] }
+            }
+          }
+        ]
+      },
+      "Tree": {
+        "type": "object",
+        "required": ["id", "name", "description", "createdAt", "updatedAt", "counts"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "description": { "type": ["string", "null"] },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" },
+          "counts": {
+            "type": "object",
+            "required": ["people", "relationships", "events", "media"],
+            "properties": {
+              "people": { "type": "integer", "minimum": 0 },
+              "relationships": { "type": "integer", "minimum": 0 },
+              "events": { "type": "integer", "minimum": 0 },
+              "media": { "type": "integer", "minimum": 0 }
+            }
+          }
+        }
+      },
+      "PersonPartner": {
+        "type": "object",
+        "required": ["person", "relationship"],
+        "properties": {
+          "person": { "$ref": "#/components/schemas/Person" },
+          "relationship": { "$ref": "#/components/schemas/PartnerRelationship" }
+        }
+      },
+      "PersonDetail": {
+        "type": "object",
+        "required": ["person", "parents", "children", "partners", "events", "media"],
+        "properties": {
+          "person": { "$ref": "#/components/schemas/Person" },
+          "parents": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Person" }
+          },
+          "children": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Person" }
+          },
+          "partners": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/PersonPartner" }
+          },
+          "events": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Event" }
+          },
+          "media": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Media" }
+          }
+        }
+      },
+      "Change": {
+        "type": "object",
+        "required": [
+          "id",
+          "action",
+          "op",
+          "entityType",
+          "entityId",
+          "personId",
+          "actorName",
+          "summary",
+          "createdAt"
+        ],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "action": { "type": "string" },
+          "op": {
+            "type": "string",
+            "enum": ["create", "update", "delete", "restore"]
+          },
+          "entityType": { "type": "string" },
+          "entityId": { "type": ["string", "null"], "format": "uuid" },
+          "personId": { "type": ["string", "null"], "format": "uuid" },
+          "actorName": { "type": "string" },
+          "summary": { "type": "string" },
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "MeResponse": {
+        "type": "object",
+        "required": ["apiVersion", "token", "user", "tree"],
+        "properties": {
+          "apiVersion": { "type": "string", "const": "v1" },
+          "token": {
+            "type": "object",
+            "required": [
+              "id",
+              "name",
+              "prefix",
+              "scopes",
+              "createdAt",
+              "expiresAt",
+              "lastUsedAt"
+            ],
+            "properties": {
+              "id": { "type": "string", "format": "uuid" },
+              "name": { "type": "string" },
+              "prefix": { "type": "string" },
+              "scopes": {
+                "type": "array",
+                "items": { "$ref": "#/components/schemas/ApiScope" }
+              },
+              "createdAt": { "type": "string", "format": "date-time" },
+              "expiresAt": { "type": ["string", "null"], "format": "date-time" },
+              "lastUsedAt": { "type": ["string", "null"], "format": "date-time" }
+            }
+          },
+          "user": {
+            "type": "object",
+            "required": ["id", "displayName"],
+            "properties": {
+              "id": { "type": "string", "format": "uuid" },
+              "displayName": { "type": "string" }
+            }
+          },
+          "tree": {
+            "type": "object",
+            "required": ["id", "name"],
+            "properties": {
+              "id": { "type": "string", "format": "uuid" },
+              "name": { "type": "string" }
+            }
+          }
+        }
+      },
+      "ApiScope": {
+        "type": "string",
+        "enum": ["tree:read", "people:read", "media:read", "changes:read", "export:read"]
+      },
+      "PeoplePage": {
+        "type": "object",
+        "required": ["data", "nextCursor", "hasMore"],
+        "properties": {
+          "data": { "type": "array", "items": { "$ref": "#/components/schemas/Person" } },
+          "nextCursor": { "type": ["string", "null"] },
+          "hasMore": { "type": "boolean" }
+        }
+      },
+      "EventsPage": {
+        "type": "object",
+        "required": ["data", "nextCursor", "hasMore"],
+        "properties": {
+          "data": { "type": "array", "items": { "$ref": "#/components/schemas/Event" } },
+          "nextCursor": { "type": ["string", "null"] },
+          "hasMore": { "type": "boolean" }
+        }
+      },
+      "ChangesPage": {
+        "type": "object",
+        "required": ["since", "data", "nextCursor", "hasMore"],
+        "properties": {
+          "since": { "type": ["string", "null"], "format": "date-time" },
+          "data": { "type": "array", "items": { "$ref": "#/components/schemas/Change" } },
+          "nextCursor": { "type": ["string", "null"] },
+          "hasMore": { "type": "boolean" }
+        }
+      },
+      "RelationshipsResponse": {
+        "type": "object",
+        "required": ["data"],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Relationship" }
+          }
+        }
+      },
+      "TreesResponse": {
+        "type": "object",
+        "required": ["data"],
+        "properties": {
+          "data": { "type": "array", "items": { "$ref": "#/components/schemas/Tree" } }
+        }
+      },
+      "SearchResponse": {
+        "type": "object",
+        "required": ["query", "people", "events", "media", "counts"],
+        "properties": {
+          "query": {
+            "type": "object",
+            "required": ["q", "place", "surname"],
+            "properties": {
+              "q": { "type": ["string", "null"] },
+              "place": { "type": ["string", "null"] },
+              "surname": { "type": ["string", "null"] }
+            }
+          },
+          "people": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Person" }
+          },
+          "events": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/EventWithPerson" }
+          },
+          "media": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/MediaWithPerson" }
+          },
+          "counts": {
+            "type": "object",
+            "required": ["people", "events", "media"],
+            "properties": {
+              "people": { "type": "integer", "minimum": 0 },
+              "events": { "type": "integer", "minimum": 0 },
+              "media": { "type": "integer", "minimum": 0 }
+            }
+          }
+        }
+      },
+      "ExportSnapshot": {
+        "type": "object",
+        "required": [
+          "schemaVersion",
+          "generatedAt",
+          "tree",
+          "people",
+          "relationships",
+          "events",
+          "media"
+        ],
+        "properties": {
+          "schemaVersion": { "type": "string" },
+          "generatedAt": { "type": "string", "format": "date-time" },
+          "tree": { "$ref": "#/components/schemas/Tree" },
+          "people": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Person" }
+          },
+          "relationships": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Relationship" }
+          },
+          "events": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Event" }
+          },
+          "media": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Media" }
+          }
+        }
+      }
+    }
+  }
+}

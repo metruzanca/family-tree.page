@@ -1,0 +1,6 @@
+extends:
+  - recommended
+
+rules:
+  # The media download endpoint intentionally redirects to a signed URL.
+  operation-2xx-response: off

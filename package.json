@@ -26,15 +26,19 @@
     "storage:cors": "tsx scripts/storage-cors.ts",
     "backup": "tsx scripts/backup.ts",
     "backup:verify": "tsx scripts/backup-verify.ts",
-    "backup:restore": "tsx scripts/backup-restore.ts"
+    "backup:restore": "tsx scripts/backup-restore.ts",
+    "openapi:check": "redocly lint openapi/roots-v1.json && tsx scripts/openapi-check.ts"
   },
   "devDependencies": {
+    "@redocly/cli": "^2.79.0",
     "@sentry/vite-plugin": "^11.12.0",
     "@types/archiver": "^8.0.0",
     "@types/d3-force": "^3.0.10",
     "@types/node": "^24.7.0",
     "@types/pg": "^8.23.1",
     "@types/s3rver": "^3.7.4",
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
     "drizzle-kit": "^0.31.10",
     "s3rver": "^3.7.1",
     "tsx": "^4.23.15",
