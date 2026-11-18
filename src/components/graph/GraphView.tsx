@@ -25,6 +25,23 @@ import {
   type GraphModel,
   type GraphNode,
 } from "~/lib/graph";
+import {
+  ENDPOINT_GAP,
+  JUNCTION_PASS_PAD,
+  LEVEL_STRENGTH,
+  PASS_THROUGH_PAD,
+  forceLinkClearance,
+  generationTargetY,
+  linkCurvatures,
+  maxGenerationLevel,
+  pathSlice,
+  polylineLength,
+  quadraticPoints,
+  segmentDistance,
+  splitPathOutsideCircles,
+  type Circle as LayoutCircle,
+  type Point as LayoutPoint,
+} from "~/lib/graph-layout";
 
 /**
  * Resting length for each kind of edge. The two arms of a family junction add
@@ -36,6 +53,9 @@ const LINK_DISTANCE: Record<GraphLink["kind"], number> = {
   partner: 65,
   media: 32,
 };
+
+/** Grid cell used when looking up nodes near a link. */
+const LINK_OBSTACLE_CELL = 128;
 
 /**
  * Birth-year gravity maps one year to a vertical offset. The band is clamped so
@@ -55,6 +75,15 @@ export type GraphHandle = {
   focus: (id: string) => void;
   zoomBy: (factor: number) => void;
 };
+
+type LinkStyle = {
+  color: string;
+  width: number;
+  dash: number[] | null;
+  dim: boolean;
+};
+
+type LinkBucket = LinkStyle & { runs: LayoutPoint[][] };
 
 type GraphViewProps = {
   data: TreeGraph;
@@ -108,6 +137,7 @@ export function GraphView(props: GraphViewProps) {
   const [model, setModel] = createSignal<GraphModel>(initialModel);
   let previousPersonIds = new Set(initialModel.people.map(node => node.id));
   let previousModelKey = "";
+  let curvatures = linkCurvatures(initialModel);
   const [hovered, setHovered] = createSignal<string | null>(null);
   const [ready, setReady] = createSignal(false);
   const [paintVersion, setPaintVersion] = createSignal(0);
@@ -635,11 +665,49 @@ export function GraphView(props: GraphViewProps) {
     context.restore();
   }
 
+  /**
+   * A junction is a layout step, not a person. The knot marks where a parent
+   * set meets its children so the arms visibly stop there instead of reading
+   * as one line running straight through the joint.
+   */
+  function drawJunction(
+    node: GraphNode,
+    context: CanvasRenderingContext2D,
+    globalScale: number,
+  ) {
+    const set = active();
+    const dim = Boolean(set) && !set!.has(node.id);
+    const x = node.x ?? 0;
+    const y = node.y ?? 0;
+    const radius = 2.8 / globalScale;
+
+    context.save();
+    context.globalAlpha = dim ? 0.3 : 1;
+    context.beginPath();
+    context.arc(x, y, radius + 1.6 / globalScale, 0, Math.PI * 2);
+    context.fillStyle = colors.bg;
+    context.fill();
+
+    context.beginPath();
+    context.moveTo(x, y - radius);
+    context.lineTo(x + radius, y);
+    context.lineTo(x, y + radius);
+    context.lineTo(x - radius, y);
+    context.closePath();
+    context.fillStyle = colors.edge;
+    context.fill();
+    context.restore();
+  }
+
   function drawNode(
     node: GraphNode,
     context: CanvasRenderingContext2D,
     globalScale: number,
   ) {
+    if (node.kind === "junction") {
+      drawJunction(node, context, globalScale);
+      return;
+    }
     if (node.kind !== "person") return;
     drawPerson(node, context, globalScale);
   }
@@ -650,26 +718,31 @@ export function GraphView(props: GraphViewProps) {
     return set.has(endpointId(link.source)) || set.has(endpointId(link.target));
   }
 
-  function linkColorFor(link: GraphLink) {
-    if (link.kind === "media") return "rgba(0,0,0,0)";
-    if (!linkIsActive(link)) return "rgba(102,115,95,0.12)";
-    return link.kind === "partner" ? colors.partner : colors.edge;
-  }
-
-  function linkWidthFor(link: GraphLink) {
-    return link.kind === "partner" ? 1.25 : 1.15;
-  }
-
-  function linkDashFor(link: GraphLink) {
-    if (link.kind === "partner") return [4, 5];
-    if (
-      link.kind === "parent" &&
-      link.parentType &&
-      link.parentType !== "biological"
-    ) {
-      return [6, 5];
+  /**
+   * Style for one link. A dimmed link keeps its colour but drops in alpha, and
+   * the painter draws every dim link before the bright ones, so tracing a
+   * family is never buried under a stranger's line.
+   */
+  function linkStyle(link: GraphLink): LinkStyle {
+    const dim = !linkIsActive(link);
+    if (link.kind === "partner") {
+      return {
+        color: dim ? "rgba(185,124,99,0.10)" : colors.partner,
+        width: 1.25,
+        dash: [4, 5],
+        dim,
+      };
     }
-    return null;
+    const dashed =
+      link.kind === "parent" &&
+      Boolean(link.parentType) &&
+      link.parentType !== "biological";
+    return {
+      color: dim ? "rgba(102,115,95,0.08)" : colors.edge,
+      width: 1.15,
+      dash: dashed ? [6, 5] : null,
+      dim,
+    };
   }
 
   /**
@@ -735,6 +808,29 @@ export function GraphView(props: GraphViewProps) {
     );
   }
 
+  /**
+   * A weak pull toward the band for each generation. Partnerships are already
+   * unioned into one level, so couples stay on the same band, and most edges
+   * run between neighbouring bands instead of crossing the whole crowd.
+   */
+  function applyGenerationOrder(graphModel: GraphModel) {
+    if (!graph) return;
+    const maxLevel = maxGenerationLevel(graphModel.generations.values());
+    if (maxLevel <= 0) {
+      graph.d3Force("level", null);
+      return;
+    }
+    graph.d3Force(
+      "level",
+      forceY<GraphNode>(node => generationTargetY(node.level, maxLevel)).strength(
+        node =>
+          node.kind === "person" || node.kind === "junction"
+            ? LEVEL_STRENGTH
+            : 0,
+      ),
+    );
+  }
+
   function drawMediaLayer(
     context: CanvasRenderingContext2D,
     globalScale: number,
@@ -758,11 +854,205 @@ export function GraphView(props: GraphViewProps) {
     }
   }
 
+  function obstacleCellKey(ix: number, iy: number) {
+    return ix * 100003 + iy;
+  }
+
+  /** Buckets every person and junction so links only check nearby obstacles. */
+  function buildObstacleGrid(nodes: GraphNode[]) {
+    const grid = new Map<number, GraphNode[]>();
+    for (const node of nodes) {
+      if (node.kind !== "person" && node.kind !== "junction") continue;
+      if (node.x == null || node.y == null) continue;
+      const key = obstacleCellKey(
+        Math.floor(node.x / LINK_OBSTACLE_CELL),
+        Math.floor(node.y / LINK_OBSTACLE_CELL),
+      );
+      const bucket = grid.get(key);
+      if (bucket) bucket.push(node);
+      else grid.set(key, [node]);
+    }
+    return grid;
+  }
+
+  /**
+   * Nodes that a link passes near without connecting. The two endpoints are
+   * handled separately, because cutting their full circles would swallow a
+   * short edge whose people have wide collision radii.
+   */
+  function obstacleCirclesFor(
+    grid: Map<number, GraphNode[]>,
+    points: readonly LayoutPoint[],
+    source: GraphNode,
+    target: GraphNode,
+  ) {
+    const circles: LayoutCircle[] = [];
+    const seen = new Set<GraphNode>();
+    const visited = new Set<number>();
+    const step = LINK_OBSTACLE_CELL / 2;
+    for (let index = 0; index < points.length - 1; index += 1) {
+      const a = points[index];
+      const b = points[index + 1];
+      const distance = Math.hypot(b.x - a.x, b.y - a.y);
+      const samples = Math.max(1, Math.ceil(distance / step));
+      for (let sample = 0; sample <= samples; sample += 1) {
+        const t = sample / samples;
+        const x = a.x + (b.x - a.x) * t;
+        const y = a.y + (b.y - a.y) * t;
+        const ix = Math.floor(x / LINK_OBSTACLE_CELL);
+        const iy = Math.floor(y / LINK_OBSTACLE_CELL);
+        for (let dx = -1; dx <= 1; dx += 1) {
+          for (let dy = -1; dy <= 1; dy += 1) {
+            const key = obstacleCellKey(ix + dx, iy + dy);
+            if (visited.has(key)) continue;
+            visited.add(key);
+            for (const node of grid.get(key) ?? []) {
+              if (seen.has(node)) continue;
+              if (node.id === source.id || node.id === target.id) continue;
+              seen.add(node);
+              circles.push({
+                x: node.x ?? 0,
+                y: node.y ?? 0,
+                radius:
+                  nodeRadius(node) +
+                  (node.kind === "junction" ? JUNCTION_PASS_PAD : PASS_THROUGH_PAD),
+              });
+            }
+          }
+        }
+      }
+    }
+    return circles;
+  }
+
+  function linkOnScreen(
+    ax: number,
+    ay: number,
+    bx: number,
+    by: number,
+    curve: number,
+  ) {
+    if (!graph) return false;
+    const a = graph.graph2ScreenCoords(ax, ay);
+    const b = graph.graph2ScreenCoords(bx, by);
+    const bulge = (Math.hypot(bx - ax, by - ay) * Math.abs(curve)) / 2;
+    const margin = 80 + bulge;
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+    if (Math.max(a.x, b.x) < -margin) return false;
+    if (Math.min(a.x, b.x) > width + margin) return false;
+    if (Math.max(a.y, b.y) < -margin) return false;
+    if (Math.min(a.y, b.y) > height + margin) return false;
+    return true;
+  }
+
+  /**
+   * Draws the link layer ourselves instead of letting force-graph paint centre
+   * to centre lines. That lets us trim the ends, cut a gap wherever a line
+   * would run behind a stranger, splay sibling arms and keep the highlighted
+   * family's edges above the dimmed ones. Strokes are batched per style, so
+   * this is cheaper than one stroke per link.
+   */
+  function drawLinks(
+    context: CanvasRenderingContext2D,
+    globalScale: number,
+  ) {
+    if (!graph) return;
+    const data = graph.graphData() as {
+      nodes: GraphNode[];
+      links: GraphLink[];
+    };
+    const links = data.links ?? [];
+    if (!links.length) return;
+    const grid = buildObstacleGrid(data.nodes ?? []);
+    const buckets = new Map<string, LinkBucket>();
+
+    for (const link of links) {
+      if (link.kind === "media") continue;
+      const source = link.source as unknown as GraphNode;
+      const target = link.target as unknown as GraphNode;
+      if (
+        !source ||
+        !target ||
+        typeof source !== "object" ||
+        typeof target !== "object"
+      ) {
+        continue;
+      }
+      if (
+        source.x == null ||
+        source.y == null ||
+        target.x == null ||
+        target.y == null
+      ) {
+        continue;
+      }
+
+      let curve = curvatures.get(link.id) ?? 0;
+      if (link.kind === "partner") {
+        // Always bow up, away from the generation band that holds the children.
+        curve = source.x <= target.x ? curve : -curve;
+      }
+      if (!linkOnScreen(source.x, source.y, target.x, target.y, curve)) continue;
+
+      const points = quadraticPoints(
+        { x: source.x, y: source.y },
+        { x: target.x, y: target.y },
+        curve,
+      );
+      const length = polylineLength(points);
+      const startTrim = Math.min(nodeRadius(source) + ENDPOINT_GAP, length * 0.35);
+      const endTrim = Math.min(nodeRadius(target) + ENDPOINT_GAP, length * 0.35);
+      const body = pathSlice(points, startTrim, length - endTrim);
+      if (body.length < 2) continue;
+      const circles = obstacleCirclesFor(grid, body, source, target);
+      const runs = splitPathOutsideCircles(body, circles);
+      if (!runs.length) continue;
+
+      const style = linkStyle(link);
+      const key = `${style.color}|${style.width}|${style.dash?.join(",") ?? ""}|${
+        style.dim ? 1 : 0
+      }`;
+      let bucket = buckets.get(key);
+      if (!bucket) {
+        bucket = { ...style, runs: [] };
+        buckets.set(key, bucket);
+      }
+      for (const run of runs) bucket.runs.push(run);
+    }
+
+    // Dimmed links first, so a hovered family always sits on top.
+    const ordered = [...buckets.values()].sort(
+      (left, right) => Number(right.dim) - Number(left.dim),
+    );
+    context.save();
+    context.lineCap = "round";
+    context.lineJoin = "round";
+    for (const bucket of ordered) {
+      context.beginPath();
+      for (const run of bucket.runs) {
+        context.moveTo(run[0].x, run[0].y);
+        for (let index = 1; index < run.length; index += 1) {
+          context.lineTo(run[index].x, run[index].y);
+        }
+      }
+      context.strokeStyle = bucket.color;
+      context.lineWidth = bucket.width / globalScale;
+      context.setLineDash(
+        bucket.dash ? bucket.dash.map(value => value / globalScale) : [],
+      );
+      context.stroke();
+    }
+    context.setLineDash([]);
+    context.restore();
+  }
+
   function drawBackground(
     context: CanvasRenderingContext2D,
     globalScale: number,
   ) {
     drawMediaLayer(context, globalScale);
+    drawLinks(context, globalScale);
   }
 
   function focusNode(id: string) {
@@ -807,10 +1097,7 @@ export function GraphView(props: GraphViewProps) {
           fit();
         }
       })
-      .linkColor(linkColorFor)
-      .linkWidth(linkWidthFor)
-      .linkLineDash(linkDashFor)
-      .linkVisibility((link: GraphLink) => link.kind !== "media")
+      .linkVisibility(() => false)
       .warmupTicks(60)
       .d3AlphaDecay(0.035)
       .d3VelocityDecay(0.4)
@@ -840,9 +1127,16 @@ export function GraphView(props: GraphViewProps) {
       .d3Force(
         "collide",
         forceCollide<GraphNode>(collisionRadius).iterations(2),
+      )
+      .d3Force(
+        "clearance",
+        forceLinkClearance(
+          () => (graph?.graphData().links ?? []) as GraphLink[],
+        ),
       );
 
     applyAgeOrder(props.data, props.ageOrder);
+    applyGenerationOrder(model());
     syncGraph(model());
     if (import.meta.env.DEV) {
       (window as any).__familyTreeGraph = graph;
@@ -854,6 +1148,51 @@ export function GraphView(props: GraphViewProps) {
           x: node.x,
           y: node.y,
         }));
+      /**
+       * Counts people who are still sitting on a line they do not own. The
+       * routing and clearance rules should keep this at zero, and it is the
+       * quickest way to check a layout change against a dense tree.
+       */
+      (window as any).__familyTreeLinkAudit = () => {
+        if (!graph) return [];
+        const nodes = graph.graphData().nodes as GraphNode[];
+        const links = graph.graphData().links as GraphLink[];
+        const offenders: Array<{ person: string; link: string; distance: number }> = [];
+        for (const node of nodes) {
+          if (node.kind !== "person") continue;
+          if (node.x == null || node.y == null) continue;
+          for (const link of links) {
+            if (link.kind === "media") continue;
+            const source = link.source as unknown as GraphNode;
+            const target = link.target as unknown as GraphNode;
+            if (
+              !source ||
+              !target ||
+              typeof source !== "object" ||
+              typeof target !== "object"
+            ) {
+              continue;
+            }
+            if (source.id === node.id || target.id === node.id) continue;
+            const hit = segmentDistance(
+              node.x,
+              node.y,
+              source.x ?? 0,
+              source.y ?? 0,
+              target.x ?? 0,
+              target.y ?? 0,
+            );
+            if (hit.distance < nodeRadius(node) + 4) {
+              offenders.push({
+                person: node.id,
+                link: link.id,
+                distance: Math.round(hit.distance),
+              });
+            }
+          }
+        }
+        return offenders;
+      };
     }
     setReady(true);
     props.onReady?.({
@@ -999,6 +1338,8 @@ export function GraphView(props: GraphViewProps) {
       nextPersonIds.size !== previousPersonIds.size ||
       [...nextPersonIds].some(id => !previousPersonIds.has(id));
     previousPersonIds = nextPersonIds;
+    curvatures = linkCurvatures(nextModel);
+    applyGenerationOrder(nextModel);
     setModel(nextModel);
     syncGraph(nextModel);
     if (peopleChanged) needsFit = true;
