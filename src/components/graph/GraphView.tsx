@@ -12,6 +12,7 @@ import type { TreeRole } from "~/server/guards";
 import type { PresencePeer } from "~/lib/presence-protocol";
 import { presenceColor } from "~/lib/presence-color";
 import { formatFuzzyYearRange, fuzzyOrderYear } from "~/lib/fuzzy-date";
+import { useI18n } from "~/i18n/LocaleProvider";
 import { cx } from "~/lib/utils";
 import {
   branchColor,
@@ -125,6 +126,7 @@ type GraphViewProps = {
 };
 
 export function GraphView(props: GraphViewProps) {
+  const { t, locale } = useI18n();
   let container!: HTMLDivElement;
   let graph: any;
   let resizeObserver: ResizeObserver | undefined;
@@ -479,7 +481,7 @@ export function GraphView(props: GraphViewProps) {
       context.fillText(label, node.x ?? 0, labelY);
 
       const years = node.person
-        ? formatFuzzyYearRange(node.person.birthDate, node.person.deathDate)
+        ? formatFuzzyYearRange(node.person.birthDate, node.person.deathDate, locale())
         : "";
       if (years) {
         const small = 9.5 / globalScale;
@@ -1397,7 +1399,7 @@ export function GraphView(props: GraphViewProps) {
         <div class="absolute inset-0 grid place-items-center" data-testid="tree-graph-loading">
           <div class="flex items-center gap-3 rounded-full border border-white/10 bg-black/30 px-4 py-2 text-xs text-white/60 backdrop-blur">
             <span class="h-2 w-2 animate-pulse rounded-full bg-gold" />
-            Drawing the branches…
+            {t("graph.loading")}
           </div>
         </div>
       </Show>

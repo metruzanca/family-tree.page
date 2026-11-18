@@ -22,7 +22,9 @@ import {
 import { FOCUS_BANDS, type FocusRadius } from "~/lib/focus";
 import type { PresencePeer, PresenceStatus } from "~/lib/presence-protocol";
 import type { TreeRole } from "~/server/guards";
-import { roleLabel } from "~/lib/format";
+import { roleKey } from "~/lib/format";
+import { useI18n } from "~/i18n/LocaleProvider";
+import type { TranslationKey } from "~/i18n";
 import { PresenceBar } from "../presence/PresenceBar";
 import { Badge } from "./../ui/badge";
 import { Kbd } from "./../ui/kbd";
@@ -74,7 +76,35 @@ type ToolbarProps = {
 const glass =
   "flex h-10 items-center justify-center gap-1.5 rounded-full border border-white/10 bg-black/35 px-3 text-sm text-white/75 backdrop-blur-md transition hover:bg-black/55 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40";
 
+/** Focus bands carry English labels for their users; the menu reads them from the dictionary. */
+const FOCUS_BAND_KEYS: Record<
+  FocusRadius,
+  { label: TranslationKey; description: TranslationKey }
+> = {
+  1: {
+    label: "graph.focus.immediate.label",
+    description: "graph.focus.immediate.description",
+  },
+  2: {
+    label: "graph.focus.close.label",
+    description: "graph.focus.close.description",
+  },
+  3: {
+    label: "graph.focus.extended.label",
+    description: "graph.focus.extended.description",
+  },
+  4: {
+    label: "graph.focus.cousins.label",
+    description: "graph.focus.cousins.description",
+  },
+  all: {
+    label: "tree.everyone",
+    description: "graph.focus.all.description",
+  },
+};
+
 export function GraphToolbar(props: ToolbarProps) {
+  const { t } = useI18n();
   const editable = () => props.role === "owner" || props.role === "editor";
   return (
     <div class="pointer-events-none absolute inset-x-0 top-0 z-20 p-3 sm:p-4">
@@ -82,11 +112,11 @@ export function GraphToolbar(props: ToolbarProps) {
         <A
           href={props.backHref ?? "/trees"}
           class={`${glass} px-3`}
-          aria-label={props.backLabel ?? "Back to your trees"}
+          aria-label={props.backLabel ?? t("graph.toolbar.back")}
           data-testid="tree-toolbar-back"
         >
           <ArrowLeft size={16} />
-          <span class="hidden sm:inline">{props.backLabel ?? "Trees"}</span>
+          <span class="hidden sm:inline">{props.backLabel ?? t("graph.toolbar.trees")}</span>
         </A>
         <div
           class="flex min-w-0 items-center gap-2 rounded-full border border-white/10 bg-black/35 px-3 py-2 backdrop-blur-md"
@@ -97,15 +127,17 @@ export function GraphToolbar(props: ToolbarProps) {
           </span>
           <span class="hidden text-[0.65rem] uppercase tracking-wide text-white/40 sm:inline">
             {props.focus.personName && props.focus.radius !== "all"
-              ? `${props.focus.visibleCount} of ${props.focus.total}`
-              : props.focus.total}{" "}
-            {props.focus.total === 1 ? "person" : "people"}
+              ? t("graph.toolbar.visibleOf", {
+                  visible: props.focus.visibleCount,
+                  count: props.focus.total,
+                })
+              : t("common.person", { count: props.focus.total })}
           </span>
           <Badge
             variant="outline"
             class="border-white/10 bg-white/10 text-[0.58rem] font-semibold uppercase tracking-wide text-white/60"
           >
-            {props.badgeLabel ?? roleLabel(props.role)}
+            {props.badgeLabel ?? t(roleKey(props.role))}
           </Badge>
         </div>
 
@@ -121,7 +153,7 @@ export function GraphToolbar(props: ToolbarProps) {
         <div class="ml-auto flex items-center gap-1.5">
           <ToolButton
             testId="tree-toolbar-search"
-            label="Search people and files"
+            label={t("graph.toolbar.search")}
             shortcut="/"
             onClick={props.onSearch}
           >
@@ -138,19 +170,23 @@ export function GraphToolbar(props: ToolbarProps) {
             <button
               type="button"
               class={`${glass} font-semibold`}
-              aria-label="Add person"
+              aria-label={t("graph.toolbar.addPerson")}
               data-testid="tree-toolbar-add-person"
               onClick={() => props.onAddPerson?.()}
             >
               <Plus size={16} />
-              <span class="hidden sm:inline">Add person</span>
+              <span class="hidden sm:inline">{t("graph.toolbar.addPerson")}</span>
             </button>
           </Show>
           <div class="hidden items-center gap-1.5 lg:flex">
             <ToolButton
               testId="tree-toolbar-media"
               active={props.showMedia}
-              label={props.showMedia ? "Hide media" : "Show media"}
+              label={
+                props.showMedia
+                  ? t("graph.toolbar.hideMedia")
+                  : t("graph.toolbar.showMedia")
+              }
               onClick={props.onToggleMedia}
             >
               <Show when={props.showMedia} fallback={<ImageOff size={17} />}>
@@ -162,8 +198,8 @@ export function GraphToolbar(props: ToolbarProps) {
               active={props.ageOrder}
               label={
                 props.ageOrder
-                  ? "Turn off birth-year order"
-                  : "Order by birth year"
+                  ? t("graph.toolbar.ageOrderOff")
+                  : t("graph.toolbar.ageOrderOn")
               }
               onClick={props.onToggleAgeOrder}
             >
@@ -171,7 +207,7 @@ export function GraphToolbar(props: ToolbarProps) {
             </ToolButton>
             <ToolButton
               testId="tree-toolbar-zoom-out"
-              label="Zoom out"
+              label={t("graph.toolbar.zoomOut")}
               shortcut="−"
               onClick={props.onZoomOut}
             >
@@ -179,7 +215,7 @@ export function GraphToolbar(props: ToolbarProps) {
             </ToolButton>
             <ToolButton
               testId="tree-toolbar-zoom-in"
-              label="Zoom in"
+              label={t("graph.toolbar.zoomIn")}
               shortcut="+"
               onClick={props.onZoomIn}
             >
@@ -187,7 +223,7 @@ export function GraphToolbar(props: ToolbarProps) {
             </ToolButton>
             <ToolButton
               testId="tree-toolbar-fit"
-              label="Fit tree"
+              label={t("graph.toolbar.fit")}
               shortcut="F"
               onClick={props.onFit}
             >
@@ -196,35 +232,35 @@ export function GraphToolbar(props: ToolbarProps) {
             <Show when={props.showTreeLinks !== false}>
               <ToolButton
                 testId="tree-toolbar-research"
-                label="Research desk"
+                label={t("graph.toolbar.research")}
                 href={`/trees/${props.treeId}/research`}
               >
                 <BookOpen size={17} />
               </ToolButton>
               <ToolButton
                 testId="tree-toolbar-gallery"
-                label="Photos"
+                label={t("media.title")}
                 href={`/trees/${props.treeId}/media`}
               >
                 <Images size={17} />
               </ToolButton>
               <ToolButton
                 testId="tree-toolbar-activity"
-                label="Activity"
+                label={t("graph.toolbar.activity")}
                 href={`/trees/${props.treeId}/activity`}
               >
                 <History size={17} />
               </ToolButton>
               <ToolButton
                 testId="tree-toolbar-calendar"
-                label="Calendar"
+                label={t("trees.calendar")}
                 href={`/trees/${props.treeId}/calendar`}
               >
                 <CalendarDays size={17} />
               </ToolButton>
               <ToolButton
                 testId="tree-toolbar-settings"
-                label="Tree settings"
+                label={t("tree.settings.title")}
                 href={`/trees/${props.treeId}/settings`}
               >
                 <Settings size={17} />
@@ -235,7 +271,7 @@ export function GraphToolbar(props: ToolbarProps) {
           <DropdownMenu placement="bottom-end">
             <DropdownMenuTrigger
               class={`${glass} px-2 lg:hidden`}
-              aria-label="More controls"
+              aria-label={t("graph.toolbar.more")}
               data-testid="tree-toolbar-more"
             >
               <MoreHorizontal size={18} />
@@ -243,7 +279,11 @@ export function GraphToolbar(props: ToolbarProps) {
             <DropdownMenuContent class="w-56 rounded-2xl border-white/10 bg-[#161b14] p-1.5 text-white/80">
               <GlassItem
                 testId="tree-toolbar-more-media"
-                label={props.showMedia ? "Hide media" : "Show media"}
+                label={
+                  props.showMedia
+                    ? t("graph.toolbar.hideMedia")
+                    : t("graph.toolbar.showMedia")
+                }
                 onSelect={props.onToggleMedia}
               >
                 <Show when={props.showMedia} fallback={<ImageOff />}>
@@ -254,8 +294,8 @@ export function GraphToolbar(props: ToolbarProps) {
                 testId="tree-toolbar-more-age-order"
                 label={
                   props.ageOrder
-                    ? "Turn off birth-year order"
-                    : "Order by birth year"
+                    ? t("graph.toolbar.ageOrderOff")
+                    : t("graph.toolbar.ageOrderOn")
                 }
                 onSelect={props.onToggleAgeOrder}
               >
@@ -266,8 +306,10 @@ export function GraphToolbar(props: ToolbarProps) {
                   testId="tree-toolbar-more-focus-person"
                   label={
                     props.focus.personName
-                      ? `Focused on ${props.focus.personName}. Change who you are`
-                      : "Tell us who you are"
+                      ? t("graph.toolbar.focusedChange", {
+                          name: props.focus.personName,
+                        })
+                      : t("graph.toolbar.tellWho")
                   }
                   onSelect={props.onChangeFocusPerson}
                 >
@@ -276,7 +318,7 @@ export function GraphToolbar(props: ToolbarProps) {
                 <Show when={props.focus.radius !== "all"}>
                   <GlassItem
                     testId="tree-toolbar-more-show-all"
-                    label="Show the whole tree"
+                    label={t("graph.toolbar.showAll")}
                     onSelect={() => props.onFocusRadius("all")}
                   >
                     <Target />
@@ -286,19 +328,23 @@ export function GraphToolbar(props: ToolbarProps) {
               <DropdownMenuSeparator class="my-1 bg-white/10" />
               <GlassItem
                 testId="tree-toolbar-more-zoom-out"
-                label="Zoom out"
+                label={t("graph.toolbar.zoomOut")}
                 onSelect={props.onZoomOut}
               >
                 <ZoomOut />
               </GlassItem>
               <GlassItem
                 testId="tree-toolbar-more-zoom-in"
-                label="Zoom in"
+                label={t("graph.toolbar.zoomIn")}
                 onSelect={props.onZoomIn}
               >
                 <ZoomIn />
               </GlassItem>
-              <GlassItem testId="tree-toolbar-more-fit" label="Fit tree" onSelect={props.onFit}>
+              <GlassItem
+                testId="tree-toolbar-more-fit"
+                label={t("graph.toolbar.fit")}
+                onSelect={props.onFit}
+              >
                 <Maximize2 />
               </GlassItem>
               <Show when={props.showTreeLinks !== false}>
@@ -310,7 +356,7 @@ export function GraphToolbar(props: ToolbarProps) {
                   class="gap-2 rounded-xl px-3 py-2 text-white/80 data-[highlighted]:bg-white/10 data-[highlighted]:text-white"
                 >
                   <Images />
-                  Photos
+                  {t("media.title")}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   as={A}
@@ -319,7 +365,7 @@ export function GraphToolbar(props: ToolbarProps) {
                   class="gap-2 rounded-xl px-3 py-2 text-white/80 data-[highlighted]:bg-white/10 data-[highlighted]:text-white"
                 >
                   <BookOpen />
-                  Research desk
+                  {t("graph.toolbar.research")}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   as={A}
@@ -328,7 +374,7 @@ export function GraphToolbar(props: ToolbarProps) {
                   class="gap-2 rounded-xl px-3 py-2 text-white/80 data-[highlighted]:bg-white/10 data-[highlighted]:text-white"
                 >
                   <History />
-                  Activity
+                  {t("graph.toolbar.activity")}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   as={A}
@@ -337,7 +383,7 @@ export function GraphToolbar(props: ToolbarProps) {
                   class="gap-2 rounded-xl px-3 py-2 text-white/80 data-[highlighted]:bg-white/10 data-[highlighted]:text-white"
                 >
                   <CalendarDays />
-                  Calendar
+                  {t("trees.calendar")}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   as={A}
@@ -346,7 +392,7 @@ export function GraphToolbar(props: ToolbarProps) {
                   class="gap-2 rounded-xl px-3 py-2 text-white/80 data-[highlighted]:bg-white/10 data-[highlighted]:text-white"
                 >
                   <Settings />
-                  Tree settings
+                  {t("tree.settings.title")}
                 </DropdownMenuItem>
               </Show>
             </DropdownMenuContent>
@@ -367,13 +413,14 @@ function FocusMenu(props: {
   onRadius: (radius: FocusRadius) => void;
   onChangePerson: () => void;
 }) {
+  const { t } = useI18n();
   return (
     <DropdownMenu placement="bottom-end">
       <DropdownMenuTrigger
         class={`${glass} size-10 px-0 ${
           props.focus.personName ? "!text-white" : "!text-white/55 hover:!text-white"
         }`}
-        aria-label="Focus and visibility"
+        aria-label={t("graph.toolbar.focusMenu")}
         data-testid="tree-toolbar-focus"
       >
         <Target size={17} />
@@ -382,11 +429,14 @@ function FocusMenu(props: {
         <div class="px-3 pb-1 pt-2">
           <p class="text-xs font-semibold text-white/90">
             {props.focus.personName
-              ? `Focused on ${props.focus.personName}`
-              : "Showing the whole tree"}
+              ? t("graph.toolbar.focused", { name: props.focus.personName })
+              : t("graph.toolbar.showingAll")}
           </p>
           <p class="mt-0.5 text-[0.7rem] text-white/45">
-            {props.focus.visibleCount} of {props.focus.total} people visible
+            {t("graph.toolbar.visibleCount", {
+              visible: props.focus.visibleCount,
+              count: props.focus.total,
+            })}
           </p>
         </div>
         <DropdownMenuSeparator class="my-1 bg-white/10" />
@@ -405,9 +455,11 @@ function FocusMenu(props: {
                 class="items-start gap-2 rounded-xl py-2 pr-2 pl-8 text-white/80 outline-none data-[highlighted]:bg-white/10 data-[highlighted]:text-white"
               >
                 <span class="flex min-w-0 flex-col">
-                  <span class="text-sm font-medium">{band.label}</span>
+                  <span class="text-sm font-medium">
+                    {t(FOCUS_BAND_KEYS[band.radius].label)}
+                  </span>
                   <span class="text-[0.65rem] leading-snug text-white/40">
-                    {band.description}
+                    {t(FOCUS_BAND_KEYS[band.radius].description)}
                   </span>
                 </span>
               </DropdownMenuRadioItem>
@@ -417,7 +469,11 @@ function FocusMenu(props: {
         <DropdownMenuSeparator class="my-1 bg-white/10" />
         <GlassItem
           testId="tree-toolbar-focus-change-person"
-          label={props.focus.personName ? "Change who I am" : "Tell us who you are"}
+          label={
+            props.focus.personName
+              ? t("graph.toolbar.changeWho")
+              : t("graph.toolbar.tellWho")
+          }
           onSelect={props.onChangePerson}
         >
           <UserRound />

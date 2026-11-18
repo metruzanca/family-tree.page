@@ -2,6 +2,7 @@ import { For, Show, createEffect, createMemo, createSignal } from "solid-js";
 import { FileText, Image as ImageIcon, Search } from "lucide-solid";
 import type { GraphFile, GraphPerson, TreeGraph } from "~/api/people-server";
 import { formatFuzzyYearRange } from "~/lib/fuzzy-date";
+import { useI18n } from "~/i18n/LocaleProvider";
 import { Avatar } from "../ui/Avatar";
 import { Kbd, KbdGroup } from "../ui/kbd";
 import { Modal } from "../ui/Modal";
@@ -15,6 +16,7 @@ export function GraphSearch(props: {
   onPerson: (person: GraphPerson) => void;
   onFile: (file: GraphFile) => void;
 }) {
+  const { t, locale } = useI18n();
   const [query, setQuery] = createSignal("");
   createEffect(() => {
     if (props.open) setQuery("");
@@ -45,17 +47,20 @@ export function GraphSearch(props: {
     <Modal
       open={props.open}
       onClose={props.onClose}
-      title="Search the tree"
-      description="Find a person or a file. Selecting a result opens its panel and brings it into view."
+      title={t("graph.search.title")}
+      description={t("graph.search.description")}
       testId="graph-search-dialog"
       footer={
         <div class="flex w-full items-center justify-between text-xs text-muted-foreground">
           <span>
-            {people().length} {people().length === 1 ? "person" : "people"}
-            <Show when={files().length}> · {files().length} files</Show>
+            {t("common.person", { count: people().length })}
+            <Show when={files().length}>
+              {" · "}
+              {t("graph.search.fileCount", { count: files().length })}
+            </Show>
           </span>
           <span class="flex items-center gap-1.5">
-            Close
+            {t("common.close")}
             <Kbd>Esc</Kbd>
           </span>
         </div>
@@ -67,7 +72,7 @@ export function GraphSearch(props: {
           class="input pl-10"
           value={query()}
           onInput={event => setQuery(event.currentTarget.value)}
-          placeholder="Name, nickname, maiden name, file…"
+          placeholder={t("graph.search.placeholder")}
           data-testid="graph-search-input"
           autofocus
         />
@@ -76,7 +81,7 @@ export function GraphSearch(props: {
       <div class="scroll-thin mt-3 max-h-[52dvh] space-y-4 overflow-y-auto pr-1">
         <Show when={people().length}>
           <section>
-            <h3 class="field-label mb-1.5">People</h3>
+            <h3 class="field-label mb-1.5">{t("graph.search.people")}</h3>
             <div class="space-y-0.5">
               <For each={people()}>
                 {person => (
@@ -96,12 +101,16 @@ export function GraphSearch(props: {
                         <Show
                           when={props.isOutsideFocus?.(person.id)}
                           fallback={
-                            formatFuzzyYearRange(person.birthDate, person.deathDate) ||
+                            formatFuzzyYearRange(
+                              person.birthDate,
+                              person.deathDate,
+                              locale(),
+                            ) ||
                             person.bio?.slice(0, 60) ||
-                            "No dates yet"
+                            t("people.focus.noDates")
                           }
                         >
-                          Outside your focus · opens in context
+                          {t("graph.search.outsideContext")}
                         </Show>
                       </span>
                     </span>
@@ -114,7 +123,7 @@ export function GraphSearch(props: {
 
         <Show when={files().length}>
           <section>
-            <h3 class="field-label mb-1.5">Files</h3>
+            <h3 class="field-label mb-1.5">{t("graph.search.files")}</h3>
             <div class="space-y-0.5">
               <For each={files()}>
                 {file => (
@@ -144,12 +153,12 @@ export function GraphSearch(props: {
                       <span class="block truncate text-xs text-muted-foreground">
                         {(file.personId
                           ? personById().get(file.personId)?.displayName
-                          : null) ?? "In the inbox"}
+                          : null) ?? t("graph.search.inInbox")}
                         <Show
                           when={file.personId && props.isOutsideFocus?.(file.personId)}
                         >
-                          {" "}
-                          · outside your focus
+                          {" · "}
+                          {t("graph.search.outsideShort")}
                         </Show>
                       </span>
                     </span>
@@ -165,7 +174,7 @@ export function GraphSearch(props: {
             class="py-10 text-center text-sm text-muted-foreground"
             data-testid="graph-search-empty"
           >
-            Nothing matches “{query()}”.
+            {t("people.focus.empty", { query: query() })}
           </p>
         </Show>
       </div>
@@ -173,7 +182,7 @@ export function GraphSearch(props: {
       <div class="mt-4 flex items-center justify-center gap-3 text-xs text-muted-foreground">
         <KbdGroup>
           <Kbd>/</Kbd>
-          <span>to search anywhere</span>
+          <span>{t("graph.search.shortcutHint")}</span>
         </KbdGroup>
       </div>
     </Modal>
