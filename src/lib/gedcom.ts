@@ -1,5 +1,9 @@
 import { createHash } from "node:crypto";
-import { fuzzySortValue, type FuzzyDate } from "./fuzzy-date";
+import {
+  fuzzySortValue,
+  type FuzzyDate,
+  type PartialDate,
+} from "./fuzzy-date";
 import type { PersonEventKind } from "./person-events";
 import { gedcomSex, type PersonSex } from "./person-sex";
 
@@ -55,6 +59,18 @@ export type GedcomFile = {
   mimeType: string;
 };
 
+export type GedcomVersion = "5.5.1" | "7.0";
+
+export type GedcomOptions = {
+  version?: GedcomVersion;
+};
+
+export function parseGedcomVersion(
+  value: string | null | undefined,
+): GedcomVersion {
+  return value === "7" || value === "7.0" ? "7.0" : "5.5.1";
+}
+
 export type GedcomInput = {
   treeName: string;
   treeDescription?: string | null;
@@ -106,25 +122,44 @@ function dateParts(value: FuzzyDate["start"]): string | null {
  * omitted rather than invented. Between falls back to AFT or BEF when only one
  * end is known.
  */
+function compareParts(left: PartialDate, right: PartialDate) {
+  const fields: Array<keyof PartialDate> = ["year", "month", "day"];
+  for (const field of fields) {
+    const a = left[field] ?? 0;
+    const b = right[field] ?? 0;
+    if (a !== b) return a - b;
+  }
+  return 0;
+}
+
 export function gedcomDate(value: FuzzyDate | null | undefined): string | null {
   if (!value || value.qualifier === "unknown") return null;
-  const start = dateParts(value.start);
-  const end = value.end ? dateParts(value.end) : null;
 
   switch (value.qualifier) {
     case "about":
-      return start ? `ABT ${start}` : null;
     case "before":
-      return start ? `BEF ${start}` : null;
-    case "after":
-      return start ? `AFT ${start}` : null;
-    case "between":
+    case "after": {
+      const start = dateParts(value.start);
+      if (!start) return null;
+      if (value.qualifier === "about") return `ABT ${start}`;
+      if (value.qualifier === "before") return `BEF ${start}`;
+      return `AFT ${start}`;
+    }
+    case "between": {
+      let startParts = value.start;
+      let endParts = value.end ?? null;
+      if (endParts && compareParts(startParts, endParts) > 0) {
+        [startParts, endParts] = [endParts, startParts];
+      }
+      const start = dateParts(startParts);
+      const end = endParts ? dateParts(endParts) : null;
       if (start && end) return `BET ${start} AND ${end}`;
       if (start) return `AFT ${start}`;
       if (end) return `BEF ${end}`;
       return null;
+    }
     default:
-      return start;
+      return dateParts(value.start);
   }
 }
 
@@ -135,11 +170,12 @@ export function gedcomName(firstName: string, lastName: string) {
   return given ? `${given} /${surname}/` : `/${surname}/`;
 }
 
-function chunks(value: string) {
+function chunks(value: string, maxChars = MAX_VALUE_CHARS) {
   if (!value) return [""];
+  if (!Number.isFinite(maxChars)) return [value];
   const parts: string[] = [];
-  for (let index = 0; index < value.length; index += MAX_VALUE_CHARS) {
-    parts.push(value.slice(index, index + MAX_VALUE_CHARS));
+  for (let index = 0; index < value.length; index += maxChars) {
+    parts.push(value.slice(index, index + maxChars));
   }
   return parts;
 }
@@ -160,17 +196,26 @@ function pushXrefLine(
   lines.push(value ? `${base} ${value}` : base);
 }
 
-/** Writes a value with CONT for paragraphs and CONC for long lines. */
-function writeLong(lines: string[], level: number, tag: string, text: string) {
+/**
+ * Writes a value with CONT for paragraphs and, in 5.5.1, CONC for long lines.
+ * GEDCOM 7 has no line limit and removed CONC.
+ */
+function writeLong(
+  lines: string[],
+  level: number,
+  tag: string,
+  text: string,
+  maxChars = MAX_VALUE_CHARS,
+) {
   const paragraphs = text.replace(/\r\n?/g, "\n").split("\n");
   const first = paragraphs.shift() ?? "";
-  const firstChunks = chunks(first);
+  const firstChunks = chunks(first, maxChars);
   pushLine(lines, level, tag, escapeValue(firstChunks[0]));
   for (const chunk of firstChunks.slice(1)) {
     pushLine(lines, level + 1, "CONC", escapeValue(chunk));
   }
   for (const paragraph of paragraphs) {
-    const paragraphChunks = chunks(paragraph);
+    const paragraphChunks = chunks(paragraph, maxChars);
     pushLine(lines, level + 1, "CONT", escapeValue(paragraphChunks[0]));
     for (const chunk of paragraphChunks.slice(1)) {
       pushLine(lines, level + 1, "CONC", escapeValue(chunk));
@@ -230,7 +275,7 @@ function eventType(kind: PersonEventKind, title: string | null) {
 function mediaFormat(mimeType: string) {
   switch (mimeType.toLowerCase()) {
     case "image/jpeg":
-      return "jpg";
+      return "jpeg";
     case "image/png":
       return "png";
     case "image/webp":
@@ -321,7 +366,13 @@ function buildFamilyGroups(input: GedcomInput): FamilyGroup[] {
     });
 }
 
-export function buildGedcom(input: GedcomInput): string {
+export function buildGedcom(
+  input: GedcomInput,
+  options: GedcomOptions = {},
+): string {
+  const version = options.version ?? "5.5.1";
+  const isSeven = version === "7.0";
+  const maxValue = isSeven ? Number.POSITIVE_INFINITY : MAX_VALUE_CHARS;
   const lines: string[] = [];
   const generatedAt = input.generatedAt ?? new Date();
   const seenXrefs = new Set<string>();
@@ -351,22 +402,27 @@ export function buildGedcom(input: GedcomInput): string {
   pushLine(lines, 2, "NAME", "Roots Family Tree");
   pushLine(lines, 2, "CORP", "Roots");
   pushLine(lines, 1, "GEDC");
-  pushLine(lines, 2, "VERS", "5.5.1");
-  pushLine(lines, 2, "FORM", "LINEAGE-LINKED");
-  pushLine(lines, 1, "CHAR", "UTF-8");
+  pushLine(lines, 2, "VERS", version);
+  if (!isSeven) {
+    pushLine(lines, 2, "FORM", "LINEAGE-LINKED");
+    pushLine(lines, 1, "CHAR", "UTF-8");
+  }
   pushLine(lines, 1, "DATE", headerDate(generatedAt));
   pushLine(lines, 1, "SUBM", "@SUBM1@");
   writeLong(
     lines,
     1,
     "NOTE",
-    "GEDCOM 5.5.1 has only HUSB and WIFE for a couple. When one partner is male and the other female, those roles follow sex. Otherwise they are assigned by stable partner order, so review same-sex and unknown-partner families after import.",
+    isSeven
+      ? "GEDCOM 7 has only HUSB and WIFE for a couple. When one partner is male and the other female, those roles follow sex. Otherwise they are assigned by stable partner order, so review same-sex and unknown-partner families after import."
+      : "GEDCOM 5.5.1 has only HUSB and WIFE for a couple. When one partner is male and the other female, those roles follow sex. Otherwise they are assigned by stable partner order, so review same-sex and unknown-partner families after import.",
+    maxValue,
   );
 
   pushXrefLine(lines, 0, "@SUBM1@", "SUBM");
   pushLine(lines, 1, "NAME", escapeValue(input.treeName));
   if (input.treeDescription) {
-    writeLong(lines, 1, "NOTE", input.treeDescription);
+    writeLong(lines, 1, "NOTE", input.treeDescription, maxValue);
   }
 
   const eventsByPerson = new Map<string, GedcomEvent[]>();
@@ -409,11 +465,11 @@ export function buildGedcom(input: GedcomInput): string {
     if (person.nickname?.trim()) {
       pushLine(lines, 2, "NICK", escapeValue(person.nickname.trim()));
     }
-    pushLine(lines, 1, "SEX", gedcomSex(person.sex));
+    pushLine(lines, 1, "SEX", gedcomSex(person.sex, version));
 
     if (person.maidenName?.trim()) {
       pushLine(lines, 1, "NAME", gedcomName(person.firstName, person.maidenName));
-      pushLine(lines, 2, "TYPE", "maiden");
+      pushLine(lines, 2, "TYPE", isSeven ? "MAIDEN" : "maiden");
       if (person.firstName.trim()) {
         pushLine(lines, 2, "GIVN", escapeValue(person.firstName.trim()));
       }
@@ -424,18 +480,22 @@ export function buildGedcom(input: GedcomInput): string {
     if (birthDate || person.birthPlace) {
       pushLine(lines, 1, "BIRT");
       if (birthDate) pushLine(lines, 2, "DATE", birthDate);
-      if (person.birthPlace) writeLong(lines, 2, "PLAC", person.birthPlace);
+      if (person.birthPlace) {
+        writeLong(lines, 2, "PLAC", person.birthPlace, maxValue);
+      }
     }
 
     const deathDate = gedcomDate(person.deathDate);
     if (deathDate || person.deathPlace) {
       pushLine(lines, 1, "DEAT");
       if (deathDate) pushLine(lines, 2, "DATE", deathDate);
-      if (person.deathPlace) writeLong(lines, 2, "PLAC", person.deathPlace);
+      if (person.deathPlace) {
+        writeLong(lines, 2, "PLAC", person.deathPlace, maxValue);
+      }
     }
 
     if (person.bio?.trim()) {
-      writeLong(lines, 1, "NOTE", person.bio.trim());
+      writeLong(lines, 1, "NOTE", person.bio.trim(), maxValue);
     }
 
     for (const event of eventsByPerson.get(person.id) ?? []) {
@@ -458,9 +518,9 @@ export function buildGedcom(input: GedcomInput): string {
       }
       const date = gedcomDate(event.date);
       if (date) pushLine(lines, 2, "DATE", date);
-      if (event.place) writeLong(lines, 2, "PLAC", event.place);
+      if (event.place) writeLong(lines, 2, "PLAC", event.place, maxValue);
       if (event.description?.trim()) {
-        writeLong(lines, 2, "NOTE", event.description.trim());
+        writeLong(lines, 2, "NOTE", event.description.trim(), maxValue);
       }
     }
 
@@ -481,6 +541,7 @@ export function buildGedcom(input: GedcomInput): string {
         1,
         "NOTE",
         "This family has more than two parents recorded. Only the first two are placed in HUSB and WIFE.",
+        maxValue,
       );
     }
     const parents = group.parentIds
@@ -548,8 +609,13 @@ export function buildGedcom(input: GedcomInput): string {
     if (!xref) continue;
     pushXrefLine(lines, 0, xref, "OBJE");
     pushLine(lines, 1, "FILE", escapeValue(file.originalName));
-    pushLine(lines, 2, "FORM", mediaFormat(file.mimeType));
-    pushLine(lines, 1, "TITL", escapeValue(file.originalName));
+    pushLine(
+      lines,
+      2,
+      "FORM",
+      isSeven ? file.mimeType : mediaFormat(file.mimeType),
+    );
+    pushLine(lines, 2, "TITL", escapeValue(file.originalName));
     pushLine(lines, 1, "_ROOTS_FILE_ID", file.id);
   }
 

@@ -693,7 +693,7 @@ function TreeSettingsInner() {
                 <SectionCard
                   class="mt-5"
                   title="GEDCOM"
-                  description="Move people between genealogy tools. Import with a review before anything changes."
+                  description="Move people between genealogy tools. Download 5.5.1 for the widest support or 7 for newer tools. Import with a review before anything changes."
                 >
                   <div class="flex flex-wrap items-center gap-3">
                     <A
@@ -702,7 +702,15 @@ function TreeSettingsInner() {
                       data-testid="tree-export-gedcom"
                     >
                       <Download size={15} />
-                      Download GEDCOM
+                      GEDCOM 5.5.1
+                    </A>
+                    <A
+                      href={`/api/trees/${params.treeId}/gedcom?version=7`}
+                      class={buttonVariants({ variant: "secondary" })}
+                      data-testid="tree-export-gedcom-7"
+                    >
+                      <Download size={15} />
+                      GEDCOM 7
                     </A>
                     <Show when={canImport()}>
                       <A

@@ -42,7 +42,11 @@ export function personSexLabel(sex: PersonSex) {
   return PERSON_SEX_OPTIONS.find(option => option.value === sex)?.label ?? "Unknown";
 }
 
-/** GEDCOM 5.5.1 only has M, F, and U. */
-export function gedcomSex(sex: PersonSex) {
+/** GEDCOM 7 adds X for other; unknown remains U in both versions. */
+export function gedcomSex(
+  sex: PersonSex,
+  version: "5.5.1" | "7.0" = "5.5.1",
+) {
+  if (sex === "other") return version === "7.0" ? "X" : "U";
   return PERSON_SEX_OPTIONS.find(option => option.value === sex)?.gedcom ?? "U";
 }

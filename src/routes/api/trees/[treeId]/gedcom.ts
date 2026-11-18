@@ -1,5 +1,5 @@
 import type { APIEvent } from "@solidjs/start/server";
-import { buildGedcom } from "~/lib/gedcom";
+import { buildGedcom, parseGedcomVersion } from "~/lib/gedcom";
 import { loadApiTreeData } from "~/server/api/data";
 import { toGedcomInput } from "~/server/api/build";
 import { checkRateLimit, getOptionalUser } from "~/server/auth-service";
@@ -44,15 +44,22 @@ export async function GET(event: APIEvent) {
 
   try {
     const data = await loadApiTreeData(access.tree);
-    const gedcom = buildGedcom({
-      ...toGedcomInput(data),
-      generatedAt: new Date(),
-    });
+    const version = parseGedcomVersion(
+      new URL(event.request.url).searchParams.get("version"),
+    );
+    const gedcom = buildGedcom(
+      {
+        ...toGedcomInput(data),
+        generatedAt: new Date(),
+      },
+      { version },
+    );
     const date = new Date().toISOString().slice(0, 10);
+    const suffix = version === "7.0" ? "-7" : "";
     return new Response(gedcom, {
       headers: {
         "Content-Type": "text/plain; charset=utf-8",
-        "Content-Disposition": `attachment; filename="${fileSlug(access.tree.name)}-${date}.ged"`,
+        "Content-Disposition": `attachment; filename="${fileSlug(access.tree.name)}-${date}${suffix}.ged"`,
         "Cache-Control": "no-store",
         "X-Content-Type-Options": "nosniff",
         "Content-Length": String(Buffer.byteLength(gedcom, "utf8")),

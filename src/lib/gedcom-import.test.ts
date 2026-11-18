@@ -329,3 +329,26 @@ this line is broken
     expect(family.startDate).toEqual(exactFuzzyDate(1950));
   });
 });
+
+
+describe("GEDCOM 7 import", () => {
+  it("reads X sex, BIRTH name types, and shared notes", () => {
+    const result = parseGedcom(`0 HEAD
+1 GEDC
+2 VERS 7.0
+0 @I1@ INDI
+1 NAME Alex /River/
+2 TYPE BIRTH
+1 SEX X
+0 @N1@ SNOTE A shared note
+0 @I2@ INDI
+1 NAME Sam /River/
+1 SEX M
+1 SNOTE @N1@
+0 TRLR`);
+    expect(result.people).toHaveLength(2);
+    expect(result.people[0].sex).toBe("other");
+    expect(result.people[1].sex).toBe("male");
+    expect(result.people[1].bio).toBe("A shared note");
+  });
+});

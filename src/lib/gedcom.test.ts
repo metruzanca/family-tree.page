@@ -4,6 +4,7 @@ import {
   buildGedcom,
   gedcomDate,
   gedcomName,
+  parseGedcomVersion,
   type GedcomInput,
   type GedcomPerson,
 } from "./gedcom";
@@ -256,7 +257,8 @@ describe("GEDCOM export", () => {
   it("attaches media records", () => {
     expect(rows.some(line => /^0 @M[A-Z0-9]+@ OBJE$/.test(line))).toBe(true);
     expect(rows).toContain("1 FILE abe.jpg");
-    expect(rows).toContain("2 FORM jpg");
+    expect(rows).toContain("2 FORM jpeg");
+    expect(rows).toContain("2 TITL abe.jpg");
   });
 
   it("keeps every line short enough for the format", () => {
@@ -300,5 +302,76 @@ describe("GEDCOM export", () => {
     expect(outLines.some(line => line.startsWith("1 HUSB "))).toBe(true);
     expect(outLines.filter(line => line.startsWith("1 WIFE "))).toHaveLength(0);
     expect(outLines.some(line => line.startsWith("1 CHIL "))).toBe(true);
+  });
+});
+
+
+describe("GEDCOM 7", () => {
+  const seven = buildGedcom(input(), { version: "7.0" });
+  const rows = lines(seven);
+
+  it("writes a 7.0 header without the 5.5.1-only tags", () => {
+    expect(rows).toContain("2 VERS 7.0");
+    expect(rows).not.toContain("1 CHAR UTF-8");
+    expect(rows).not.toContain("2 FORM LINEAGE-LINKED");
+    expect(rows.at(-1)).toBe("0 TRLR");
+  });
+
+  it("uses X for other sex and uppercase name types", () => {
+    const out = buildGedcom(
+      input({
+        people: [
+          person("a", "Ada", "One", { sex: "female" }),
+          person("b", "Bea", "One", { sex: "male" }),
+          person("c", "Cam", "One", { sex: "other" }),
+          person("d", "Dee", "One", { sex: "unknown" }),
+          person("e", "Eve", "One", { maidenName: "Old" }),
+        ],
+        relationships: [],
+        events: [],
+        files: [],
+      }),
+      { version: "7.0" },
+    );
+    const outLines = lines(out);
+    expect(outLines.filter(line => line === "1 SEX F")).toHaveLength(1);
+    expect(outLines.filter(line => line === "1 SEX M")).toHaveLength(1);
+    expect(outLines.filter(line => line === "1 SEX X")).toHaveLength(1);
+    expect(outLines.filter(line => line === "1 SEX U")).toHaveLength(2);
+    expect(outLines).toContain("2 TYPE MAIDEN");
+  });
+
+  it("uses MIME types and puts TITL under FILE", () => {
+    expect(rows).toContain("2 FORM image/jpeg");
+    expect(rows).toContain("2 TITL abe.jpg");
+    expect(rows).not.toContain("1 TITL abe.jpg");
+    expect(rows).not.toContain("2 FORM jpeg");
+  });
+
+  it("removes CONC and keeps CONT for paragraphs", () => {
+    const long = "A very long biography. ".repeat(40);
+    const out = buildGedcom(
+      input({
+        people: [person("a", "A", "One", { bio: `${long}\nSecond paragraph.` })],
+        relationships: [],
+        events: [],
+        files: [],
+      }),
+      { version: "7.0" },
+    );
+    const outLines = lines(out);
+    expect(outLines.some(line => line.startsWith("1 CONC"))).toBe(false);
+    expect(outLines.some(line => line.startsWith("2 CONC"))).toBe(false);
+    expect(outLines.some(line => line.startsWith("2 CONT Second paragraph."))).toBe(true);
+    expect(outLines.some(line => line.startsWith("1 NOTE "))).toBe(true);
+  });
+});
+
+describe("GEDCOM version parsing", () => {
+  it("accepts the short and full forms", () => {
+    expect(parseGedcomVersion("7")).toBe("7.0");
+    expect(parseGedcomVersion("7.0")).toBe("7.0");
+    expect(parseGedcomVersion("5.5.1")).toBe("5.5.1");
+    expect(parseGedcomVersion(null)).toBe("5.5.1");
   });
 });

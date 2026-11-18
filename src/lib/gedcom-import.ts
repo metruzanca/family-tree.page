@@ -444,7 +444,7 @@ function readNote(
 }
 
 function readNotes(node: Node, noteRecords: Map<string, string>) {
-  return children(node, "NOTE")
+  return [...children(node, "NOTE"), ...children(node, "SNOTE")]
     .map(entry => readNote(entry, noteRecords))
     .filter((value): value is string => Boolean(value));
 }
@@ -595,10 +595,10 @@ function readPerson(
       ? "male"
       : sexValue === "F"
         ? "female"
-        : sexValue === "O"
+        : sexValue === "X" || sexValue === "O"
           ? "other"
           : "unknown";
-  if (sexValue && !["M", "F", "O", "U", ""].includes(sexValue)) {
+  if (sexValue && !["M", "F", "X", "O", "U", ""].includes(sexValue)) {
     warnings.add("sex", `Unrecognised sex "${sexValue}" was imported as unknown.`, {
       line: record.line,
       xref: record.xref,
@@ -645,7 +645,7 @@ function readPerson(
       continue;
     }
 
-    if (node.tag === "NOTE") {
+    if (node.tag === "NOTE" || node.tag === "SNOTE") {
       const note = readNote(node, noteRecords);
       if (note) bioParts.push(note);
       continue;
@@ -925,7 +925,7 @@ export function parseGedcom(text: string): GedcomImportResult {
 
   const noteRecords = new Map<string, string>();
   for (const root of roots) {
-    if (root.tag === "NOTE" && root.xref) {
+    if ((root.tag === "NOTE" || root.tag === "SNOTE") && root.xref) {
       noteRecords.set(root.xref.replace(/^@|@$/g, ""), root.value);
     }
   }
@@ -944,6 +944,7 @@ export function parseGedcom(text: string): GedcomImportResult {
       case "REPO":
         break;
       case "NOTE":
+      case "SNOTE":
         break;
       case "SOUR":
         sourceRefs.add(root.xref ?? `record:${root.line}`);

@@ -844,11 +844,24 @@
           "Export"
         ],
         "operationId": "exportGedcom",
-        "summary": "Export GEDCOM 5.5.1",
-        "description": "A GEDCOM 5.5.1 file for Ancestry, MyHeritage, Gramps, RootsMagic, and other genealogy tools. Names, dates, places, life events, notes, media references, and families are included. The tree does not record sex, so every person exports as SEX U and HUSB and WIFE are assigned by stable partner order. Limited to 10 exports per hour per token, shared with the JSON export.",
+        "summary": "Export GEDCOM 5.5.1 or 7.0",
+        "description": "A GEDCOM file for Ancestry, MyHeritage, Gramps, RootsMagic, and other genealogy tools. Version 5.5.1 is the default for the widest compatibility; version 7.0 is available for tools that support it. Names, dates, places, life events, notes, media references, and families are included. The tree does not record sex for everyone, so unknown people export as SEX U, and HUSB and WIFE follow sex for mixed couples or stable partner order otherwise. Limited to 10 exports per hour per token, shared with the JSON export.",
         "parameters": [
           {
             "$ref": "#/components/parameters/TreeId"
+          },
+          {
+            "name": "version",
+            "in": "query",
+            "description": "GEDCOM version to write.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "5.5.1",
+                "7.0"
+              ],
+              "default": "5.5.1"
+            }
           }
         ],
         "responses": {
