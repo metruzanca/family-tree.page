@@ -1,6 +1,7 @@
 import { recordFileFaces } from "~/api/faces-server";
 import { friendlyMessage } from "./action-result";
 import { detectFaces, supportsFaceDetection } from "./face-detect";
+import { tClient } from "../i18n";
 
 export type FaceScanResult =
   | { ok: true; count: number }
@@ -18,7 +19,7 @@ export async function scanBlobForFaces(input: {
   if (!supportsFaceDetection()) {
     return {
       ok: false,
-      error: "This browser cannot check for faces. Tag people instead.",
+      error: tClient("media.error.browserNoFace"),
     };
   }
 
@@ -43,7 +44,7 @@ export async function scanFileForFaces(
 ): Promise<FaceScanResult> {
   try {
     const response = await fetch(`/api/files/${fileId}/thumb`);
-    if (!response.ok) return { ok: false, error: "Could not load that photo." };
+    if (!response.ok) return { ok: false, error: tClient("media.error.photoLoad") };
     const blob = await response.blob();
     return scanBlobForFaces({ treeId, fileId, blob });
   } catch (error) {
