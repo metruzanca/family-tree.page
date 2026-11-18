@@ -2,23 +2,25 @@
 
 Deferred work beyond v0.1.0. None of this is shipped yet. The order is a suggestion, not a commitment.
 
-## 1. GEDCOM import and export
+## 1. GEDCOM import
 
-GEDCOM is still the common exchange format between genealogy tools, so it is the highest-value interoperability feature.
+GEDCOM 5.5.1 export is shipped: names, dates, places, life events, notes, media references, families, and `_ROOTS_ID` for round trips. Import is the remaining half, and it is where data quality is won or lost.
 
 Scope:
 
-- Export people, parent-child links, partnerships, names, dates, places, notes, and media references.
-- Import GEDCOM 5.5.1 first, with GEDCOM 7 as a follow-up.
-- Map fuzzy dates to GEDCOM date approximations and back without losing qualifiers.
-- Preview imports, report skipped or ambiguous rows, and never merge silently.
+- Parse GEDCOM 5.5.1 first, with GEDCOM 7 as a follow-up.
+- Preview every import with a per-record report, and never merge silently.
+- On conflict, offer keep, replace, or merge per person, and reuse the duplicate detector as the review step.
+- Map GEDCOM date approximations back to fuzzy dates without losing qualifiers.
+- Map `FAM` records to partnerships and parent-child links without inventing sex. The model has no sex field, so `HUSB` and `WIFE` become partner order or a follow-up sex field.
 - Keep the operation resumable, because large files can exceed a single request.
+- Decide whether media is matched by file name, embedded, or skipped.
 
 Open questions:
 
-- Whether media should be embedded or referenced by relative path.
-- How to map custom life events to standard GEDCOM event tags.
-- Whether to reuse the duplicate detector as an import review step.
+- Whether to add a sex field before import, since both GEDCOM and the pedigree chart want one.
+- How to map custom life events to the standard event tags and back.
+- Whether an import creates a new tree or merges into an existing one.
 
 ## 2. Printable charts and tree posters
 
@@ -102,7 +104,7 @@ Shipped: read-only `/api/v1` endpoints, tree-scoped hashed tokens with scopes an
 
 Remaining:
 
-- GEDCOM 5.5.1 export first, then GEDCOM 7, sharing the JSON serializer. Export stable ids so a round trip matches instead of duplicating. Then GEDCOM import with preview, diff, and the duplicate detector as the review step.
+- GEDCOM 7 export, sharing the existing serializer. GEDCOM 5.5.1 export is shipped; import is tracked in item 1.
 - A public share JSON feed under the existing share token, with the living-person redaction in `src/lib/share.ts`.
 - Write scopes with conflict handling and an explicit merge policy. Reads were deliberately first.
 - Webhooks for `person.created`, `export.completed`, and similar events, after the pull API settles.
