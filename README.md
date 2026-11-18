@@ -1,750 +1,124 @@
-# family-tree
+<p align="center">
+  <img src="https://family-tree.page/favicon.svg" width="72" height="72" alt="family-tree.page logo">
+</p>
 
-A private, collaborative family tree built around an interactive graph of people, relationships, and the photographs and documents attached to them.
+<h1 align="center">family-tree.page</h1>
 
-The graph is the main view. People are nodes, parent and partner relationships are edges, and media clusters behind the person who owns it. Each tree can have one owner and any number of editors and viewers, invited by link.
+<p align="center">
+  A private family tree that looks like a family, not a spreadsheet.
+</p>
 
-## Stack
+<p align="center">
+  <a href="https://family-tree.page">Live app</a> ·
+  <a href="https://family-tree.page/demo">Try the demo</a> ·
+  <a href="docs/README.md">Documentation</a> ·
+  <a href="LICENSE">MIT licensed</a>
+</p>
 
-- SolidStart 2 + SolidJS
-- Drizzle ORM + PostgreSQL
-- Railway Storage Bucket (S3-compatible) for originals and thumbnails
-- `force-graph` for canvas rendering, pan and zoom
-- Tailwind CSS v4
-- shadcn-solid components on Kobalte for dialogs, menus, selects, tabs and toasts
-- Zod for server input validation
-- Vitest for unit tests
+<p align="center">
+  <a href="https://family-tree.page/demo"><img src="docs/assets/demo.png" alt="The demo tree, with people as nodes, relationship lines, and photos filed under the people they belong to"></a>
+</p>
 
-## Features in this version
+<p align="center">
+  <a href="https://github.com/metruzanca/family-tree.page/actions/workflows/ci.yml"><img src="https://github.com/metruzanca/family-tree.page/actions/workflows/ci.yml/badge.svg" alt="CI status"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT license"></a>
+  <a href="package.json"><img src="https://img.shields.io/badge/node-%3E%3D24-brightgreen.svg" alt="Node 24 or newer"></a>
+</p>
 
-- Email and password accounts with encrypted session cookies
-- Email verification, password reset by email, and session invalidation on password changes
-- Email address changes with a confirmation link to the new address and a notice to the old one
-- Download a copy of your account, trees, and media as a zip, or delete your account with ownership safeguards
-- Private family trees with owner, editor, and viewer roles
-- Invites by copyable link or by email, with expiry and single use
-- People, parent-child relationships, and partnerships
-- Add a child with a second parent in one step, and keep the dialog open to add several children quickly
-- Force-directed layout: parent and partner edges pull families into loose clusters, so relatives stay together and edges stay short
-- Every parent set meets at a marked family junction, so a couple and their children fan out from one knot instead of crossing lines
-- Links stop short of the avatars they connect and are cut wherever one would pass behind someone else, so a line through a stranger never reads as a relationship
-- Partner links arc above the couple, child links end in an arrowhead, sibling arms fan out in birth order, and a clearance force keeps people off lines that do not belong to them
-- A label-aware collision force keeps names readable, and disconnected branches find their own space
-- Optional birth-year gravity drifts older people upward without pinning rows, toggled from the toolbar and remembered per browser
-- Weak generation gravity settles each level in its own loose band, and partners always share a band
-- Media clusters around its owner through a short hidden spring and is drawn behind the graph, so a photo never covers a person
-- Parent arms follow the relationship type, and hovering a person lifts their own links above the dimmed ones
-- Cycle-safe relationship analysis that stays bounded when relationships contradict each other, with an in-app warning and `pnpm db:check`
-- The focus menu links a member to their person, so the tree opens around their own branch instead of the whole family
-- Focus rings from immediate family out to first cousins, with a "Show more" chip and an Everyone option that reveals the rest of the tree in one click
-- Search, neighbor highlighting, zoom and pan
-- Calendar tab with birth and death anniversaries, plus upcoming birthdays for living relatives
-- Subscribe to all tree birthdays from Google Calendar, Apple Calendar, or Outlook with a private iCal URL
-- Email birthday reminders, with one-week, day-before, and day-of toggles in account settings
-- Live presence: see who else has the tree open, which person, file, or album they are looking at, and a colored ring and name tag around that node
-- Pointer cursor only over nodes, not links or empty canvas
-- Person and document info panels on desktop and mobile
-- Tree activity feed with filters, field-level changes, and an actor history
-- Research desk with a family group sheet, individual dossier, Ahnentafel pedigree, descendant register, surname and place indexes, and a data quality queue
-- Surname variants clustered with Soundex and edit distance, and places normalized by hierarchy
-- Print-friendly research views with Ahnentafel, Register, and NGSQ numbering
-- Live refresh nudge when another member changes the tree
-- Duplicate person warnings before adding a similar name or birth year
-- Read-only `/demo` that runs the real tree workspace on sample data
-- Public read-only share links with living-person privacy, optional thumbnails, expiry, and revocation
-- A read-only developer API with tree-scoped tokens, cursor pagination, ETags, and an OpenAPI 3.1 contract at `/docs/api`
-- GEDCOM 5.5.1 and 7 export from tree settings and the API, with dates, places, events, notes, media references, and families
-- GEDCOM 5.5.1 import into a new or existing tree, with a parsed preview, per-person create, merge, or skip decisions, and gap-filling merges
-- Nightly PostgreSQL and media backups to a second private bucket, with checksum verification and a one-command restore
-- Optional Sentry error tracking with PII scrubbing
-- Optional Umami analytics with page views and product events, enabled by environment variables
-- Privacy policy at `/privacy` and terms at `/terms`, linked from the app and the registration form
-- Per-account storage and lifetime people limits, with a usage card in account settings
-- Coarse abuse signals in Postgres with a `pnpm abuse:report` summary
-- Full-screen image lightbox with a details sidebar
-- Photo gallery grouped by year, with filename search and person filters, plus bulk filing and deletion
-- People folders that mirror a file manager, where dragging a photo onto a person files it under them
-- A tree inbox for uploads that do not belong to a person yet; tag the photo to file it, or drag it later
-- Tag other people in a photo, with an "Also in photos" section on each tagged person's profile
-- Optional date taken on photos, prefilled from EXIF and editable as a partial or approximate date
-- Multi-file uploads become albums rendered as stacked nodes on the graph
-- Portraits stay on the person node and are not duplicated as file nodes
-- Person profiles with parents, partners, children, and life notes
-- Social profile icons from Simple Icons, one personal-website house link, and optional contact email and phone
-- Sex per person, used for father and mother labels and GEDCOM `SEX`
-- Partial and approximate dates for people, partnerships, and photos, including unknown-year birthdays
-- A life events timeline for each person: residence, occupation, education, military service, migration, marriage, divorce, burial, and custom events
-- Image, PDF, and document uploads attached to people
-- Client-generated thumbnails, server-side content validation, and private file access
-- Mobile layout with a person sheet, touch gestures, and a list-free graph fallback through search
+## Why another family tree app?
 
-## Local development
+Most genealogy tools put a form in front of you. Add a person, add another person, then fill in a table of relationships.
 
-The repository includes a Nix shell with Node 24, pnpm, and PostgreSQL. Local S3 is provided by `s3rver` through npm, so no Docker is required.
+This one puts the family in front of you. People are nodes, relationships are lines, and photos hang off the person they belong to. You move through the tree the way you talk about it: "that's my grandmother's sister, her son is..."
+
+It is free to use, open source, and self-hostable. Your tree is private by default, and you can take it with you.
+
+## What you get
+
+**A real graph.** A force-directed canvas with family junctions, arrows from parent to child, and link routing that stops one family's line from passing behind a stranger. Optional generation bands and birth-year gravity keep big trees readable. Focus rings let you open on your own branch and expand outward.
+
+**Photos that stay attached.** Upload photos and documents to people, file them into folders, or drop them in the tree inbox until you know where they belong. Client-side thumbnails, EXIF dates, albums, tags, and face boxes detected in your browser. Face data never leaves the device.
+
+**A research desk for the rest of us.** Family group sheets, an individual dossier, Ahnentafel pedigree, Register and NGSQ descendant registers, surname clusters, place indexes, and a queue of contradictions and gaps. All linkable and print-friendly.
+
+**Sharing that respects living people.** Invite editors and viewers, create a read-only link, or publish a tree with living people reduced to names, hidden, or shown in full. Links can expire and can be revoked at any time.
+
+**Collaboration without a spreadsheet.** See who else has the tree open and which person they are looking at. Activity history records field-level changes. Other open tabs refresh when someone edits.
+
+**Calendars and reminders.** Birthdays and anniversaries in the app, an iCal feed for Google Calendar, Apple Calendar, or Outlook, and optional email reminders.
+
+**No lock-in.** Export GEDCOM 5.5.1 or 7 for Ancestry, MyHeritage, Gramps, RootsMagic, and friends. Import a GEDCOM file with a preview and per-person create, merge, or skip. Read everything from a token-scoped JSON API. Download a zip of your account and every original, or delete it all.
+
+## Quick start
+
+You need Node 24 and pnpm. The repo ships a Nix shell with both, plus PostgreSQL and a local S3 stand-in, so Docker is not required.
 
 ```bash
-nix-shell
+git clone https://github.com/metruzanca/family-tree.page.git
+cd family-tree.page
+
+nix-shell           # optional: Node 24, pnpm, PostgreSQL
 pnpm install
 cp .env.example .env
-pnpm dev:services
+
+pnpm dev:services   # local Postgres and S3
 pnpm db:migrate
 pnpm db:seed
 pnpm dev
 ```
 
-Open <http://localhost:3000>.
-
-The seed account is:
+Open <http://localhost:3000> and sign in with:
 
 ```text
 demo@family-tree.local
 family-tree-demo-12345
 ```
 
-The dev server binds to `0.0.0.0`, so a phone on the same Tailscale network can open `http://<tailnet-host>:3000`.
+No Nix? Use your own PostgreSQL and any S3-compatible storage, then point the `DATABASE_URL` and `S3_*` variables at them. The full setup, including production copies and dangerous-environment guards, is in [docs/development.md](docs/development.md).
 
-### Dev services
+## Self-hosting
 
-```bash
-pnpm dev:services   # start Postgres on 5432 and local S3 on 9000
-pnpm dev:status
-pnpm dev:stop
-pnpm dev:reset-db   # delete and re-create the disposable local Postgres cluster
-```
+The app is one service, one PostgreSQL database, and one private S3 bucket. Add a second bucket if you want the built-in nightly database and media backup.
 
-Postgres data lives in `.dev/postgres`. Local objects live in `.dev/s3`. Both are ignored by git.
+Railway is the happy path and is what production uses, but nothing is Railway-specific: any Node host, Postgres, and S3-compatible storage will do. See [docs/operations.md](docs/operations.md) for environment variables, deployment, backups, logging, analytics, and quotas.
 
-If you do not use Nix, any PostgreSQL 18+ database and S3-compatible service will work. Point `DATABASE_URL`, `S3_ENDPOINT`, and the other `S3_*` variables at them.
+## Stack
 
-### Never develop against production
+- [SolidStart](https://start.solidjs.com) 2 and SolidJS
+- [Drizzle ORM](https://orm.drizzle.team) with PostgreSQL
+- S3-compatible storage for originals and thumbnails
+- [`force-graph`](https://github.com/vasturiano/force-graph) with a custom link pass, plus `d3-force`
+- [Tailwind CSS](https://tailwindcss.com) v4 and [shadcn-solid](https://shadcn-solid.com) on Kobalte
+- Zod for server input validation, Vitest for unit tests
 
-Production data is read-only from a development machine. Do not point `DATABASE_URL` at Railway or any other remote host, and do not run feature work, seeds, or migrations there.
+## Documentation
 
-Copy production Postgres into the local cluster instead:
-
-```bash
-pnpm dev:services
-pnpm db:pull
-pnpm dev
-```
-
-`pnpm db:pull` dumps the linked Railway `Postgres` service over SSH, restores it into the local database, and applies any newer migrations from your branch. Set `RAILWAY_DB_SERVICE` if the database service has another name.
-
-`pnpm dev` and `pnpm db:seed` refuse to start when `DATABASE_URL` is not a loopback host. `pnpm db:migrate` applies the same rule but allows the Railway pre-deploy environment. Override only when you know what you are doing with `ALLOW_REMOTE_DB=1`.
-
-Check the copied data for contradictory family links:
-
-```bash
-pnpm db:check
-```
-
-It reports parent loops, partners who are also ancestors, and people with more than two parents.
-
-### Environment
-
-Copy `.env.example` to `.env`. The important variables:
-
-| Variable | Purpose |
+| Document | What is in it |
 |---|---|
-| `DATABASE_URL` | PostgreSQL connection string |
-| `SESSION_SECRET` | 32+ random characters used to encrypt session cookies |
-| `APP_URL` | Local development origin fallback for email links. Railway sets `RAILWAY_PUBLIC_DOMAIN` in production |
-| `RESEND_API_KEY` | Resend API key used for verification, reset, invitation, and birthday emails |
-| `RESEND_FROM_EMAIL` | Sender identity, for example `family-tree <hello@your-domain.tld>` |
-| `BIRTHDAY_EMAILS` | Set to `off` to disable the birthday email scheduler, or `on` to enable it in development |
-| `BIRTHDAY_EMAIL_HOUR_UTC` | UTC hour after which birthday emails are sent each day, default `8` |
-| `S3_ENDPOINT` | S3 API endpoint |
-| `S3_REGION` | Bucket region |
-| `S3_BUCKET` | Bucket name |
-| `S3_ACCESS_KEY_ID` | Bucket access key |
-| `S3_SECRET_ACCESS_KEY` | Bucket secret |
-| `S3_FORCE_PATH_STYLE` | `true` for local s3rver, `false` for Railway buckets |
-| `BACKUP_S3_ENDPOINT` | Backup bucket endpoint |
-| `BACKUP_S3_REGION` | Backup bucket region |
-| `BACKUP_S3_BUCKET` | Backup bucket name |
-| `BACKUP_S3_ACCESS_KEY_ID` | Backup bucket access key |
-| `BACKUP_S3_SECRET_ACCESS_KEY` | Backup bucket secret |
-| `BACKUP_S3_FORCE_PATH_STYLE` | `true` for local s3rver, `false` for Railway buckets |
-| `BACKUP_MEDIA` | Set to `off` to back up PostgreSQL only |
-| `LOG_LEVEL` | Optional log verbosity: `debug`, `info`, `warn`, or `error` |
-| `SENTRY_DSN` | Optional server Sentry DSN |
-| `VITE_SENTRY_DSN` | Optional browser Sentry DSN, inlined at build time |
-| `SENTRY_ENVIRONMENT` / `VITE_SENTRY_ENVIRONMENT` | Optional Sentry environment labels |
-| `VITE_RELEASE` | Optional browser release name |
-| `SENTRY_ORG` / `SENTRY_PROJECT` / `SENTRY_AUTH_TOKEN` | Optional source map upload during the build |
-| `UMAMI_SCRIPT_URL` | Optional Umami script URL, for example `https://analytics.example.com/script.js` |
-| `UMAMI_WEBSITE_ID` | Optional Umami website ID that pairs with the script URL |
-| `SUPPORT_EMAIL` | Support address shown in quota errors and the usage card |
-| `ADMIN_ALERT_EMAIL` | Optional recipient for the daily abuse digest |
+| [Features](docs/features.md) | Everything the app does, plus known limitations |
+| [Architecture](docs/architecture.md) | Graph rendering, live refresh, presence, calendar feeds |
+| [Development](docs/development.md) | Local setup, scripts, project layout, UI conventions |
+| [Operations](docs/operations.md) | Environment variables, deployment, backups, privacy |
+| [API](docs/api.md) | The read-only `/api/v1` and its OpenAPI contract |
+| [GEDCOM](docs/gedcom.md) | Export and import details |
+| [Research guide](docs/research.md) | The full guide for genealogists |
+| [Roadmap](docs/roadmap.md) | What comes after v0.1.0 |
 
-`UMAMI_SCRIPT_URL` and `UMAMI_WEBSITE_ID` are both optional. Set both to inject the Umami script into the document; leave either blank to disable analytics. Product events are sent through `src/lib/analytics.ts` and silently no-op when the script is absent. See [Analytics](#analytics).
+## Status
 
-`SUPPORT_EMAIL` defaults to `samuele+family-tree@zanca.dev`. It is shown when an account reaches a storage or people limit, and in the usage card in account settings.
+v0.1.0. It runs a real family tree in production, but it is still early. There is no realtime co-editing or person merge tool yet. The [known limitations](docs/features.md#known-limitations) are listed in full rather than buried.
 
-`CORS_ORIGINS` can hold extra comma-separated origins for `pnpm storage:cors`. Production does not need it: `RAILWAY_PUBLIC_DOMAIN` supplies the public origin.
+## Contributing
 
-`RESEND_API_KEY` and `RESEND_FROM_EMAIL` are optional in development. Without a key, verification, reset, and invitation emails are printed to the server console instead of being sent, so the flows still work locally. In production the sender domain must be verified in Resend first.
+Issues and pull requests are welcome. Good places to help:
 
-On Railway, `RAILWAY_PUBLIC_DOMAIN` is the source of truth for the public origin, so email links, invite links, and bucket CORS all use it (`family-tree.page` in production). `APP_URL` is only a local fallback.
+- Translations. English and Italian ship today; [docs/i18n.md](docs/i18n.md) explains the string files.
+- Accessibility, keyboard, and mobile polish.
+- Tests around the graph layout, fuzzy dates, and GEDCOM round trips.
+- The research views and the import preview.
 
-## How media works
-
-1. The browser creates a small WebP or JPEG thumbnail with canvas.
-2. The server returns presigned POST fields for the original and the thumbnail.
-3. The browser uploads both directly to the bucket.
-4. The server checks the object size, declared type, and magic bytes, then marks the file ready.
-5. Thumbnails are served through `/api/files/:id/thumb` with a membership check and private cache headers.
-6. Originals and documents redirect to a short-lived presigned URL after an authorization check.
-
-The bucket stays private. Browsers never receive storage credentials. SVG, HTML, JavaScript, and executable files are rejected.
-
-### The tree inbox
-
-Uploads do not have to belong to anyone. A file uploaded without a person is unfiled: it waits in the tree inbox, is listed in the media gallery, and never appears on the graph or in share links. Editors can tag an inbox photo with people, which files it under the first person picked, or move it to a person's folder later. Storage keys for inbox files live under `trees/<treeId>/inbox/`.
-
-Files still have one home, the person they are filed under, which is where a graph node lives. Deleting a person keeps their photos: those files return to the inbox, lose their portrait flag, and leave albums that disappear with the person.
-
-### Gallery and folders
-
-`/trees/:treeId/media` shows every image in the tree, grouped by year and ordered by the date taken with the upload date as a fallback. Filename search and a person filter narrow the grid, and selecting photos enables bulk actions: file under a person, delete, or clear. Clicking a photo opens the same lightbox used on the graph, so tagging, faces, dates, and portraits all work there.
-
-The People tab is a file manager. Each person is a folder, the inbox sits at the top, and albums appear as subfolders. Drag a photo onto a folder to file it under that person, drag it back to the inbox to unfile it, or drop files from the desktop straight onto a folder to upload there. Touch and keyboard users get the same result through selection and "File under…".
-
-Both views read the graph payload, so opening the media page costs no extra query. A tree with thousands of photos would eventually need a paginated media query; family-sized libraries do not.
-
-### Photo tags and dates
-
-Editors can tag any other people who appear in an image. Tags live in `file_tags` with tree-scoped foreign keys, so removing a person or a file removes the tags automatically. A tagged person sees the picture under "Also in photos" on their profile without becoming the owner.
-
-Images also carry an optional `taken_at` date. The browser reads EXIF `DateTimeOriginal` with `exifr` during upload and uses it as the initial value; editors can change or clear it in the file panel or lightbox. This is separate from the upload date, so scanned photos can be dated to when they were actually taken, and the date can be partial or approximate.
-
-`file_tags` records the people in a photo with a `source` of `manual` or `face`. The tag picker links someone without a box, which is also the fallback when a face is not detected.
-
-### Faces
-
-Editors can link people to individual faces in a photo. Detection runs in the browser with MediaPipe BlazeFace, using the app's own copy of the WASM runtime and model, so photos and face data never reach a third party.
-
-- The detector runs on the 640 px thumbnail after an image upload and on demand from "Check for faces" in the lightbox. Browser support is required; unsupported browsers fall back to tagging without boxes.
-- Only the box is stored, in `file_faces`, as normalized `x`, `y`, `width`, and `height` fractions. No embedding or identity template is created, so nothing can match a face across photos.
-- An unassigned box waits for an editor to link a person. Linking writes a `file_tags` row with `source = face`, so profiles, "Also in photos", activity, and exports keep working.
-- When the first check finds exactly one face, it is linked to the person the photo is filed under. Unlink it if the detector caught someone else. An unfiled photo waits in the inbox with an unassigned box until someone tags it. Re-scans never re-apply this, so an unlink stays put.
-- In a group photo, people already tagged in the picture appear first in the picker under "Already in this photo", followed by everyone else alphabetically.
-- If the detector misses a face, "Add a face" draws a box and links a person in one step. The photo owner is already linked by ownership, so no duplicate tag is created.
-- "Not a face" keeps the box but hides it and protects it from re-scans. Removing a person from the tag list unassigns their face and keeps the box. Re-scanning matches boxes by overlap, so links and ignored faces survive.
-- Share links and the demo never include face boxes or the scan marker. Deleting a person unassigns their faces; deleting a photo or tree removes them.
-
-## Research desk
-
-The research desk is at `/trees/:treeId/research`. It renders the tree as text rather than as a canvas, because genealogists work in standard document shapes: a family group sheet to file, a pedigree to print, a surname index to scan, and a place index to search records by.
-
-The views share one focus person, chosen from a picker or passed as `?person=`. Every view is linkable and supports browser back.
-
-- **Family sheet** groups children by their exact parent set, so a second marriage, a single parent, and a childless couple each get their own sheet. It shows both parents, their dates and places, their life events, the partnership, and a child table with birth, death, and partner.
-- **Dossier** is everything known about one person: a merged chronology, parents, partners with the children shared with each, children, siblings, media, open questions, and the relationship to the signed-in member when they have claimed a person.
-- **Pedigree** uses Ahnentafel numbering: the subject is 1, parents are 2n and 2n+1, and each generation doubles. The chart stops at seven generations and reports when an ancestor still has more parents.
-- **Descendants** offers the two North American systems. Register numbers only the people whose line continues and labels children with lowercase Roman numerals. NGSQ numbers everyone in reading order and marks a continuing line with a plus.
-- **Surnames** clusters spellings that are likely the same family. Soundex buckets candidates and an edit distance of two or less decides the merge, so Smith, Smyth, and Smythe group together while White and Wade stay apart. Maiden names are included.
-- **Places** parses a place on commas, canonicalizes case and spacing, and groups every birth, death, and life event under it. It also counts births and dated events with no place, because that is the next record to find.
-- **Issues** is a research queue. Warnings are contradictions that cannot all be true: a death before birth, a parent under twelve, a child born long after a parent died, a partnership that ends before it starts, or more than two parents. Gaps are missing dates, places, relationships, and possible duplicates.
-
-All views live in `src/lib/research/` as pure functions with tests, and the components in `src/components/research/` only render their output. `buildResearchIndex` groups parents, children, partners, events, and media once, and the views reuse that index. Dates sort with `fuzzySortValue`, so unknown dates go last instead of pretending to be year zero. A parent cycle is bounded rather than followed forever.
-
-People record sex as female, male, other, or unknown. The pedigree labels a known male parent as father and a known female parent as mother, and falls back to parent for other or unknown. Relationship labels stay neutral, so the desk never guesses at aunt or uncle. GEDCOM export uses the same field for `SEX` and, when a couple is one male and one female, for `HUSB` and `WIFE`.
-
-The full researcher feature guide, including GEDCOM and the API, is in [docs/research.md](docs/research.md).
-
-## How dates work
-
-Date fields are stored as a small JSON value rather than a SQL `date`, so partial and approximate dates survive:
-
-- A qualifier: `exact`, `about`, `before`, `after`, `between`, or `unknown`.
-- A start date with an optional year, month, and day.
-- An optional end date for a range.
-- A birthday with a known month and day but no known year.
-
-`src/lib/fuzzy-date.ts` parses, formats, validates, and sorts these values. The editor has a type selector plus optional year, month, and day inputs; choosing "between" adds the end date. The graph, profile header, search results, and file panel show labels such as `c. 1920`, `before 1900`, `1890-1900`, and `Born 1920 - 1987`.
-
-Birthday emails and iCal subscriptions only include dates with a known month and day. An unknown year still produces a birthday, but the age is omitted. Approximate dates with a day are treated as birthdays; open-ended ranges are not.
-
-The same model is used for `people.birth_date`, `people.death_date`, `partnerships.start_date`, `partnerships.end_date`, `files.taken_at`, and `person_events.date`. Existing `date` columns were converted in migration `0007_gray_sumo.sql`, which backfills every value as an exact date.
-
-## Life events
-
-Each person has a timeline of life events. An event has a kind (residence, occupation, education, military service, immigration, emigration, marriage, divorce, burial, or other), an optional title, a place, a fuzzy date, and notes. Editors can add, edit, and delete events from the person panel. Events are included in account exports and are removed with the person or tree.
-
-A parent's timeline also lists the birth of each child who has a birth date on their own record. These entries are derived, not stored as events: they are read-only from the parent, and selecting one opens the child. `buildLifeTimeline` in `src/lib/person-events.ts` merges both sources and sorts them by fuzzy date.
-
-## Tree activity
-
-Every meaningful change writes a row to `tree_activity` with an actor name snapshot, an action, the affected person when there is one, a human summary, and field-level before and after values for person and event edits. The activity page is at `/trees/:treeId/activity` and is visible to every member. It supports filtering by person, member, and type, with cursor pagination.
-
-The actor name is snapshotted. Deleting an account replaces the actor with "Former member" instead of erasing the history. Rows are deleted with the tree.
-
-## Live refresh
-
-The presence WebSocket also carries a `tree-changed` message. Mutations call `notifyTreeChanged`, the WebSocket route forwards it to sockets in that tree, and open tabs revalidate the graph after a short debounce. Tabs also refresh on focus and visibility change, and after a reconnect that lasted more than five seconds; a quick reconnect (proxy idle close, sleep) is ignored because nothing was likely missed. If a dialog is open, the refresh waits until it closes and a toast explains why.
-
-A refetch does not redraw by itself. The graph builds a fingerprint of the rows the canvas actually draws, and an identical payload leaves force-graph untouched, so the zoom, pan, and node positions survive presence housekeeping. Only a real change rebuilds the simulation, and only a change to the visible people re-fits the view.
-
-## How the graph keeps lines honest
-
-A force layout can put an edge behind a person who is not on it, and two edges can settle onto nearly the same line. Both read as relationships that do not exist, so the canvas does not let force-graph paint links at all. `GraphView` draws them in its own pass, using the helpers in `src/lib/graph-layout.ts`:
-
-- Each link stops `ENDPOINT_GAP` short of the two avatars it connects, so it looks attached without smearing into the portrait.
-- Any other person or junction the line would cross gets a `PASS_THROUGH_PAD` gap and the stroke is cut there. A line visibly interrupted by an avatar is a line that does not belong to it.
-- Partner links arc above the couple, sibling arms fan out of their junction in birth order, and parent arms alternate their small curve, so no two edges can be collinear.
-- Every child link ends in an arrowhead, so the line reads from parent to child even when the couple and the joint sit close together.
-- Junctions are painted as a small knot. Arms terminate at a visible joint instead of reading as one line running straight through it.
-- Dimmed links paint first and the hovered or selected family's links paint last, so tracing a relative never runs under a stranger's line.
-- A clearance force pushes people out of the corridor of links that do not belong to them, and a weak generation force pulls each level into its own loose band. Partners already share a level, so a couple is never split across bands.
-- A cold load seeds each person on their generation band in birth order before the first tick. D3 would otherwise start every node on a tight spiral, and the single cooling cycle would leave the tree knotted. Existing positions are carried over on a refresh, so only new people need the seed.
-
-In development, `window.__familyTreeNodes()` reports the settled positions and `window.__familyTreeLinkAudit()` lists the people still sitting on a foreign line. That audit is the quickest way to check a layout change against a dense tree.
-
-## Duplicate people
-
-Before creating a person, the app compares normalized names, maiden names, nicknames, and birth year ranges. A likely duplicate shows a warning with the matching reasons. The add-relative flow can switch to the existing person, and "Add anyway" records an explicit override. `pnpm db:check` prints likely duplicate pairs.
-
-## Demo and share links
-
-`/demo` runs the real tree workspace on the static sample data from `src/components/landing/demo-tree.ts`. It has no account, no presence, and no write actions, and it shows a banner that links to registration.
-
-Tree owners can create public read-only links from the Sharing tab in tree settings. Each link stores only a SHA-256 hash of its token, so the URL is shown once at creation. A link can have a label, an expiry from one day to ninety days or no expiry, and can be revoked immediately. Revoked, expired, or unknown tokens show a simple unavailable page.
-
-Living people are anyone without a recorded death date. The default share setting is names only: names and relationships, with dates, places, biographies, portraits, events, and media removed. Owners can instead hide living people entirely or show full details. When media is enabled, only image thumbnails are served, never original files or documents, and a thumbnail request for a living person is rejected unless the link allows full details. Share responses send `X-Robots-Tag: noindex` and `Cache-Control: private, no-store`.
-
-## How presence works
-
-1. The browser opens `wss://<host>/presence?treeId=...` with `@solid-primitives/websocket`, which buffers the first focus message and reconnects with a fixed delay after deploys, sleeps, and network drops. A ping every 25 seconds keeps proxies from closing an idle socket, which also keeps the roster and the graph view stable.
-2. Nitro's WebSocket route in `server/routes/presence.ts` unseals the same `family_tree_session` cookie SolidStart uses and checks tree membership before the upgrade completes. Because the session is a sealed cookie with no server-side state, reconnects survive deploys.
-3. Each socket joins a namespace per tree and a presence topic. The client sends `{ type: "focus", nodeId }` when the open person, file, or album changes; the server broadcasts a full snapshot of who is present and what each peer has open.
-4. The avatar stack dedupes by user, and each avatar is outlined in that person's presence color. The graph draws one ring per connected tab plus a name tag in the same color. Colors come from a matte palette keyed by user id, so renaming a person does not change their color.
-
-Presence is ephemeral. Nothing is written to Postgres, and a closed tab removes the peer immediately. State lives in the app process, which matches a single Railway replica.
-
-## How birthday emails work
-
-Account settings has three independent reminders: one week before, the day before, and on the morning of a birthday. They are off, off, and on by default. Preferences are per user and cover every tree that user belongs to.
-
-1. A Nitro plugin checks once an hour and runs the job after `BIRTHDAY_EMAIL_HOUR_UTC` (08:00 by default) on the UTC calendar date.
-2. The job collects verified users with at least one reminder enabled and living people with birth dates from all their trees.
-3. Each enabled reminder becomes one digest email per user, so a person with several birthdays on the same day receives a single message.
-4. `birthday_email_log` claims each user, reminder kind, and date before sending. Restarts, repeated hourly checks, and duplicate replicas cannot send the same reminder twice.
-5. February 29 birthdays are treated as February 28 in common years.
-
-Set `BIRTHDAY_EMAILS=off` to disable the scheduler, or `BIRTHDAY_EMAILS=on` to run it in development and print emails to the server console when Resend is not configured. `BIRTHDAY_EMAIL_HOUR_UTC` changes the daily send hour.
-
-## How calendar subscriptions work
-
-Account settings has a Calendar subscription card. It creates one private iCal URL per user that covers every tree that user belongs to.
-
-1. The URL contains a feed id and an HMAC signature made with `SESSION_SECRET`. No token is stored in the database.
-2. The endpoint checks the signature and then joins current tree memberships, so leaving a tree removes its people on the next fetch.
-3. Each person with a birth date becomes one recurring all-day event. February 29 birthdays use a recurrence rule that falls on February 28 in common years.
-4. Creating a new link revokes the old feed and issues a new id. Turning the feed off revokes it immediately.
-5. Rotating `SESSION_SECRET` invalidates every existing subscription URL, along with sessions.
-
-The link is a bearer secret: anyone who has it can read names and birthdays from that user's trees. Treat it like a password. Calendar apps refresh subscribed feeds on their own schedule, so edits are not instant.
-
-## Privacy and GDPR
-
-The hosted instance targets family members in the EU, so the app is built around GDPR expectations. This is engineering documentation, not legal advice, and the published policy should get a legal review.
-
-- `/privacy` is the controller-facing policy and `/terms` is the service agreement. Both are public, linked from the landing footer, the auth pages, account settings, and the registration form.
-- The controller for the hosted instance is Samuele Zanca, contact `samuele+family-tree@zanca.dev`. Self-hosters are the controller for their own instance, and the policy says so.
-- Tree content often describes living relatives who never created an account. The policy has a dedicated section for that, and account holders are responsible for having a lawful basis to add it.
-- Rights are operable in the product: change email, download a zip with a JSON manifest and every original, and delete the account with password plus typed confirmation. Deletion blocks when the user is the last owner of a shared tree and removes trees where they are the only member.
-- Tree deletion is guarded separately. Owners request it with the exact tree name. A tree with several owners needs every owner to approve. Once approved, the tree is locked for 30 days and any owner can restore it from `/trees`. The daily maintenance job then erases the storage prefix and the database rows. Account deletion still removes trees where the user is the only member immediately, because no account remains to restore them.
-- An erasure request from a data subject is handled by the controller and is not blocked by the owner approval flow. `pnpm tree:purge -- <treeId> --yes [--force]` erases a tree immediately when that is required.
-- Retention is enforced in code. The daily maintenance plugin prunes expired auth tokens, old invites, birthday email logs older than 12 months, `usage_events` older than 90 days, and trees whose 30 day deletion window has ended. Backup retention is 30 daily dumps plus one per month for 12 months.
-- Data is hosted in the US. The policy discloses the location, the providers, and the safeguards used for EU data.
-
-If you add a new data category, a new processor, or a new retention period, update `/privacy` in the same change.
-
-## Analytics
-
-Umami is optional and self-hosted. It is cookieless, and the app is configured so personal data does not reach it:
-
-- Automatic pageviews are off (`data-auto-pageview="false"`). `src/components/app/AnalyticsPageviews.tsx` sends pageviews by hand through `trackPageview`, which reduces paths to a safe label. `/trees/<id>` becomes `/app`, `/invite/<token>` becomes `/invite`, and unknown paths are dropped.
-- The document sets `data-exclude-search`, `data-exclude-hash`, `data-do-not-track`, `data-salt-rotation="daily"`, and `data-domains` from the public origin.
-- `src/lib/analytics.ts` owns the full event list and payload allowlist. Adding an event requires a type entry, and unknown payload keys are dropped at runtime. Never add names, emails, file names, person ids, or tree ids.
-- Never set `data-distinct-id` and never call `umami.identify()`.
-
-Recommended Umami server settings for the self-hosted instance:
-
-```text
-SALT_ROTATION=day
-ENABLE_CLIENT_SALT=1
-DISABLE_TELEMETRY=1
-PRIVATE_MODE=1
-SKIP_LOCATION_HEADERS=1
-TRUSTED_PROXIES=<your proxy CIDRs>
-FORCE_SSL=1
-```
-
-Leave `GEO_DATABASE_URL` unset unless you actually need city-level location, and do not enable replays or heatmaps. Umami keeps data forever by default, so add a monthly prune to its database:
-
-```sql
-DELETE FROM website_event WHERE created_at < now() - interval '12 months';
-DELETE FROM session WHERE created_at < now() - interval '12 months';
-```
-
-The privacy policy promises up to 12 months for analytics, so keep that job in place.
-
-## Storage limits and abuse monitoring
-
-Every account has a storage quota and a lifetime people quota. Defaults are 1 GiB and 500 people. Both live on `users` as `storage_quota_bytes` and `people_quota`, so you can raise one account without a deploy:
-
-```sql
-UPDATE users SET storage_quota_bytes = 10 * 1024 * 1024 * 1024 WHERE email = 'someone@example.com';
-UPDATE users SET people_quota = 2000 WHERE email = 'someone@example.com';
-```
-
-How enforcement works:
-
-1. `prepareUpload` reserves space inside a transaction protected by a per-account advisory lock. The reservation includes the declared original size plus the thumbnail, and the file row is inserted in the same transaction, so parallel prepares cannot both pass.
-2. The presigned POST is capped at the declared size with `content-length-range`, so a client cannot under-declare an upload to slip past the quota.
-3. `finalizeFile` stores the real original and thumbnail sizes. `users.people_created_count` increments inside a conditional `UPDATE`, so a create that would exceed the quota fails and the counter never decreases on delete.
-4. Uploads count against the uploader across every tree. Files you uploaded into someone else's tree keep counting after you leave it.
-5. A daily plugin removes `uploading` rows and objects older than 24 hours so abandoned prepares do not hold a reservation forever.
-
-Account settings has a Storage and limits card showing bytes used, people created, the limits, and a `mailto:` link through `SUPPORT_EMAIL`.
-
-Abuse signals live in `usage_events`, not in Umami. `pnpm abuse:report` prints per-account activity for the last 24 hours and 7 days: bytes uploaded, files uploaded, tree create/delete churn, quota rejections, rejected types, and rate-limit trips. The default warning thresholds are relative to the account quota (2x quota in 6 hours) plus absolute rules (1000 files, 20 tree create/delete cycles, 20 rejections). Set `ADMIN_ALERT_EMAIL` to receive the digest by email from the nightly job.
-
-`usage_events` holds numbers and timestamps only: no file names, no email addresses, and no content. Rows cascade away with the account and are pruned after 90 days.
-
-Run both reports from the repo:
-
-```text
-pnpm usage:report      storage used per account
-pnpm abuse:report      uploads, churn, rejections, rate limits
-```
-
-Proposed paid tiers, the cost model, and how to map a plan to the two quota columns live in `docs/storage-plans.md`. Keep pricing out of the app until a plan is actually for sale.
-
-## Backups
-
-Production keeps two private Railway Storage Buckets in `iad`: the live bucket (`roots-files`) and a backup bucket (`roots-backups`). A Railway cron service, `roots-backup`, runs `pnpm backup` daily at 03:00 UTC from `Dockerfile.backup`.
-
-### Provisioned cron service
-
-| Setting | Value |
-|---|---|
-| Service | `roots-backup` |
-| Schedule | `0 3 * * *`, daily at 03:00 UTC |
-| Source | `metruzanca/family-tree.page`, branch `main` |
-| Build | `Dockerfile.backup` |
-| Start command | `pnpm backup` |
-| Restart policy | `NEVER` |
-| Region | `us-east4-eqdc4a` |
-| Source bucket | `roots-files` in `iad` |
-| Backup bucket | `roots-backups` in `iad` |
-
-The service has no public domain and no HTTP health check. Its variables reference `Postgres`, `roots-files`, and `roots-backups`, so database and bucket credentials are resolved by Railway instead of being copied into the service.
-
-Inspect the service and its runs:
-
-```sh
-railway status
-railway logs --service roots-backup
-railway redeploy --service roots-backup --yes
-```
-
-`railway redeploy` runs the backup once outside the schedule. A successful run ends with:
-
-```text
-Uploaded postgres/<timestamp>.dump (...)
-Media: N copied (...), N deleted, N in source.
-No expired dumps to delete.
-Backup finished.
-```
-
-The first manual run on 2026-11-17 wrote a 70 KB dump, copied 48 media objects (44 MB), and finished with no errors.
-
-### What each run does
-
-1. Writes a compressed `pg_dump` to `postgres/<timestamp>.dump` and updates `postgres/latest.json` with the size, SHA-256, git SHA, and media status.
-2. Copies media keys under `trees/` to `media/trees/` in the backup bucket. Storage keys are immutable, so only missing objects are copied.
-3. Deletes backup media whose source object no longer exists, so deleted photos and accounts do not linger. That step is skipped when the source bucket is empty.
-4. Deletes database dumps older than 30 days, except the first dump of each month, which is kept for 12 months.
-
-```text
-pnpm backup                   dump PostgreSQL and sync media now
-pnpm backup --dry-run         show what would change
-pnpm backup --skip-media      database only
-pnpm backup --keep-deleted-media
-pnpm backup:verify            check the latest checksum and archive
-pnpm backup:restore --yes     restore the latest dump into a local database
-```
-
-`pnpm backup:verify` reads `postgres/latest.json` unless you pass `--key <object key>`. `pnpm backup:restore` refuses a remote `DATABASE_URL` and requires `--yes`. Restore into a scratch database, never production.
-
-Media restore is manual: copy `media/trees/` from the backup bucket back to `trees/` in the live bucket with `aws s3 sync` or the Railway dashboard. Storage keys are stable, so the database rows point at the restored objects without changes.
-
-To recreate the service from scratch:
-
-1. Add a second Storage Bucket in the same project and region.
-2. Add a service from this repository and set its config file path to `/railway.backup.json`, or set the Dockerfile path, start command, and cron schedule directly. It builds `Dockerfile.backup` and runs `pnpm backup` on the cron schedule.
-3. Set these variables on the backup service:
-
-```text
-DATABASE_URL=${{Postgres.DATABASE_URL}}
-S3_ENDPOINT=${{roots-files.ENDPOINT}}
-S3_REGION=${{roots-files.REGION}}
-S3_BUCKET=${{roots-files.BUCKET}}
-S3_ACCESS_KEY_ID=${{roots-files.ACCESS_KEY_ID}}
-S3_SECRET_ACCESS_KEY=${{roots-files.SECRET_ACCESS_KEY}}
-S3_FORCE_PATH_STYLE=false
-BACKUP_S3_ENDPOINT=${{roots-backups.ENDPOINT}}
-BACKUP_S3_REGION=${{roots-backups.REGION}}
-BACKUP_S3_BUCKET=${{roots-backups.BUCKET}}
-BACKUP_S3_ACCESS_KEY_ID=${{roots-backups.ACCESS_KEY_ID}}
-BACKUP_S3_SECRET_ACCESS_KEY=${{roots-backups.SECRET_ACCESS_KEY}}
-BACKUP_S3_FORCE_PATH_STYLE=false
-```
-
-4. Disable the HTTP health check and keep the restart policy at `NEVER`.
-5. Enable Postgres point-in-time recovery as the first line of defense between dumps. Check it with `railway postgres pitr status --service Postgres`. Railway currently offers this only on Pro workspaces, so it stays off on the current plan.
-
-The backup bucket is private, but the dumps are not encrypted by the app. Both buckets live in the same provider and region, so a Railway account or regional failure loses both. The upgrade path is an external S3-compatible target, `age` encryption, and object versioning.
-
-## Logging and error tracking
-
-The server writes structured JSON logs to stdout and stderr. Every request gets
-an `x-request-id`, every server action logs its outcome, and expected failures
-such as validation and permission errors are logged at `warn` instead of being
-silently returned to the browser. Set `LOG_LEVEL` to `debug`, `info`, `warn`, or
-`error`; production defaults to `info`. See [docs/logging.md](docs/logging.md)
-for the event catalog, privacy rules, and the support workflow.
-
-Railway runtime logs are short-lived. Add a log drain to a service such as
-Axiom or Better Stack if you need long-term search. The startup `app.started`
-line confirms that the log pipeline is working after a deploy.
-
-Sentry is optional and off by default. Set `SENTRY_DSN` on the server and `VITE_SENTRY_DSN` at build time for the browser. Without a DSN both sides do nothing.
-
-The server captures unexpected errors in `runAction`, the Nitro error hook, the presence socket, and the birthday scheduler. The browser captures route errors and unhandled errors. Data collection is disabled for user info, cookies, headers, bodies, query strings, and database values, and `beforeSend` removes any request or user fields that still appear. Errors include the same request id as the logs.
-
-Set `SENTRY_ORG`, `SENTRY_PROJECT`, and `SENTRY_AUTH_TOKEN` to upload source maps during `pnpm build`. All three are required, otherwise the Vite plugin is skipped. `SENTRY_ENVIRONMENT` and `VITE_SENTRY_ENVIRONMENT` label events, and `VITE_RELEASE` sets the browser release.
-
-Add an external uptime check on `/api/health`. It returns `503` when the database is unreachable.
-
-## Railway deployment
-
-Create a Railway project with:
-
-- One app service from this repository
-- One PostgreSQL service
-- Two Storage Buckets: one for live media and one for backups
-
-Keep all three in the same region. Set the app service variables with references:
-
-```text
-DATABASE_URL=${{Postgres.DATABASE_URL}}
-SESSION_SECRET=<generate with: openssl rand -base64 48>
-APP_URL=https://<your-railway-domain>
-HOST=0.0.0.0
-RESEND_API_KEY=<from the Resend dashboard>
-RESEND_FROM_EMAIL=family-tree <hello@your-domain.tld>
-S3_ENDPOINT=${{BucketName.ENDPOINT}}
-S3_REGION=${{BucketName.REGION}}
-S3_BUCKET=${{BucketName.BUCKET}}
-S3_ACCESS_KEY_ID=${{BucketName.ACCESS_KEY_ID}}
-S3_SECRET_ACCESS_KEY=${{BucketName.SECRET_ACCESS_KEY}}
-S3_FORCE_PATH_STYLE=false
-LOG_LEVEL=info
-SENTRY_DSN=<optional server DSN>
-VITE_SENTRY_DSN=<optional browser DSN>
-SENTRY_ENVIRONMENT=production
-VITE_SENTRY_ENVIRONMENT=production
-UMAMI_SCRIPT_URL=<optional Umami script URL>
-UMAMI_WEBSITE_ID=<optional Umami website ID>
-SUPPORT_EMAIL=samuele+family-tree@zanca.dev
-ADMIN_ALERT_EMAIL=<optional abuse digest recipient>
-```
-
-`railway.json` configures the build, start command, health check, and the `pnpm db:migrate` pre-deploy command. The backup service is separate and uses `railway.backup.json`; see [Backups](#backups).
-
-After a domain is assigned, apply bucket CORS with the production credentials:
-
-```bash
-railway run --service family-tree-web pnpm storage:cors
-```
-
-The script reads `RAILWAY_PUBLIC_DOMAIN` from the service, so the bucket always allows the live domain. Localhost origins are included by default.
-
-For local development against the same bucket, add extra origins through `CORS_ORIGINS`.
-
-## Scripts
-
-```text
-pnpm dev            start Vite with host 0.0.0.0
-pnpm build          production build
-pnpm start          run the production server
-pnpm typecheck      TypeScript check
-pnpm test           Vitest unit tests
-pnpm db:generate    generate a Drizzle migration
-pnpm db:migrate     apply migrations
-pnpm db:seed        seed the demo tree
-pnpm db:pull        copy the linked Railway Postgres into the local database
-pnpm db:check       report contradictory parent and partner relationships
-pnpm usage:report   show storage, quota, and people counts per account
-pnpm abuse:report   show upload, churn, rejection, and rate limit signals
-pnpm maintenance:run prune stale uploads, tokens, invites, and old events
-pnpm storage:cors   set bucket CORS from APP_URL and CORS_ORIGINS
-pnpm backup         dump PostgreSQL and sync media to the backup bucket
-pnpm backup:verify  check the latest dump checksum and archive
-pnpm backup:restore restore a dump into a local scratch database
-pnpm dev:services   start local Postgres and S3
-pnpm dev:reset-db   delete and re-create the local Postgres cluster
-```
-
-UI checks are done manually with the agent-browser tool against the local or production app. The project does not include a browser test runner.
-
-## Project layout
-
-```text
-drizzle/            schema and SQL migrations
-scripts/            migration, seed, storage, dev-service scripts
-src/api/            server functions and query wrappers
-src/components/     graph, people, files, trees, UI primitives
-src/lib/            pure client helpers: graph model, focus distances, thumbnails, uploads, formatting, presence socket
-src/routes/         file-based routes and API handlers
-src/server/         auth, guards, storage, file service, config, presence state
-server/routes/      Nitro server routes for WebSocket endpoints (not SolidStart routes)
-```
-
-The WebSocket endpoint lives in `server/` because SolidStart's `src/routes` only handles `GET`/`POST` handlers. `vite.config.ts` points Nitro at `./server` and enables `features.websocket`.
-
-### UI conventions
-
-The interface uses [shadcn-solid](https://shadcn-solid.com) components on top of Kobalte, kept in `src/components/ui`. Tailwind theme tokens live in `src/app.css` and carry the paper, moss and gold palette: use `bg-background`, `bg-card`, `text-foreground`, `text-muted-foreground`, `border-border`, `bg-primary`, `bg-accent`, `text-destructive` and `text-gold` rather than raw hex values.
-
-- Add a component with `pnpm dlx shadcn-solid@latest add <name>` (configured by `components.json`), then edit it in place like any other source file.
-- `~/components/ui/button.tsx` holds the shared button variants, `icon-button.tsx` wraps icon-only buttons with a tooltip, and `~/lib/utils.ts` exports `cva`/`cx` with `tailwind-merge` applied.
-- `Modal`, `ConfirmDialog`, `Field`, `Toast` and `Loading` are thin adapters over the generated primitives, so app code does not need to change when a primitive is restyled.
-- Dark mode is the `.dark` class on `<html>`, set by `ThemeProvider`, and is wired into Tailwind through `@custom-variant dark` in `src/app.css`.
-- The graph canvas draws with its own hardcoded colours in `src/components/graph/GraphView.tsx`; theme tokens do not affect it.
-
-## Your data
-
-Account settings has three exits for your own data:
-
-- **Change email.** A confirmation link goes to the new address and a notice goes to the old one. The old address keeps working until the new one confirms. Pending changes can be cancelled from account settings.
-- **Download your data.** `GET /api/account/export` streams a zip with `family-tree-export.json` and a README. The manifest covers your profile, memberships, trees, people, relationships, groups, tags, life events, and file metadata. Add `?media=1` to include every original photo and document, or `?format=json` to download the manifest alone. Exports are rate limited to three per hour per account.
-- **Delete account.** This requires your password and a typed email confirmation. Trees where you are the only member are deleted with their storage objects. If you are the last owner of a shared tree, promote another owner or delete that tree first. Deleting your account clears the session and cascades memberships, calendar feeds, birthday logs, auth tokens, and pending email changes.
-
-Account settings also shows storage and people usage against your limits, with a link to ask for more. The published policy is at `/privacy` and the terms are at `/terms`. See [Privacy and GDPR](#privacy-and-gdpr) for the engineering side.
-
-## Developer API
-
-Every tree can issue read-only bearer tokens from tree settings, under **Sharing**. A token is bound to one tree, stored only as a SHA-256 hash, and shown once. It reads the whole tree, including living relatives, so only an owner can create one. Tokens can expire and can be revoked immediately; leaving a tree disables its token on the next request.
-
-The API lives under `/api/v1`:
-
-- `GET /me` describes the token, its scopes, and its tree.
-- `GET /trees` and `GET /trees/:treeId` return tree metadata and counts.
-- `GET /trees/:treeId/people` accepts `q`, `surname`, `limit`, and `cursor`.
-- `GET /trees/:treeId/people/:personId` returns the person, immediate family, partners, events, and media.
-- `GET /trees/:treeId/relationships`, `/events`, `/search`, and `/changes` cover the rest of the tree.
-- `GET /trees/:treeId/export.json` returns a complete snapshot. Media is referenced by URL, not embedded.
-- `GET /trees/:treeId/gedcom` returns GEDCOM 5.5.1, or 7 with `?version=7`, for other genealogy tools.
-- `GET /trees/:treeId/media/:fileId/thumb` and `/download` serve binaries with the same token.
-
-Lists use an opaque cursor over `(updatedAt, id)`. Tree metadata, relationships, and exports support `ETag` with `If-None-Match`. Requests are limited to 120 per minute per token and exports to 10 per hour. The limiter is in-process, matching the single-replica presence design.
-
-The contract is `openapi/roots-v1.json`, served at `/api/v1/openapi.json` and rendered at `/docs/api`. `pnpm openapi:check` runs Redocly lint and validates every documented example; the contract test in `src/server/api/contract.test.ts` validates real DTO output against the schemas. CI runs both, so a handler change cannot drift from the published contract.
-
-The changes feed is derived from the human activity log. It reports creates, updates, deletes, and restores, but it is not a byte-level diff; clients that need a consistent snapshot should fetch the export. Browser clients on another origin need that origin added to `API_ALLOWED_ORIGINS`.
-
-## GEDCOM export
-
-Tree settings has **GEDCOM 5.5.1** and **GEDCOM 7** downloads on the Tree tab, and the API exposes the same files at `GET /api/v1/trees/:treeId/gedcom` with the `export:read` scope, adding `?version=7` for the newer format. Both are limited to ten exports per hour.
-
-5.5.1 is the default because Ancestry, MyHeritage, Gramps, RootsMagic, Family Tree Maker, and most other tools import it. 7 is there for tools that support it: a 7.0 header, no `CHAR` or `GEDC.FORM`, no `CONC`, MIME media types, `TITL` under `FILE`, and `SEX X` for other. Both versions import into this app, with 5.5.1 the better tested path.
-
-The file contains:
-
-- A header with UTF-8, LINEAGE-LINKED, a submitter, and a note about couple roles.
-- One `INDI` per person with the primary name, nickname, maiden name, birth, death, biography, life events, and media references.
-- One `FAM` per parent set or partnership, with `HUSB`, `WIFE`, and `CHIL`, plus marriage, divorce, separation, partnership, or widowed events.
-- `OBJE` records that reference the original file name, not the stored binary.
-- `_ROOTS_ID` on every person and partnership, so a future import can match records instead of guessing.
-
-Dates use the standard approximations: `ABT`, `BEF`, `AFT`, and `BET ... AND ...`. Partial dates keep their precision, and a date with no year is omitted rather than invented. Long notes and biographies wrap with `CONT` and `CONC`.
-
-GEDCOM 5.5.1 has only `HUSB` and `WIFE` for a couple. When one partner is male and the other female, the roles follow sex. Same-sex couples and unknown partners keep stable partner order, and the file header says so, because the format has no neutral roles. Review those families after importing. Media records point at file names and do not embed binaries, which matches how most tools handle media. GEDCOM import is not built yet.
-
-## GEDCOM import
-
-The trees page has **Import** next to **New tree**. Choose a `.ged` file, review the people, families, events, and warning counts, name the new tree, and import. The preview parses in the browser; the server parses the file again before writing anything.
-
-To merge into an existing tree, open **Tree settings**, then **GEDCOM**, then **Import into this tree**. Every person in the file gets a row with **Create**, **Merge**, or **Skip**. The duplicate detector suggests a match, an exact full name or a strong score defaults to Merge, and every row can be changed before applying.
-
-Import always creates a new tree and never touches an existing one. It reads GEDCOM 5.5.1 names, sex, dates, places, birth and death, life events, notes, parent-child links, and partnerships with marriage, divorce, separation, or widowed dates. Duplicate family records are merged. Missing references, unreadable dates, and unsupported tags become warnings instead of silent guesses.
-
-- People and families are written in one transaction, so a failed import leaves no partial tree.
-- A merge only fills empty fields. It never overwrites a non-empty name, date, place, sex, or biography.
-- Existing relationships and identical events are left alone, so re-importing the same export is effectively a no-op.
-- Two imported people cannot merge into the same existing person, and a merge without a target blocks the apply.
-- The account people quota still applies. An import that would exceed it rolls back.
-- Imports are limited to 5 MB and 5,000 people, to five new trees or ten merges per hour per account.
-- Media files and source citations are skipped because a GEDCOM file contains references, not the files or a source model.
-- Full GEDCOM 7 import validation, source records, media bundles, and resumable processing for very large files are follow-ups.
-
-The parser lives in `src/lib/gedcom-import.ts` with tests, including a round trip from an exported tree back through the parser.
-
-## Deleting a tree
-
-Deleting a tree is deliberately slower than leaving one. The controls live in the **Danger** tab of tree settings.
-
-1. An owner types the exact tree name. The request dialog shows the tree's people and member counts so the wrong tree is hard to pick by mistake.
-2. If the tree has one owner, that confirmation schedules the deletion. If it has several, the request waits for every current owner to approve. Each approval is its own confirmation, co-owners get an email, and the request lapses after 14 days if not everyone agrees. Any owner can cancel it.
-3. When every owner approves, the tree is locked. Its URLs redirect to `/trees`, invites and share links are revoked, and it drops out of birthday emails, calendar feeds, and presence.
-4. The tree and its files stay in place for 30 days. `/trees` shows it under **Recently deleted** with the purge date and a Restore button. Any owner can restore it instantly, even if they were not the person who requested the deletion.
-5. Seven days before the purge, every member with a confirmed address gets a reminder email.
-6. The daily maintenance job deletes the tree's storage prefix, then the database row, which cascades people, relationships, files, tags, faces, events, activity, invites, and share links. Storage goes first: if it fails, the row stays so the next run retries instead of leaving orphaned objects.
-
-`pnpm tree:purge -- <treeId> --yes [--force]` is the operator-only escape hatch for a legal erasure request. It skips the grace period and is deliberately not reachable from the app.
-
-Account deletion is separate and still immediate for trees where the user is the only member, since no account remains to restore them. An owner of a shared tree must transfer ownership or delete the tree first.
-
-## Focused browsing
-
-Every member can mark the person they represent from the focus menu in the graph toolbar. The graph then opens with distance rings around that person instead of the whole family:
-
-- 1 hop: partner, parents and children
-- 2 hops: siblings, grandparents, grandchildren and in-laws
-- 3 hops: aunts, uncles, nieces, nephews and great-grandparents
-- 4 hops: first cousins, great-aunts and great-uncles
-
-The default is 4 for trees of 25 people or more, and Everyone below that. The Show more chip adds the next ring, Everyone reveals the whole tree, and the focus menu switches bands or changes who you are. Partners of visible people come along with them, so a spouse is never cut off one hop away. Unconnected people are always shown, and the chosen band is remembered per tree in the browser.
-
-Selecting a search result or opening a deep link outside the focus reveals the shortest chain of relationships to that person, so they arrive in context without expanding every branch. Owners can unlink a member from the Members tab in tree settings.
-
-This is a reading aid, not access control. The whole graph is still sent to every member.
-
-## Known limitations
-
-- No realtime co-editing. The graph refreshes after changes and a live nudge refreshes other open tabs, but edits are not merged character by character.
-- Duplicate detection is heuristic. There is no merge tool yet, so "Add anyway" can still create a duplicate.
-- Share links cover a whole tree. There is no per-person sharing or comment access yet.
-- Presence is held in the app process. It works as-is on a single Railway replica. Running more than one replica needs a shared presence store, such as Redis or Postgres `LISTEN`/`NOTIFY`.
-- HEIC photos work only when the browser can decode them; otherwise the user is asked to export as JPEG.
-- Backups live in a second Railway bucket in the same region and are not encrypted by the app. Backups run daily, so enable PostgreSQL point-in-time recovery for the gap between dumps.
-- Dates are Gregorian and structured. Seasons and free-text dates such as "spring 1918" are not represented; use an event note for those.
-- Focus is a presentation aid, not access control. The whole tree is still loaded for every member, and anyone can reveal all branches with one click.
-- The API is read-only. There are no write scopes, webhooks, or GEDCOM import yet. See [docs/roadmap.md](docs/roadmap.md) for the deferred work.
-- GEDCOM merge fills only empty fields. It never overwrites a non-empty value, and it does not import media binaries or create source records.
-- GEDCOM 5.5.1 has no neutral couple roles. Same-sex and unknown-partner families export `HUSB` and `WIFE` by stable order, with a note in the file header. Review those roles after importing.
-- The API changes feed is derived from tree activity, not a strict per-row delta with tombstones. Use `export.json` when a client needs a guaranteed snapshot.
-- No printable chart export, OCR, or face recognition yet. Face detection and manual linking ship, but names are never suggested.
-
-## Roadmap
-
-GEDCOM import and export, printable charts, OCR, face naming suggestions, multi-replica presence, and a person merge flow are deferred beyond v0.1.0. See [docs/roadmap.md](docs/roadmap.md) for scope and open questions. Pre-release checks and their current status live in [docs/release-checklist.md](docs/release-checklist.md).
+Before opening a PR, run `pnpm typecheck` and `pnpm test`, and read [docs/development.md](docs/development.md) for conventions. Commits follow the conventional format (`feat:`, `fix:`, `chore:`).
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE).
