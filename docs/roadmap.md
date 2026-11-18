@@ -82,7 +82,35 @@ Scope:
 - Move media and tags, then delete the losing row.
 - Write one activity entry that explains the merge.
 
-## 7. Smaller follow-ups
+## 7. Research desk follow-ups
+
+The text views shipped first because they work over the existing records. The evidence layer is what turns them into defensible research.
+
+Scope:
+
+- Sources and citations: source, repository, citation detail, page or film number, URL, accessed date, and quality. Attach a citation to a specific fact, not just a person.
+- Fact confidence: certain, probable, possible, disputed, plus a proof note.
+- Name variants: birth, married, religious, and also-known-as names with GEDCOM `NAME` type mapping.
+- Research tasks and notes per person or branch, so open questions are visible to collaborators.
+- A sex field on people. It unlocks father and mother labels in the pedigree, the conventional aunt/uncle wording, GEDCOM `SEX`, and the standard descendant numbering styles without guessing.
+- Place authority: canonical place plus hierarchy, with a merge step for variants.
+- Saved searches, a "changed since" digest, and comments on a person.
+
+## 8. Read-only API and OpenAPI contract
+
+A versioned read-only API lets the tree feed scripts, a personal site, or another research tool without changing the graph UI.
+
+Scope:
+
+- Personal access tokens scoped to one tree, hashed at rest and revocable, with `lastUsedAt` and optional expiry. Only an owner can mint one, and the token exposes living relatives in full by design. The public share feed stays redacted separately.
+- `/api/v1` endpoints for trees, people, relationships, events, media metadata, search, changes since a cursor, and JSON or NDJSON export.
+- `GET /api/v1/me` so an integration can confirm its tree and scopes.
+- Cursor pagination ordered by `(updatedAt, id)`, `ETag` and `If-None-Match`, and a changes feed. Deletes cascade today, so a reliable incremental feed needs tombstones.
+- An OpenAPI 3.1 contract checked in before the handlers, served at `/api/v1/openapi.json`, and rendered at `/docs/api`. Redocly lint, example validation, and fixture response validation run in CI as `pnpm openapi:check`.
+- GEDCOM 5.5.1 export first, then GEDCOM 7, sharing the JSON serializer. Export stable ids so a round trip matches instead of duplicating.
+- No write scopes in v1.
+
+## 9. Smaller follow-ups
 
 - Per-person or per-branch share links.
 - Comment access on share links without edit rights.

@@ -45,6 +45,9 @@ The graph is the main view. People are nodes, parent and partner relationships a
 - Pointer cursor only over nodes, not links or empty canvas
 - Person and document info panels on desktop and mobile
 - Tree activity feed with filters, field-level changes, and an actor history
+- Research desk with a family group sheet, individual dossier, Ahnentafel pedigree, descendant register, surname and place indexes, and a data quality queue
+- Surname variants clustered with Soundex and edit distance, and places normalized by hierarchy
+- Print-friendly research views with Ahnentafel, Register, and NGSQ numbering
 - Live refresh nudge when another member changes the tree
 - Duplicate person warnings before adding a similar name or birth year
 - Read-only `/demo` that runs the real tree workspace on sample data
@@ -207,6 +210,24 @@ Editors can link people to individual faces in a photo. Detection runs in the br
 - If the detector misses a face, "Add a face" draws a box and links a person in one step. The photo owner is already linked by ownership, so no duplicate tag is created.
 - "Not a face" keeps the box but hides it and protects it from re-scans. Removing a person from the tag list unassigns their face and keeps the box. Re-scanning matches boxes by overlap, so links and ignored faces survive.
 - Share links and the demo never include face boxes or the scan marker. Deleting a person unassigns their faces; deleting a photo or tree removes them.
+
+## Research desk
+
+The research desk is at `/trees/:treeId/research`. It renders the tree as text rather than as a canvas, because genealogists work in standard document shapes: a family group sheet to file, a pedigree to print, a surname index to scan, and a place index to search records by.
+
+The views share one focus person, chosen from a picker or passed as `?person=`. Every view is linkable and supports browser back.
+
+- **Family sheet** groups children by their exact parent set, so a second marriage, a single parent, and a childless couple each get their own sheet. It shows both parents, their dates and places, their life events, the partnership, and a child table with birth, death, and partner.
+- **Dossier** is everything known about one person: a merged chronology, parents, partners with the children shared with each, children, siblings, media, open questions, and the relationship to the signed-in member when they have claimed a person.
+- **Pedigree** uses Ahnentafel numbering: the subject is 1, parents are 2n and 2n+1, and each generation doubles. The chart stops at seven generations and reports when an ancestor still has more parents.
+- **Descendants** offers the two North American systems. Register numbers only the people whose line continues and labels children with lowercase Roman numerals. NGSQ numbers everyone in reading order and marks a continuing line with a plus.
+- **Surnames** clusters spellings that are likely the same family. Soundex buckets candidates and an edit distance of two or less decides the merge, so Smith, Smyth, and Smythe group together while White and Wade stay apart. Maiden names are included.
+- **Places** parses a place on commas, canonicalizes case and spacing, and groups every birth, death, and life event under it. It also counts births and dated events with no place, because that is the next record to find.
+- **Issues** is a research queue. Warnings are contradictions that cannot all be true: a death before birth, a parent under twelve, a child born long after a parent died, a partnership that ends before it starts, or more than two parents. Gaps are missing dates, places, relationships, and possible duplicates.
+
+All views live in `src/lib/research/` as pure functions with tests, and the components in `src/components/research/` only render their output. `buildResearchIndex` groups parents, children, partners, events, and media once, and the views reuse that index. Dates sort with `fuzzySortValue`, so unknown dates go last instead of pretending to be year zero. A parent cycle is bounded rather than followed forever.
+
+The tree does not record sex. That is why the pedigree labels the two parent slots "parent A" and "parent B" instead of father and mother, and why relationship labels read "aunt or uncle" and "sibling". A sex field is the first data-model follow-up, because it also unlocks the conventional labels in GEDCOM and NGSQ work.
 
 ## How dates work
 
