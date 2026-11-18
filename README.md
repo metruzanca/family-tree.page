@@ -26,11 +26,14 @@ The graph is the main view. People are nodes, parent and partner relationships a
 - People, parent-child relationships, and partnerships
 - Add a child with a second parent in one step, and keep the dialog open to add several children quickly
 - Force-directed layout: parent and partner edges pull families into loose clusters, so relatives stay together and edges stay short
-- Every parent set meets at a hidden family junction, so a couple and their children fan out from one point instead of crossing lines
+- Every parent set meets at a marked family junction, so a couple and their children fan out from one knot instead of crossing lines
+- Links stop short of the avatars they connect and are cut wherever one would pass behind someone else, so a line through a stranger never reads as a relationship
+- Partner links arc above the couple, sibling arms fan out in birth order, and a clearance force keeps people off lines that do not belong to them
 - A label-aware collision force keeps names readable, and disconnected branches find their own space
 - Optional birth-year gravity drifts older people upward without pinning rows, toggled from the toolbar and remembered per browser
+- Weak generation gravity settles each level in its own loose band, and partners always share a band
 - Media clusters around its owner through a short hidden spring and is drawn behind the graph, so a photo never covers a person
-- Partner edges are dashed, parent arms follow the relationship type, and hovering a person dims everyone outside their immediate family
+- Parent arms follow the relationship type, and hovering a person lifts their own links above the dimmed ones
 - Cycle-safe relationship analysis that stays bounded when relationships contradict each other, with an in-app warning and `pnpm db:check`
 - The focus menu links a member to their person, so the tree opens around their own branch instead of the whole family
 - Focus rings from immediate family out to first cousins, with a "Show more" chip and an Everyone option that reveals the rest of the tree in one click
@@ -235,6 +238,19 @@ The actor name is snapshotted. Deleting an account replaces the actor with "Form
 The presence WebSocket also carries a `tree-changed` message. Mutations call `notifyTreeChanged`, the WebSocket route forwards it to sockets in that tree, and open tabs revalidate the graph after a short debounce. Tabs also refresh on focus and visibility change, and after a reconnect that lasted more than five seconds; a quick reconnect (proxy idle close, sleep) is ignored because nothing was likely missed. If a dialog is open, the refresh waits until it closes and a toast explains why.
 
 A refetch does not redraw by itself. The graph builds a fingerprint of the rows the canvas actually draws, and an identical payload leaves force-graph untouched, so the zoom, pan, and node positions survive presence housekeeping. Only a real change rebuilds the simulation, and only a change to the visible people re-fits the view.
+
+## How the graph keeps lines honest
+
+A force layout can put an edge behind a person who is not on it, and two edges can settle onto nearly the same line. Both read as relationships that do not exist, so the canvas does not let force-graph paint links at all. `GraphView` draws them in its own pass, using the helpers in `src/lib/graph-layout.ts`:
+
+- Each link stops `ENDPOINT_GAP` short of the two avatars it connects, so it looks attached without smearing into the portrait.
+- Any other person or junction the line would cross gets a `PASS_THROUGH_PAD` gap and the stroke is cut there. A line visibly interrupted by an avatar is a line that does not belong to it.
+- Partner links arc above the couple, sibling arms fan out of their junction in birth order, and parent arms alternate their small curve, so no two edges can be collinear.
+- Junctions are painted as a small knot. Arms terminate at a visible joint instead of reading as one line running straight through it.
+- Dimmed links paint first and the hovered or selected family's links paint last, so tracing a relative never runs under a stranger's line.
+- A clearance force pushes people out of the corridor of links that do not belong to them, and a weak generation force pulls each level into its own loose band. Partners already share a level, so a couple is never split across bands.
+
+In development, `window.__familyTreeNodes()` reports the settled positions and `window.__familyTreeLinkAudit()` lists the people still sitting on a foreign line. That audit is the quickest way to check a layout change against a dense tree.
 
 ## Duplicate people
 
