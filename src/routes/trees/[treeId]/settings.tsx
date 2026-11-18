@@ -409,6 +409,8 @@ function TreeSettingsInner() {
     setCreatedApi(result.data);
     setApiRows(rows => [result.data, ...(rows ?? [])]);
     setApiName("");
+    setApiExpiry("90");
+    setApiScopes([...DEFAULT_API_SCOPES]);
     await revalidate(apiTokensQuery.key);
     toast.show("API token created.", "success");
   }
