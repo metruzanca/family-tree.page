@@ -1,6 +1,6 @@
 import { For, Show, createEffect, createSignal } from "solid-js";
 import { A, createAsync, useNavigate, useParams, useSearchParams, revalidate } from "@solidjs/router";
-import { Copy, Download, KeyRound, Link2, LogOut, Mail, Plus, RotateCw, Settings, Share2, Shield, ShieldAlert, Trash2, Unlink, Users } from "lucide-solid";
+import { Copy, Download, KeyRound, Link2, LogOut, Mail, Plus, RotateCw, Settings, Share2, Shield, ShieldAlert, Trash2, Unlink, Upload, Users } from "lucide-solid";
 import {
   approveTreeDeletion,
   cancelTreeDeletionRequest,
@@ -232,6 +232,8 @@ function TreeSettingsInner() {
   });
 
   const isOwner = () => overview()?.role === "owner";
+  const canImport = () =>
+    overview()?.role === "owner" || overview()?.role === "editor";
   const canEmailInvites = () => Boolean(user()?.emailVerified);
 
   async function saveTree(event: SubmitEvent) {
@@ -690,8 +692,8 @@ function TreeSettingsInner() {
 
                 <SectionCard
                   class="mt-5"
-                  title="Export"
-                  description="Take this tree to another genealogy tool as a GEDCOM 5.5.1 file."
+                  title="GEDCOM"
+                  description="Move people between genealogy tools. Import with a review before anything changes."
                 >
                   <div class="flex flex-wrap items-center gap-3">
                     <A
@@ -702,10 +704,20 @@ function TreeSettingsInner() {
                       <Download size={15} />
                       Download GEDCOM
                     </A>
-                    <p class="text-xs text-muted-foreground">
-                      Names, dates, places, events, notes, media references, and families.
-                    </p>
+                    <Show when={canImport()}>
+                      <A
+                        href={`/trees/${params.treeId}/import`}
+                        class={buttonVariants({ variant: "secondary" })}
+                        data-testid="tree-import-gedcom"
+                      >
+                        <Upload size={15} />
+                        Import into this tree
+                      </A>
+                    </Show>
                   </div>
+                  <p class="mt-2 text-xs text-muted-foreground">
+                    Names, dates, places, events, notes, media references, and families.
+                  </p>
                   <p class="mt-2 text-xs leading-relaxed text-muted-foreground">
                     The tree does not record sex, so each person exports as
                     <code class="mx-1 rounded bg-muted px-1">SEX U</code>

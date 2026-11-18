@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { API_SCOPE_VALUES } from "../lib/api";
 import { PERSON_SEX_VALUES } from "../lib/person-sex";
-import { MAX_GEDCOM_CHARS } from "../lib/gedcom-import";
+import { MAX_GEDCOM_CHARS, MAX_IMPORT_PEOPLE } from "../lib/gedcom-import";
 import {
   isValidFuzzyDate,
   isValidPartialDate,
@@ -161,6 +161,31 @@ export const importGedcomSchema = z.object({
     .string()
     .min(1, "Choose a GEDCOM file.")
     .max(MAX_GEDCOM_CHARS, "That GEDCOM file is too large."),
+});
+
+export const gedcomImportDecisionSchema = z.object({
+  xref: z.string().trim().min(1).max(120),
+  action: z.enum(["create", "merge", "skip"]),
+  personId: z.string().uuid().nullable().optional(),
+});
+
+export const applyGedcomImportSchema = z.object({
+  treeId: z.string().uuid(),
+  fileName: z
+    .string()
+    .trim()
+    .max(255)
+    .optional()
+    .nullable()
+    .transform(value => value || null),
+  text: z
+    .string()
+    .min(1, "Choose a GEDCOM file.")
+    .max(MAX_GEDCOM_CHARS, "That GEDCOM file is too large."),
+  decisions: z
+    .array(gedcomImportDecisionSchema)
+    .min(1, "Review at least one person.")
+    .max(MAX_IMPORT_PEOPLE),
 });
 
 export const apiTokenSchema = z.object({

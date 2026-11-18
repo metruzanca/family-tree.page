@@ -19,7 +19,10 @@ import {
   getTreeOverview as getTreeOverviewFn,
 } from "./trees-server";
 import { getTreeGraph as getTreeGraphFn } from "./people-server";
-import { importGedcom as importGedcomFn } from "./gedcom-import-server";
+import {
+  applyGedcomImport as applyGedcomImportFn,
+  importGedcom as importGedcomFn,
+} from "./gedcom-import-server";
 import {
   createTreeApiToken as createTreeApiTokenFn,
   getTreeApiTokens as getTreeApiTokensFn,
@@ -61,6 +64,7 @@ export const getEmailChangePreview = query(getEmailChangePreviewFn, "email-chang
 export const getUsage = query(getUsageFn, "account-usage");
 
 export const importGedcom = action(importGedcomFn, "import-gedcom");
+export const applyGedcomImport = action(applyGedcomImportFn, "apply-gedcom-import");
 export const createTreeApiToken = action(createTreeApiTokenFn, "create-tree-api-token");
 export const revokeTreeApiToken = action(revokeTreeApiTokenFn, "revoke-tree-api-token");
 
