@@ -54,7 +54,7 @@ The graph is the main view. People are nodes, parent and partner relationships a
 - Public read-only share links with living-person privacy, optional thumbnails, expiry, and revocation
 - A read-only developer API with tree-scoped tokens, cursor pagination, ETags, and an OpenAPI 3.1 contract at `/docs/api`
 - GEDCOM 5.5.1 export from tree settings and the API, with dates, places, events, notes, media references, and families
-- GEDCOM 5.5.1 import into a new tree, with a parsed preview, warnings, and no changes to existing trees
+- GEDCOM 5.5.1 import into a new or existing tree, with a parsed preview, per-person create, merge, or skip decisions, and gap-filling merges
 - Nightly PostgreSQL and media backups to a second private bucket, with checksum verification and a one-command restore
 - Optional Sentry error tracking with PII scrubbing
 - Optional Umami analytics with page views and product events, enabled by environment variables
@@ -657,13 +657,18 @@ GEDCOM 5.5.1 has only `HUSB` and `WIFE` for a couple. When one partner is male a
 
 The trees page has **Import** next to **New tree**. Choose a `.ged` file, review the people, families, events, and warning counts, name the new tree, and import. The preview parses in the browser; the server parses the file again before writing anything.
 
+To merge into an existing tree, open **Tree settings**, then **GEDCOM**, then **Import into this tree**. Every person in the file gets a row with **Create**, **Merge**, or **Skip**. The duplicate detector suggests a match, an exact full name or a strong score defaults to Merge, and every row can be changed before applying.
+
 Import always creates a new tree and never touches an existing one. It reads GEDCOM 5.5.1 names, sex, dates, places, birth and death, life events, notes, parent-child links, and partnerships with marriage, divorce, separation, or widowed dates. Duplicate family records are merged. Missing references, unreadable dates, and unsupported tags become warnings instead of silent guesses.
 
 - People and families are written in one transaction, so a failed import leaves no partial tree.
+- A merge only fills empty fields. It never overwrites a non-empty name, date, place, sex, or biography.
+- Existing relationships and identical events are left alone, so re-importing the same export is effectively a no-op.
+- Two imported people cannot merge into the same existing person, and a merge without a target blocks the apply.
 - The account people quota still applies. An import that would exceed it rolls back.
-- Imports are limited to 5 MB and 5,000 people, and to five imports per hour per account.
+- Imports are limited to 5 MB and 5,000 people, to five new trees or ten merges per hour per account.
 - Media files and source citations are skipped because a GEDCOM file contains references, not the files or a source model.
-- Importing into an existing tree, merging duplicates, GEDCOM 7, and source records are follow-ups.
+- GEDCOM 7, source records, media bundles, and resumable processing for very large files are follow-ups.
 
 The parser lives in `src/lib/gedcom-import.ts` with tests, including a round trip from an exported tree back through the parser.
 
@@ -708,7 +713,7 @@ This is a reading aid, not access control. The whole graph is still sent to ever
 - Dates are Gregorian and structured. Seasons and free-text dates such as "spring 1918" are not represented; use an event note for those.
 - Focus is a presentation aid, not access control. The whole tree is still loaded for every member, and anyone can reveal all branches with one click.
 - The API is read-only. There are no write scopes, webhooks, or GEDCOM import yet. See [docs/roadmap.md](docs/roadmap.md) for the deferred work.
-- GEDCOM import creates a new tree only. It does not merge into an existing tree, import media binaries, or create source records.
+- GEDCOM merge fills only empty fields. It never overwrites a non-empty value, and it does not import media binaries or create source records.
 - GEDCOM 5.5.1 has no neutral couple roles. Same-sex and unknown-partner families export `HUSB` and `WIFE` by stable order, with a note in the file header. Review those roles after importing.
 - The API changes feed is derived from tree activity, not a strict per-row delta with tombstones. Use `export.json` when a client needs a guaranteed snapshot.
 - No printable chart export, OCR, or face recognition yet. Face detection and manual linking ship, but names are never suggested.

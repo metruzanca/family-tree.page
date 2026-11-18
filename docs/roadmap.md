@@ -4,16 +4,16 @@ Deferred work beyond v0.1.0. None of this is shipped yet. The order is a suggest
 
 ## 1. GEDCOM import follow-ups
 
-GEDCOM 5.5.1 export is shipped, and so is import into a new tree: a browser-side preview, a server-side reparse, one transaction, warnings for missing references and unreadable dates, and quota enforcement. The remaining work is the harder half.
+GEDCOM 5.5.1 export is shipped, and so is import into a new tree and a reviewed merge into an existing tree: a browser-side preview, duplicate suggestions, per-person create, merge, or skip, one transaction, gap-filling merges, warnings for missing references and unreadable dates, and quota enforcement. The remaining work is deeper fidelity.
 
 Scope:
 
-- Import into an existing tree with a per-record review, and reuse the duplicate detector instead of guessing.
 - GEDCOM 7, after 5.5.1.
 - Source and citation records, then import `SOUR` and `REPO` instead of skipping them.
 - Media by file name or an uploaded bundle. GEDCOM references files; it does not contain them.
 - Resumable processing for very large files, beyond the current 5 MB and 5,000 people limits.
-- Merge family records that differ only by a missing partner, and review same-sex role handling, since GEDCOM 5.5.1 has only `HUSB` and `WIFE`.
+- Review parent types and same-sex role handling, since GEDCOM 5.5.1 has only `HUSB` and `WIFE` and no neutral parent roles.
+- Let a reviewer change relationship and event decisions, not just person decisions.
 
 ## 2. Printable charts and tree posters
 
