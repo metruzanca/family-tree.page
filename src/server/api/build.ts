@@ -1,4 +1,5 @@
 import type { Person, StoredFile } from "../../../drizzle/schema";
+import type { GedcomInput } from "../../lib/gedcom";
 import {
   buildTreeSnapshot,
   toApiEvent,
@@ -156,4 +157,62 @@ export function buildExportSnapshot(
 
 export function buildRelationships(data: ApiTreeData) {
   return toApiRelationships(data.parents, data.partnerships);
+}
+
+/** Maps the same consistent tree read into the GEDCOM serializer input. */
+export function toGedcomInput(data: ApiTreeData): GedcomInput {
+  return {
+    treeName: data.tree.name,
+    treeDescription: data.tree.description,
+    people: data.people.map(person => ({
+      id: person.id,
+      firstName: person.firstName,
+      lastName: person.lastName,
+      maidenName: person.maidenName,
+      nickname: person.nickname,
+      birthDate: person.birthDate ?? null,
+      deathDate: person.deathDate ?? null,
+      birthPlace: person.birthPlace,
+      deathPlace: person.deathPlace,
+      bio: person.bio,
+    })),
+    relationships: [
+      ...data.parents.map(
+        row =>
+          ({
+            id: row.id,
+            type: "parent" as const,
+            source: row.parentId,
+            target: row.childId,
+          }),
+      ),
+      ...data.partnerships.map(
+        row =>
+          ({
+            id: row.id,
+            type: "partner" as const,
+            source: row.personAId,
+            target: row.personBId,
+            status: row.status,
+            startDate: row.startDate ?? null,
+            endDate: row.endDate ?? null,
+          }),
+      ),
+    ],
+    events: data.events.map(row => ({
+      id: row.id,
+      personId: row.personId,
+      kind: row.kind,
+      title: row.title,
+      place: row.place,
+      date: row.date ?? null,
+      description: row.description,
+    })),
+    files: data.files.map(row => ({
+      id: row.id,
+      personId: row.personId,
+      originalName: row.originalName,
+      mimeType: row.mimeType,
+    })),
+  };
 }

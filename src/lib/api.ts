@@ -22,7 +22,7 @@ export const API_SCOPES = [
   {
     value: "export:read",
     label: "Export",
-    description: "A full JSON snapshot of the tree.",
+    description: "A full JSON or GEDCOM snapshot of the tree.",
   },
 ] as const;
 

@@ -687,6 +687,31 @@ function TreeSettingsInner() {
                     </Show>
                   </form>
                 </SectionCard>
+
+                <SectionCard
+                  class="mt-5"
+                  title="Export"
+                  description="Take this tree to another genealogy tool as a GEDCOM 5.5.1 file."
+                >
+                  <div class="flex flex-wrap items-center gap-3">
+                    <A
+                      href={`/api/trees/${params.treeId}/gedcom`}
+                      class={buttonVariants({ variant: "secondary" })}
+                      data-testid="tree-export-gedcom"
+                    >
+                      <Download size={15} />
+                      Download GEDCOM
+                    </A>
+                    <p class="text-xs text-muted-foreground">
+                      Names, dates, places, events, notes, media references, and families.
+                    </p>
+                  </div>
+                  <p class="mt-2 text-xs leading-relaxed text-muted-foreground">
+                    The tree does not record sex, so each person exports as
+                    <code class="mx-1 rounded bg-muted px-1">SEX U</code>
+                    and family roles use stable partner order. Review roles after importing.
+                  </p>
+                </SectionCard>
               </TabsContent>
 
               <TabsContent value="members">

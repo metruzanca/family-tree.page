@@ -3,6 +3,7 @@ import Ajv2020 from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
 import spec from "../../../openapi/roots-v1.json";
 import { exactFuzzyDate } from "../../lib/fuzzy-date";
+import { buildGedcom } from "../../lib/gedcom";
 import type {
   ParentChild,
   Partnership,
@@ -15,6 +16,7 @@ import {
   buildExportSnapshot,
   buildPersonDetail,
   buildRelationships,
+  toGedcomInput,
 } from "./build";
 import type { ApiTreeData } from "./types";
 
@@ -211,5 +213,17 @@ describe("API DTO contract", () => {
   it("marks people without a death date as living", () => {
     const snapshot = buildExportSnapshot(data, origin);
     expect(snapshot.people.every(row => row.living)).toBe(true);
+  });
+
+  it("maps the same tree into a GEDCOM file", () => {
+    const gedcom = buildGedcom({
+      ...toGedcomInput(data),
+      generatedAt: new Date("2026-01-02T00:00:00.000Z"),
+    });
+    expect(gedcom.startsWith("0 HEAD\r\n")).toBe(true);
+    expect(gedcom.trimEnd().endsWith("0 TRLR")).toBe(true);
+    expect(gedcom).toContain("1 NAME Abraham /Simpson/");
+    expect(gedcom).toContain("1 MARR");
+    expect(gedcom).toContain("1 CHIL ");
   });
 });

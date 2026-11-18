@@ -835,6 +835,45 @@
         }
       }
     },
+    "/trees/{treeId}/gedcom": {
+      "get": {
+        "tags": [
+          "Export"
+        ],
+        "operationId": "exportGedcom",
+        "summary": "Export GEDCOM 5.5.1",
+        "description": "A GEDCOM 5.5.1 file for Ancestry, MyHeritage, Gramps, RootsMagic, and other genealogy tools. Names, dates, places, life events, notes, media references, and families are included. The tree does not record sex, so every person exports as SEX U and HUSB and WIFE are assigned by stable partner order. Limited to 10 exports per hour per token, shared with the JSON export.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TreeId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The GEDCOM file.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
     "/trees/{treeId}/media/{fileId}/thumb": {
       "get": {
         "tags": [
