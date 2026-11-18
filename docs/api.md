@@ -7,7 +7,7 @@ The API lives under `/api/v1`:
 - `GET /me` describes the token, its scopes, and its tree.
 - `GET /trees` and `GET /trees/:treeId` return tree metadata and counts.
 - `GET /trees/:treeId/people` accepts `q`, `surname`, `limit`, and `cursor`.
-- `GET /trees/:treeId/people/:personId` returns the person, immediate family, partners, events, and media.
+- `GET /trees/:treeId/people/:personId` returns the person, immediate family, partners, events, and media. A shared marriage or divorce appears on both participants, and events carry `partnerPersonId` when one is recorded.
 - `GET /trees/:treeId/relationships`, `/events`, `/search`, and `/changes` cover the rest of the tree.
 - `GET /trees/:treeId/export.json` returns a complete snapshot. Media is referenced by URL, not embedded.
 - `GET /trees/:treeId/gedcom` returns GEDCOM 5.5.1, or 7 with `?version=7`, for other genealogy tools.

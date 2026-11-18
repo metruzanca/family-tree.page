@@ -138,6 +138,8 @@ The same model is used for `people.birth_date`, `people.death_date`, `partnershi
 
 Each person has a timeline of life events. An event has a kind (residence, occupation, education, military service, immigration, emigration, marriage, divorce, burial, or other), an optional title, a place, a fuzzy date, and notes. Editors can add, edit, and delete events from the person panel. Events are included in account exports and are removed with the person or tree.
 
+A marriage or divorce can name a recorded partner of that person. The event is one row shared by both timelines: editing or deleting it from either person updates both, and the panel labels the other participant. Only people already connected as partners are offered, so writing an event never creates a relationship. Deleting the row owner hands the event to the surviving partner instead of erasing it; clearing the partner unshares it.
+
 A parent's timeline also lists the birth of each child who has a birth date on their own record. These entries are derived, not stored as events: they are read-only from the parent, and selecting one opens the child. `buildLifeTimeline` in `src/lib/person-events.ts` merges both sources and sorts them by fuzzy date.
 
 ## Research desk
@@ -170,7 +172,7 @@ Tree owners control who joins, what they can do, and what the outside world can 
 
 Tree owners can create public read-only links from the Sharing tab in tree settings. Each link stores only a SHA-256 hash of its token, so the URL is shown once at creation. A link can have a label, an expiry from one day to ninety days or no expiry, and can be revoked immediately. Revoked, expired, or unknown tokens show a simple unavailable page.
 
-Living people are anyone without a recorded death date. The default share setting is names only: names and relationships, with dates, places, biographies, portraits, events, and media removed. Owners can instead hide living people entirely or show full details. When media is enabled, only image thumbnails are served, never original files or documents, and a thumbnail request for a living person is rejected unless the link allows full details. Share responses send `X-Robots-Tag: noindex` and `Cache-Control: private, no-store`.
+Living people are anyone without a recorded death date. The default share setting is names only: names and relationships, with dates, places, biographies, portraits, events, and media removed. Owners can instead hide living people entirely or show full details. A shared marriage or divorce is kept while either participant is visible, so it stays on a deceased spouse's timeline without revealing a hidden living partner. When media is enabled, only image thumbnails are served, never original files or documents, and a thumbnail request for a living person is rejected unless the link allows full details. Share responses send `X-Robots-Tag: noindex` and `Cache-Control: private, no-store`.
 
 ### Your data
 
