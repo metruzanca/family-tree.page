@@ -10,6 +10,15 @@ Open a tree and choose **Research desk** from the toolbar, or go directly to `/t
 
 Seven views share one focus person. Every view is linkable with `?view=` and `?person=`, so a specific sheet or chart can be bookmarked, shared inside the family, or printed.
 
+Members with edit access do not need to leave the desk to correct a record. The family sheet, the dossier, and the issues queue open the same person, event, and relative dialogs used on the graph:
+
+- Edit a parent or child from the family sheet.
+- Edit the focus person from the dossier, or add and change their life events in the chronology.
+- Pick a person in the issues queue and land in the form field where the gap belongs.
+- Connect a parent, partner, or child from either the sheet or the dossier.
+
+Charts and indexes stay read-only: they link to the dossier, where the record can be changed. A viewer sees no edit controls. Print output never includes them either.
+
 ### Family group sheet
 
 The unit researchers file and exchange: one couple, their events, and their children.

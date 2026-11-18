@@ -158,6 +158,8 @@ The views share one focus person, chosen from a picker or passed as `?person=`. 
 
 All views live in `src/lib/research/` as pure functions with tests, and the components in `src/components/research/` only render their output. `buildResearchIndex` groups parents, children, partners, events, and media once, and the views reuse that index. Dates sort with `fuzzySortValue`, so unknown dates go last instead of pretending to be year zero. A parent cycle is bounded rather than followed forever.
 
+A member with edit access can change a person, their life events, and their relatives from the sheet, dossier, or issues queue through the same dialogs as the graph. The charts and indexes stay read-only and link to the dossier. Print output hides every edit control.
+
 People record sex as female, male, other, or unknown. The pedigree labels a known male parent as father and a known female parent as mother, and falls back to parent for other or unknown. Relationship labels stay neutral, so the desk never guesses at aunt or uncle. GEDCOM export uses the same field for `SEX` and, when a couple is one male and one female, for `HUSB` and `WIFE`.
 
 The full researcher feature guide, including GEDCOM and the API, is in [docs/research.md](research.md).
