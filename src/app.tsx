@@ -8,6 +8,8 @@ import { ToastProvider } from "./components/ui/Toast";
 import { LoadingScreen } from "./components/ui/Loading";
 import { AppErrorBoundary } from "./components/app/AppErrorBoundary";
 import { AnalyticsPageviews } from "./components/app/AnalyticsPageviews";
+import { LocaleProvider } from "./i18n/LocaleProvider";
+import { useI18n } from "./i18n/LocaleProvider";
 
 function CacheBoundary(props: ParentProps) {
   const location = useLocation();
@@ -19,28 +21,37 @@ function CacheBoundary(props: ParentProps) {
   return <>{props.children}</>;
 }
 
+function AppRouter() {
+  const { t } = useI18n();
+  return (
+    <Router
+      root={props => (
+        <CacheBoundary>
+          <AnalyticsPageviews />
+          <Suspense fallback={<LoadingScreen />}>
+            <AppErrorBoundary
+              title={t("error.title")}
+              back={{ href: "/", label: t("error.goHome") }}
+            >
+              {props.children}
+            </AppErrorBoundary>
+          </Suspense>
+        </CacheBoundary>
+      )}
+    >
+      <FileRoutes />
+    </Router>
+  );
+}
+
 export default function App() {
   return (
-    <ThemeProvider>
-      <ToastProvider>
-        <Router
-          root={props => (
-            <CacheBoundary>
-              <AnalyticsPageviews />
-              <Suspense fallback={<LoadingScreen />}>
-                <AppErrorBoundary
-                  title="Something went wrong"
-                  back={{ href: "/", label: "Go home" }}
-                >
-                  {props.children}
-                </AppErrorBoundary>
-              </Suspense>
-            </CacheBoundary>
-          )}
-        >
-          <FileRoutes />
-        </Router>
-      </ToastProvider>
-    </ThemeProvider>
+    <LocaleProvider>
+      <ThemeProvider>
+        <ToastProvider>
+          <AppRouter />
+        </ToastProvider>
+      </ThemeProvider>
+    </LocaleProvider>
   );
 }

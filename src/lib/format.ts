@@ -1,3 +1,4 @@
+import { localeTag, translate, type Locale } from "../i18n";
 import { formatFuzzyYears, type FuzzyDate } from "./fuzzy-date";
 
 export function asDate(value: Date | string | null | undefined): Date | null {
@@ -6,10 +7,13 @@ export function asDate(value: Date | string | null | undefined): Date | null {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-export function formatDate(value: Date | string | null | undefined) {
+export function formatDate(
+  value: Date | string | null | undefined,
+  locale: Locale = "en",
+) {
   const date = asDate(value);
   if (!date) return "";
-  return new Intl.DateTimeFormat(undefined, {
+  return new Intl.DateTimeFormat(localeTag(locale), {
     year: "numeric",
     month: "short",
     day: "numeric",
@@ -19,8 +23,9 @@ export function formatDate(value: Date | string | null | undefined) {
 export function formatYears(
   birthDate?: FuzzyDate | null,
   deathDate?: FuzzyDate | null,
+  locale: Locale = "en",
 ) {
-  return formatFuzzyYears(birthDate, deathDate);
+  return formatFuzzyYears(birthDate, deathDate, locale);
 }
 
 export function formatBytes(bytes: number) {
@@ -36,7 +41,10 @@ export function formatBytes(bytes: number) {
   return `${value >= 10 ? Math.round(value) : value.toFixed(1)} ${units[unit]}`;
 }
 
-export function formatRelative(value: Date | string | null | undefined) {
+export function formatRelative(
+  value: Date | string | null | undefined,
+  locale: Locale = "en",
+) {
   const date = asDate(value);
   if (!date) return "";
   const diff = date.getTime() - Date.now();
@@ -49,15 +57,26 @@ export function formatRelative(value: Date | string | null | undefined) {
     ["hour", 60 * 60_000],
     ["minute", 60_000],
   ];
-  const formatter = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
+  const formatter = new Intl.RelativeTimeFormat(localeTag(locale), { numeric: "auto" });
   for (const [unit, ms] of units) {
     if (abs >= ms || unit === "minute") {
       return formatter.format(Math.round(diff / ms), unit);
     }
   }
-  return "just now";
+  return translate(locale, "date.justNow");
 }
 
-export function roleLabel(role: "owner" | "editor" | "viewer") {
+export type Role = "owner" | "editor" | "viewer";
+
+export function roleKey(role: Role) {
+  return role === "owner"
+    ? ("common.roleOwner" as const)
+    : role === "editor"
+      ? ("common.roleEditor" as const)
+      : ("common.roleViewer" as const);
+}
+
+/** English label for emails and other non-UI output. */
+export function roleLabel(role: Role) {
   return role === "owner" ? "Owner" : role === "editor" ? "Editor" : "Viewer";
 }

@@ -9,6 +9,7 @@ import {
 } from "solid-js";
 import { Portal } from "solid-js/web";
 import { CheckCircle2, CircleAlert, Info, X } from "lucide-solid";
+import { useI18n } from "~/i18n/LocaleProvider";
 
 type ToastTone = "success" | "error" | "info";
 type ToastItem = { id: number; message: string; tone: ToastTone };
@@ -16,6 +17,7 @@ type ToastItem = { id: number; message: string; tone: ToastTone };
 const ToastContext = createContext<{ show: (message: string, tone?: ToastTone) => void }>();
 
 export function ToastProvider(props: { children: JSX.Element }) {
+  const { t } = useI18n();
   const [items, setItems] = createSignal<ToastItem[]>([]);
   const timers = new Map<number, ReturnType<typeof setTimeout>>();
   onCleanup(() => {
@@ -73,7 +75,7 @@ export function ToastProvider(props: { children: JSX.Element }) {
                 <button
                   type="button"
                   class="rounded-full p-0.5 text-muted-foreground transition hover:bg-accent hover:text-foreground"
-                  aria-label="Dismiss notification"
+                  aria-label={t("common.dismissNotification")}
                   onClick={() => dismiss(item.id)}
                 >
                   <X size={15} />

@@ -1,6 +1,7 @@
 // @refresh reload
 import { StartServer, createHandler } from "@solidjs/start/server";
 import { optionalEnv, publicOrigin } from "./server/config";
+import { resolveLocaleFromHeaders, translate } from "./i18n";
 
 const themeScript = `try{const s=localStorage.getItem("family-tree-theme");const d=s==="dark"||(!s&&matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.classList.toggle("dark",d);document.documentElement.style.colorScheme=d?"dark":"light";}catch(e){}`;
 
@@ -18,28 +19,30 @@ const umami =
     ? { scriptUrl: umamiScriptUrl, websiteId: umamiWebsiteId, domain: umamiDomain }
     : null;
 
-export default createHandler(() => (
+export default createHandler(context => {
+  const locale = resolveLocaleFromHeaders(context.request.headers);
+  return (
   <StartServer
     document={({ assets, children, scripts }) => (
-      <html lang="en">
+      <html lang={locale}>
         <head>
           <meta charset="utf-8" />
           <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
           <meta
             name="description"
-            content="A private, collaborative family tree built as an interactive graph. Add people, connect parents and partners, and attach the photos and documents that hold the stories together. Free and open source."
+            content={translate(locale, "meta.description")}
           />
           <meta name="theme-color" content="#f6f1e7" />
           <meta property="og:type" content="website" />
-          <meta property="og:title" content="family-tree: a private, collaborative family graph" />
+          <meta property="og:title" content={translate(locale, "meta.title")} />
           <meta
             property="og:description"
-            content="A private, collaborative family tree built as an interactive graph. People, partners, children and media in one connected picture. Free and open source."
+            content={translate(locale, "meta.description")}
           />
           <meta property="og:url" content="https://family-tree.page" />
           <meta name="twitter:card" content="summary" />
           <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-          <title>family-tree: a private, collaborative family graph</title>
+          <title>{translate(locale, "meta.title")}</title>
           {umami && (
             <script
               defer
@@ -63,4 +66,5 @@ export default createHandler(() => (
       </html>
     )}
   />
-));
+  );
+});

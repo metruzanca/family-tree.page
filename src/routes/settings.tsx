@@ -1,4 +1,4 @@
-import { Show, createEffect, createSignal } from "solid-js";
+import { Show, For, createEffect, createSignal } from "solid-js";
 import { A, createAsync, revalidate } from "@solidjs/router";
 import {
   BellRing,
@@ -9,6 +9,7 @@ import {
   ExternalLink,
   HardDrive,
   KeyRound,
+  Languages,
   Mail,
   RotateCw,
   ShieldAlert,
@@ -47,6 +48,9 @@ import {
 import { useToast } from "~/components/ui/Toast";
 import { attemptAction } from "~/lib/action-result";
 import { track } from "~/lib/analytics";
+import { useI18n } from "~/i18n/LocaleProvider";
+import { LOCALES } from "~/i18n";
+import { LOCALE_NAMES } from "~/i18n/LocaleSwitcher";
 
 export const route = {
   preload: () => {
@@ -79,6 +83,7 @@ export default function AccountSettingsPage() {
 function AccountSettingsInner() {
   const user = createAsync(() => requireUserPage());
   const toast = useToast();
+  const { t, locale, setLocale } = useI18n();
   const [displayName, setDisplayName] = createSignal("");
   const [profilePending, setProfilePending] = createSignal(false);
   const [currentPassword, setCurrentPassword] = createSignal("");
@@ -312,6 +317,47 @@ function AccountSettingsInner() {
                     {profilePending() ? "Saving…" : "Save profile"}
                   </Button>
                 </form>
+              </CardContent>
+            </Card>
+
+            <Card
+              class="mt-5 gap-4 py-5 sm:py-6"
+              data-testid="settings-language-card"
+            >
+              <CardHeader class="gap-1 px-5 sm:px-6">
+                <div class="flex items-center gap-3">
+                  <span class="grid size-9 place-items-center rounded-xl bg-accent text-accent-foreground">
+                    <Languages size={17} />
+                  </span>
+                  <div>
+                    <CardTitle class="font-display text-xl">
+                      {t("settings.language.title")}
+                    </CardTitle>
+                    <CardDescription class="text-xs">
+                      {t("settings.language.description")}
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent class="px-5 sm:px-6">
+                <div
+                  class="flex flex-wrap gap-2"
+                  role="group"
+                  aria-label={t("common.language")}
+                >
+                  <For each={LOCALES}>
+                    {code => (
+                      <Button
+                        type="button"
+                        variant={locale() === code ? "default" : "secondary"}
+                        onClick={() => setLocale(code)}
+                        data-testid={`settings-language-${code}`}
+                      >
+                        {LOCALE_NAMES[code]}
+                      </Button>
+                    )}
+                  </For>
+                </div>
               </CardContent>
             </Card>
 

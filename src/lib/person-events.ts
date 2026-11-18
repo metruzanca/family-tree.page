@@ -1,4 +1,5 @@
 import { compareFuzzyDates, type FuzzyDate } from "./fuzzy-date";
+import { translate, type Locale, type TranslationKey } from "../i18n";
 
 export const PERSON_EVENT_KINDS = [
   "residence",
@@ -28,8 +29,25 @@ export const PERSON_EVENT_OPTIONS: { value: PersonEventKind; label: string }[] =
   { value: "other", label: "Other" },
 ];
 
-export function personEventKindLabel(kind: PersonEventKind) {
-  return PERSON_EVENT_OPTIONS.find(option => option.value === kind)?.label ?? "Event";
+export const PERSON_EVENT_KEYS: Record<PersonEventKind, TranslationKey> = {
+  residence: "person.event.residence",
+  occupation: "person.event.occupation",
+  education: "person.event.education",
+  military: "person.event.military",
+  immigration: "person.event.immigration",
+  emigration: "person.event.emigration",
+  marriage: "person.event.marriage",
+  divorce: "person.event.divorce",
+  burial: "person.event.burial",
+  other: "person.event.other",
+};
+
+export function personEventKey(kind: PersonEventKind): TranslationKey {
+  return PERSON_EVENT_KEYS[kind] ?? "person.event.other";
+}
+
+export function personEventKindLabel(kind: PersonEventKind, locale: Locale = "en") {
+  return translate(locale, personEventKey(kind));
 }
 
 /** The child fields a derived birth entry needs, kept free of API types. */

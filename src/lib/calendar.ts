@@ -1,5 +1,6 @@
 import type { GraphPerson } from "~/api/people-server";
 import { birthdayParts, type FuzzyDate } from "./fuzzy-date";
+import { localeTag, type Locale } from "../i18n";
 
 export type DateParts = {
   year: number;
@@ -222,8 +223,9 @@ export function birthdayMatchesOn(
   return occurrence.month === target.month && occurrence.day === target.day;
 }
 
-export function formatMonthDay(parts: DateParts) {
-  return new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric" }).format(
-    new Date(parts.year, parts.month, parts.day),
-  );
+export function formatMonthDay(parts: DateParts, locale: Locale = "en") {
+  return new Intl.DateTimeFormat(localeTag(locale), {
+    month: "long",
+    day: "numeric",
+  }).format(new Date(parts.year, parts.month, parts.day));
 }

@@ -7,6 +7,7 @@ import {
 import { friendlyMessage } from "~/lib/action-result";
 import { track } from "~/lib/analytics";
 import { captureClientError } from "~/lib/sentry-client";
+import { useI18n } from "~/i18n/LocaleProvider";
 
 type AppErrorBoundaryProps = {
   children: JSX.Element;
@@ -24,6 +25,7 @@ type AppErrorBoundaryProps = {
  * "Uncaught Client Exception" page.
  */
 export function AppErrorBoundary(props: AppErrorBoundaryProps) {
+  const { t } = useI18n();
   return (
     <ErrorBoundary
       fallback={(error, reset) => {
@@ -54,7 +56,7 @@ export function AppErrorBoundary(props: AppErrorBoundaryProps) {
           <ErrorState
             variant={props.variant}
             title={props.title}
-            message={props.message ?? friendlyMessage(error)}
+            message={props.message ?? friendlyMessage(error, t)}
             retrying={retrying()}
             onRetry={retry}
             back={props.back}

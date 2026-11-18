@@ -1,14 +1,16 @@
 import { For } from "solid-js";
 import { Skeleton } from "./skeleton";
+import { useI18n } from "~/i18n/LocaleProvider";
 
 export function LoadingScreen(props: { label?: string }) {
+  const { t } = useI18n();
   return (
     <div class="flex min-h-[60dvh] flex-col items-center justify-center gap-4 px-6">
       <span class="relative flex size-10 items-center justify-center">
         <span class="absolute inset-0 animate-ping rounded-full bg-primary/15" />
         <span class="size-2.5 rounded-full bg-primary" />
       </span>
-      <p class="text-sm text-muted-foreground">{props.label ?? "Growing your tree…"}</p>
+      <p class="text-sm text-muted-foreground">{props.label ?? t("loading.tree")}</p>
     </div>
   );
 }

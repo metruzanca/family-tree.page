@@ -3,6 +3,7 @@ import { ArrowLeft, RefreshCw, Sprout, TriangleAlert } from "lucide-solid";
 import { Show } from "solid-js";
 import { Button, buttonVariants } from "./button";
 import { Card } from "./card";
+import { useI18n } from "~/i18n/LocaleProvider";
 
 export type ErrorStateVariant = "page" | "graph" | "inline";
 
@@ -20,10 +21,10 @@ export type ErrorStateProps = {
  * fits inside a card or list, and every variant offers a retry when possible.
  */
 export function ErrorState(props: ErrorStateProps) {
+  const { t } = useI18n();
   const variant = () => props.variant ?? "page";
-  const title = () => props.title ?? "Something went wrong";
-  const message = () =>
-    props.message ?? "That request did not finish. Try again in a moment.";
+  const title = () => props.title ?? t("error.title");
+  const message = () => props.message ?? t("error.message");
 
   const retryButton = (size: "default" | "sm" = "default", className?: string) => (
     <Show when={props.onRetry}>
@@ -35,7 +36,7 @@ export function ErrorState(props: ErrorStateProps) {
         onClick={() => props.onRetry?.()}
       >
         <RefreshCw class={props.retrying ? "animate-spin" : undefined} />
-        {props.retrying ? "Trying again…" : "Try again"}
+        {props.retrying ? t("common.retrying") : t("common.retry")}
       </Button>
     </Show>
   );
@@ -121,7 +122,7 @@ export function ErrorState(props: ErrorStateProps) {
                       size={16}
                       class={props.retrying ? "animate-spin" : undefined}
                     />
-                    {props.retrying ? "Trying again…" : "Try again"}
+                    {props.retrying ? t("common.retrying") : t("common.retry")}
                   </button>
                 </Show>
                 <Show when={props.back}>

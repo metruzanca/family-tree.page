@@ -1,5 +1,7 @@
 import type { ActionResult } from "~/server/errors";
 import { errorRequestId } from "./request-tracking";
+import { tClient } from "../i18n";
+import type { TranslationKey } from "../i18n";
 
 /** Redirects thrown by server functions must reach the router instead of becoming error text. */
 export function isRedirectResponse(value: unknown): value is Response {
@@ -7,40 +9,48 @@ export function isRedirectResponse(value: unknown): value is Response {
   return value.status >= 300 && value.status < 400 && value.headers.has("Location");
 }
 
+type Translate = (key: TranslationKey) => string;
+
 /**
  * Turns an unknown failure, usually a rejected server function call or a
  * network error, into a sentence we can show a person.
  */
-export function friendlyMessage(error: unknown): string {
+export function friendlyMessage(error: unknown, t: Translate = tClient): string {
   if (typeof navigator !== "undefined" && navigator.onLine === false) {
-    return "You appear to be offline. Check your connection and try again.";
+    return t("error.offline");
   }
 
   if (error instanceof Response) {
-    if (error.status === 401) return "Your session has expired. Sign in again.";
-    if (error.status === 403) return "You do not have permission to do that.";
-    if (error.status === 404) return "That item could not be found.";
-    if (error.status >= 500) return "The server had a problem. Please try again in a moment.";
-    return "That request could not be completed. Try again.";
+    if (error.status === 401) return t("error.sessionExpired");
+    if (error.status === 403) return t("error.forbidden");
+    if (error.status === 404) return t("error.notFound");
+    if (error.status >= 500) return t("error.server");
+    return t("error.request");
   }
 
   if (error instanceof Error) {
     const message = error.message.trim();
     if (/failed to fetch|network ?error|fetch failed|load failed|networkerror/i.test(message)) {
-      return "Could not reach the server. Check your connection and try again.";
+      return t("error.network");
     }
     if (/internal server error|server function error|uncaught client exception/i.test(message)) {
-      return "The server had a problem. Please try again in a moment.";
+      return t("error.server");
     }
     if (message) return message;
   }
 
-  return "Something went wrong. Please try again.";
+  return t("error.generic");
 }
 
-export function withReference(message: string, reference: string | undefined) {
-  if (!reference || message.includes(`Reference: ${reference}`)) return message;
-  return `${message} Reference: ${reference}`;
+export function withReference(
+  message: string,
+  reference: string | undefined,
+  t: Translate = tClient,
+) {
+  if (!reference) return message;
+  const suffix = t("error.reference").replace("{reference}", reference);
+  if (message.includes(suffix)) return message;
+  return `${message} ${suffix}`;
 }
 
 export function failureReference(error: unknown, result?: { reference?: string }) {

@@ -14,6 +14,8 @@ import {
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
 import { useTheme } from "../ui/Theme";
+import { useI18n } from "~/i18n/LocaleProvider";
+import { LocaleSwitcher } from "~/i18n/LocaleSwitcher";
 
 export function BrandMark(props: { compact?: boolean; href?: string }) {
   return (
@@ -44,6 +46,7 @@ export function AppHeader(props: {
   center?: JSX.Element;
 }) {
   const { theme, toggle } = useTheme();
+  const { t } = useI18n();
   const navigate = useNavigate();
   let signOutForm: HTMLFormElement | undefined;
 
@@ -71,8 +74,9 @@ export function AppHeader(props: {
         </Show>
         <div class="ml-auto flex items-center gap-1.5">
           {props.actions}
+          <LocaleSwitcher />
           <IconButton
-            label={theme() === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+            label={theme() === "dark" ? t("header.lightTheme") : t("header.darkTheme")}
             onClick={toggle}
             data-testid="header-theme-toggle"
           >
@@ -84,7 +88,7 @@ export function AppHeader(props: {
           <DropdownMenu placement="bottom-end">
             <DropdownMenuTrigger
               class="rounded-full p-0.5 outline-hidden transition hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/35"
-              aria-label="Account menu"
+              aria-label={t("header.accountMenu")}
               data-testid="header-account-menu"
             >
               <Avatar name={props.user.displayName} size={34} />
@@ -101,7 +105,7 @@ export function AppHeader(props: {
                 onSelect={() => navigate("/settings")}
               >
                 <Settings />
-                Account settings
+                {t("header.accountSettings")}
               </DropdownMenuItem>
               <DropdownMenuItem
                 variant="destructive"
@@ -110,7 +114,7 @@ export function AppHeader(props: {
                 onSelect={() => signOutForm?.requestSubmit()}
               >
                 <LogOut />
-                Sign out
+                {t("header.signOut")}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

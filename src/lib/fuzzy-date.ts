@@ -1,3 +1,5 @@
+import { translate, type Locale } from "../i18n";
+
 export type PartialDate = {
   year: number | null;
   /** 1-12. */
@@ -126,13 +128,16 @@ export function partialDateFromISO(value: string | null | undefined): PartialDat
   return isValidPartialDate(parts) ? parts : null;
 }
 
-function formatter(options: Intl.DateTimeFormatOptions) {
-  return new Intl.DateTimeFormat(undefined, { ...options, timeZone: "UTC" });
+function formatter(options: Intl.DateTimeFormatOptions, locale: Locale) {
+  return new Intl.DateTimeFormat(locale === "it" ? "it-IT" : "en-US", {
+    ...options,
+    timeZone: "UTC",
+  });
 }
 
 export function formatPartialDate(
   parts: PartialDate | null | undefined,
-  options: { longMonth?: boolean } = {},
+  options: { longMonth?: boolean; locale?: Locale } = {},
 ): string {
   if (!parts || isEmptyPartialDate(parts)) return "";
 
@@ -144,46 +149,48 @@ export function formatPartialDate(
   const date = new Date(
     Date.UTC(parts.year ?? 2000, (parts.month ?? 1) - 1, parts.day ?? 1),
   );
-  return formatter(formatOptions).format(date);
+  return formatter(formatOptions, options.locale ?? "en").format(date);
 }
 
 export function formatFuzzyDate(
   value: FuzzyDate | null | undefined,
-  options: { longMonth?: boolean } = {},
+  options: { longMonth?: boolean; locale?: Locale } = {},
 ): string {
   if (!value) return "";
+  const locale = options.locale ?? "en";
   const start = formatPartialDate(value.start, options);
+  const unknown = translate(locale, "date.unknown");
 
   switch (value.qualifier) {
     case "unknown":
-      return "Unknown";
+      return unknown;
     case "about":
-      return start ? `c. ${start}` : "Unknown";
+      return start ? translate(locale, "date.about", { date: start }) : unknown;
     case "before":
-      return start ? `before ${start}` : "Unknown";
+      return start ? translate(locale, "date.before", { date: start }) : unknown;
     case "after":
-      return start ? `after ${start}` : "Unknown";
+      return start ? translate(locale, "date.after", { date: start }) : unknown;
     case "between": {
       const end = formatPartialDate(value.end, options);
-      if (!start && !end) return "Unknown";
+      if (!start && !end) return unknown;
       if (!end) return start;
-      return `${start} to ${end}`;
+      return translate(locale, "date.between", { start, end });
     }
     default:
-      return start || "Unknown";
+      return start || unknown;
   }
 }
 
-function yearLabel(value: FuzzyDate | null | undefined): string {
+function yearLabel(value: FuzzyDate | null | undefined, locale: Locale): string {
   if (!value) return "";
   const year = value.start.year;
   switch (value.qualifier) {
     case "about":
-      return year === null ? "?" : `c. ${year}`;
+      return year === null ? "?" : translate(locale, "date.about", { date: year });
     case "before":
-      return year === null ? "?" : `before ${year}`;
+      return year === null ? "?" : translate(locale, "date.before", { date: year });
     case "after":
-      return year === null ? "?" : `after ${year}`;
+      return year === null ? "?" : translate(locale, "date.after", { date: year });
     case "between":
       return `${year ?? "?"}-${value.end?.year ?? "?"}`;
     case "unknown":
@@ -196,9 +203,10 @@ function yearLabel(value: FuzzyDate | null | undefined): string {
 export function formatFuzzyYearRange(
   birthDate: FuzzyDate | null | undefined,
   deathDate: FuzzyDate | null | undefined,
+  locale: Locale = "en",
 ) {
-  const birth = yearLabel(birthDate);
-  const death = yearLabel(deathDate);
+  const birth = yearLabel(birthDate, locale);
+  const death = yearLabel(deathDate, locale);
   if (birth && death) return `${birth} - ${death}`;
   return birth || death;
 }
@@ -206,13 +214,14 @@ export function formatFuzzyYearRange(
 export function formatFuzzyYears(
   birthDate: FuzzyDate | null | undefined,
   deathDate: FuzzyDate | null | undefined,
+  locale: Locale = "en",
 ) {
-  const birth = yearLabel(birthDate);
-  const death = yearLabel(deathDate);
+  const birth = yearLabel(birthDate, locale);
+  const death = yearLabel(deathDate, locale);
   if (!birth && !death) return "";
   if (birth && death) return `${birth} - ${death}`;
-  if (birth) return `Born ${birth}`;
-  return `Died ${death}`;
+  if (birth) return translate(locale, "date.born", { years: birth });
+  return translate(locale, "date.died", { years: death });
 }
 
 export function fuzzyYear(value: FuzzyDate | null | undefined): number | null {
