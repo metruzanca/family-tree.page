@@ -3,12 +3,14 @@ import { MapPin, Search } from "lucide-solid";
 import { formatFuzzyDate } from "~/lib/fuzzy-date";
 import { personName } from "~/lib/research/graph";
 import type { PlaceEntry, PlaceIndex } from "~/lib/research/indexes";
+import { useI18n } from "~/i18n/LocaleProvider";
 import { researchHref } from "./views";
 
 export function PlaceIndexView(props: {
   treeId: string;
   index: PlaceIndex;
 }) {
+  const { t } = useI18n();
   const [query, setQuery] = createSignal("");
   const needle = createMemo(() => query().trim().toLowerCase());
 
@@ -27,9 +29,9 @@ export function PlaceIndexView(props: {
   return (
     <div class="space-y-4">
       <div class="grid gap-2 sm:grid-cols-3">
-        <Stat label="Places recorded" value={props.index.places.length} />
-        <Stat label="Births without a place" value={props.index.missing.births} />
-        <Stat label="Dated events without a place" value={props.index.missing.events} />
+        <Stat label={t("research.places.recorded")} value={props.index.places.length} />
+        <Stat label={t("research.places.missingBirths")} value={props.index.missing.births} />
+        <Stat label={t("research.places.missingEvents")} value={props.index.missing.events} />
       </div>
 
       <div class="rounded-2xl border border-border bg-card px-4 py-3">
@@ -41,7 +43,7 @@ export function PlaceIndexView(props: {
           <input
             type="search"
             class="input pl-9"
-            placeholder="Filter by place or person"
+            placeholder={t("research.places.filter")}
             value={query()}
             onInput={event => setQuery(event.currentTarget.value)}
             data-testid="research-place-search"
@@ -57,9 +59,9 @@ export function PlaceIndexView(props: {
             data-testid="research-place-empty"
           >
             <MapPin class="mx-auto text-muted-foreground" />
-            <p class="mt-3 text-sm font-medium">No places match</p>
+            <p class="mt-3 text-sm font-medium">{t("research.places.emptyTitle")}</p>
             <p class="mt-1 text-xs text-muted-foreground">
-              Add a birth place or a place to a life event, then come back.
+              {t("research.places.emptyBody")}
             </p>
           </div>
         }
@@ -81,10 +83,8 @@ export function PlaceIndexView(props: {
                     </Show>
                   </span>
                   <span class="text-xs text-muted-foreground">
-                    {group.entries.length}{" "}
-                    {group.entries.length === 1 ? "record" : "records"} ·{" "}
-                    {group.peopleCount}{" "}
-                    {group.peopleCount === 1 ? "person" : "people"}
+                    {t("common.record", { count: group.entries.length })} ·{" "}
+                    {t("common.person", { count: group.peopleCount })}
                   </span>
                 </summary>
                 <ul class="border-t border-border px-4 py-2">
@@ -106,7 +106,7 @@ export function PlaceIndexView(props: {
 
       <Show when={props.index.missing.people.length}>
         <section class="rounded-2xl border border-dashed border-border bg-muted/40 p-4">
-          <h2 class="text-sm font-semibold">Births with a date but no place</h2>
+          <h2 class="text-sm font-semibold">{t("research.places.missingTitle")}</h2>
           <p class="mt-1 text-xs text-muted-foreground">
             {props.index.missing.people
               .slice(0, 12)
@@ -114,7 +114,9 @@ export function PlaceIndexView(props: {
               .join(", ")}
             <Show when={props.index.missing.people.length > 12}>
               {" "}
-              and {props.index.missing.people.length - 12} more
+              {t("common.moreCount", {
+                count: props.index.missing.people.length - 12,
+              })}
             </Show>
           </p>
         </section>
@@ -128,6 +130,7 @@ function PlaceRow(props: {
   treeId: string;
   testId: string;
 }) {
+  const { t, locale } = useI18n();
   return (
     <li
       class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b border-border/60 py-1.5 text-sm last:border-0"
@@ -141,10 +144,13 @@ function PlaceRow(props: {
         >
           {personName(props.entry.person)}
         </a>
-        <span class="ml-2 text-xs text-muted-foreground">{props.entry.label}</span>
+        <span class="ml-2 text-xs text-muted-foreground">
+          {props.entry.labelKey ? t(props.entry.labelKey) : props.entry.label}
+        </span>
       </span>
       <span class="text-xs text-muted-foreground">
-        {formatFuzzyDate(props.entry.date) || "No date"}
+        {formatFuzzyDate(props.entry.date, { locale: locale() }) ||
+          t("research.noDate")}
       </span>
     </li>
   );

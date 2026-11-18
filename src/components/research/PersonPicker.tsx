@@ -1,12 +1,14 @@
 import { For, createMemo } from "solid-js";
 import type { GraphPerson } from "~/api/people-server";
 import { personName } from "~/lib/research/graph";
+import { useI18n } from "~/i18n/LocaleProvider";
 
 export function PersonPicker(props: {
   people: GraphPerson[];
   personId: string | null;
   onChange: (personId: string) => void;
 }) {
+  const { t } = useI18n();
   const people = createMemo(() =>
     [...props.people].sort((left, right) =>
       personName(left).localeCompare(personName(right)),
@@ -15,7 +17,7 @@ export function PersonPicker(props: {
 
   return (
     <label class="flex min-w-0 flex-col gap-1 text-[0.68rem] font-semibold uppercase tracking-wide text-muted-foreground">
-      Focus person
+      {t("research.picker.focusPerson")}
       <select
         class="input min-w-[13rem] text-sm normal-case tracking-normal"
         value={props.personId ?? ""}

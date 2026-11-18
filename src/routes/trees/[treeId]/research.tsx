@@ -23,9 +23,11 @@ import { SurnameIndexView } from "~/components/research/SurnameIndexView";
 import {
   DEFAULT_RESEARCH_VIEW,
   isResearchView,
-  researchViewLabel,
+  researchViewLabelKey,
   type ResearchView,
 } from "~/components/research/views";
+import { formatDate } from "~/lib/format";
+import { useI18n } from "~/i18n/LocaleProvider";
 import { buildDossier } from "~/lib/research/dossier";
 import {
   buildFamilyUnits,
@@ -50,13 +52,14 @@ export const route = {
 };
 
 export default function TreeResearchPage() {
+  const { t } = useI18n();
   return (
     <Suspense fallback={<LoadingScreen />}>
       <AppErrorBoundary
-        title="We could not load the research desk"
-        message="The tree may be temporarily unavailable. Try again in a moment."
+        title={t("research.errorTitle")}
+        message={t("tree.error.unavailable")}
         revalidateKeys={[requireUserPage.key, getTreeGraph.key]}
-        back={{ href: "/trees", label: "Back to your trees" }}
+        back={{ href: "/trees", label: t("tree.error.backToTrees") }}
       >
         <TreeResearchInner />
       </AppErrorBoundary>
@@ -87,6 +90,7 @@ function ResearchWorkspace(props: {
   graph: TreeGraph;
   treeId: string;
 }) {
+  const { t, locale } = useI18n();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const view = createMemo<ResearchView>(() =>
@@ -115,17 +119,17 @@ function ResearchWorkspace(props: {
 
   const families = createMemo(() => familiesForPerson(index(), personId()));
   const allFamilies = createMemo(() => buildFamilyUnits(index()));
-  const dossier = createMemo(() => buildDossier(index(), personId()));
+  const dossier = createMemo(() => buildDossier(index(), personId(), locale()));
   const pedigree = createMemo(() => buildPedigree(index(), personId()));
   const register = createMemo(() =>
     buildDescendantRegister(index(), personId(), mode()),
   );
   const surnames = createMemo(() => buildSurnameIndex(index()));
-  const places = createMemo(() => buildPlaceIndex(index()));
-  const issues = createMemo(() => buildResearchIssues(index()));
+  const places = createMemo(() => buildPlaceIndex(index(), locale()));
+  const issues = createMemo(() => buildResearchIssues(index(), locale()));
 
   const [printedOn, setPrintedOn] = createSignal("");
-  onMount(() => setPrintedOn(new Date().toLocaleDateString()));
+  onMount(() => setPrintedOn(formatDate(new Date(), locale())));
 
   const printPage = () => {
     if (typeof window !== "undefined") window.print();
@@ -136,7 +140,7 @@ function ResearchWorkspace(props: {
       <div class="print:hidden">
         <AppHeader
           user={props.user}
-          back={{ href: `/trees/${props.treeId}`, label: "Back to tree" }}
+          back={{ href: `/trees/${props.treeId}`, label: t("tree.backToTree") }}
           center={props.graph.tree.name}
         />
       </div>
@@ -146,7 +150,7 @@ function ResearchWorkspace(props: {
           <div>
             <p class="eyebrow mb-2 flex items-center gap-1.5">
               <BookOpen size={13} />
-              Research desk
+              {t("research.eyebrow")}
             </p>
             <h1 class="font-display text-4xl tracking-tight">{props.graph.tree.name}</h1>
             <ResearchViewIntro view={view()} />
@@ -166,7 +170,7 @@ function ResearchWorkspace(props: {
               data-testid="research-print"
             >
               <Printer size={15} />
-              Print
+              {t("research.print")}
             </Button>
             <A
               href={`/trees/${props.treeId}`}
@@ -174,7 +178,7 @@ function ResearchWorkspace(props: {
               data-testid="research-open-graph"
             >
               <Network size={15} />
-              Open graph
+              {t("tree.openGraph")}
             </A>
           </div>
         </div>
@@ -185,8 +189,14 @@ function ResearchWorkspace(props: {
 
         <div class="hidden print:mb-4 print:block">
           <p class="text-xs uppercase tracking-wide text-muted-foreground">
-            {researchViewLabel(view())} · {props.graph.tree.name}
-            <Show when={printedOn()}> · printed {printedOn()}</Show>
+            {t("research.print.header", {
+              view: t(researchViewLabelKey(view())),
+              tree: props.graph.tree.name,
+            })}
+            <Show when={printedOn()}>
+              {" · "}
+              {t("research.print.printed", { date: printedOn() })}
+            </Show>
           </p>
           <Show when={person()}>
             {selected => (
@@ -203,16 +213,16 @@ function ResearchWorkspace(props: {
               data-testid="research-empty-tree"
             >
               <Search class="mx-auto text-muted-foreground" />
-              <p class="mt-3 text-sm font-medium">This tree has no people yet</p>
+              <p class="mt-3 text-sm font-medium">{t("research.empty.title")}</p>
               <p class="mt-1 text-xs text-muted-foreground">
-                Add a person on the graph and the research views will fill in.
+                {t("research.empty.body")}
               </p>
               <A
                 href={`/trees/${props.treeId}`}
                 class={buttonVariants({ variant: "secondary", size: "sm", class: "mt-4" })}
                 data-testid="research-empty-open-graph"
               >
-                Open the graph
+                {t("research.empty.open")}
               </A>
             </div>
           }
@@ -232,8 +242,7 @@ function ResearchWorkspace(props: {
                   />
                   <Show when={allFamilies().length > 1}>
                     <p class="mt-3 text-xs text-muted-foreground">
-                      {allFamilies().length} family sheets in this tree. Change the
-                      focus person to open another one.
+                      {t("research.sheet.more", { count: allFamilies().length })}
                     </p>
                   </Show>
                 </Show>
@@ -297,14 +306,15 @@ function ResearchWorkspace(props: {
 }
 
 function MissingPerson() {
+  const { t } = useI18n();
   return (
     <div
       class="rounded-3xl border border-dashed border-border p-10 text-center"
       data-testid="research-missing-person"
     >
-      <p class="text-sm font-medium">Choose a person to begin</p>
+      <p class="text-sm font-medium">{t("research.missingPerson.title")}</p>
       <p class="mt-1 text-xs text-muted-foreground">
-        This view is built from one person and their immediate family.
+        {t("research.missingPerson.body")}
       </p>
     </div>
   );

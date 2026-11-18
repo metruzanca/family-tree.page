@@ -1,5 +1,11 @@
 import type { GraphPerson, GraphRelationship } from "~/api/people-server";
 import {
+  translate,
+  type Locale,
+  type TranslationKey,
+  type TranslationParams,
+} from "../../i18n";
+import {
   fuzzyDatesOverlap,
   fuzzyYear,
   fuzzyYearRange,
@@ -27,6 +33,11 @@ export type ResearchIssue = {
   category: ResearchIssueCategory;
   title: string;
   detail: string;
+  /** Key and params for the same title, so views can translate it. */
+  titleKey: TranslationKey;
+  titleParams: TranslationParams;
+  detailKey: TranslationKey;
+  detailParams: TranslationParams;
   personIds: string[];
 };
 
@@ -36,11 +47,16 @@ function definiteYear(value: FuzzyDate | null | undefined) {
   return fuzzyYear(value);
 }
 
-function sampleNames(people: GraphPerson[], limit = 4) {
+function sampleNames(people: GraphPerson[], locale: Locale = "en", limit = 4) {
   const names = people.slice(0, limit).map(personName);
   const remaining = people.length - names.length;
   if (!names.length) return "";
-  if (remaining > 0) return `${names.join(", ")} and ${remaining} more`;
+  if (remaining > 0) {
+    return translate(locale, "research.issue.namesMore", {
+      names: names.join(", "),
+      count: remaining,
+    });
+  }
   return names.join(", ");
 }
 
@@ -48,16 +64,23 @@ function issue(
   id: string,
   severity: ResearchIssueSeverity,
   category: ResearchIssueCategory,
-  title: string,
+  titleKey: TranslationKey,
+  titleParams: TranslationParams,
   people: GraphPerson[],
-  detail: string,
+  detailKey: TranslationKey,
+  locale: Locale,
 ): ResearchIssue {
+  const detailParams = { names: sampleNames(people, locale) };
   return {
     id,
     severity,
     category,
-    title,
-    detail: `${detail} ${sampleNames(people)}`.trim(),
+    title: translate(locale, titleKey, titleParams),
+    titleKey,
+    titleParams,
+    detail: translate(locale, detailKey, detailParams),
+    detailKey,
+    detailParams,
     personIds: people.map(person => person.id),
   };
 }
@@ -67,7 +90,10 @@ function issue(
  * all be true, so one of the records is wrong. Info items are gaps worth
  * chasing rather than errors.
  */
-export function buildResearchIssues(index: ResearchIndex): ResearchIssue[] {
+export function buildResearchIssues(
+  index: ResearchIndex,
+  locale: Locale = "en",
+): ResearchIssue[] {
   const issues: ResearchIssue[] = [];
 
   const impossibleDates: GraphPerson[] = [];
@@ -78,14 +104,17 @@ export function buildResearchIssues(index: ResearchIndex): ResearchIssue[] {
     if (death.end < birth.start) impossibleDates.push(person);
   }
   if (impossibleDates.length) {
+    const count = impossibleDates.length;
     issues.push(
       issue(
         "death-before-birth",
         "warning",
         "dates",
-        `${impossibleDates.length} ${impossibleDates.length === 1 ? "person dies" : "people die"} before birth`,
+        "research.issue.deathBeforeBirth.title",
+        { count },
         impossibleDates,
-        "The death year is earlier than the birth year.",
+        "research.issue.deathBeforeBirth.detail",
+        locale,
       ),
     );
   }
@@ -100,6 +129,7 @@ export function buildResearchIssues(index: ResearchIndex): ResearchIssue[] {
       definiteYear(relationship.endDate)! < definiteYear(relationship.startDate)!,
   );
   if (partnershipsOutOfOrder.length) {
+    const count = partnershipsOutOfOrder.length;
     const names = partnershipsOutOfOrder
       .map(relationship =>
         [index.peopleById.get(relationship.source), index.peopleById.get(relationship.target)]
@@ -108,14 +138,23 @@ export function buildResearchIssues(index: ResearchIndex): ResearchIssue[] {
           .join(" & "),
       )
       .slice(0, 4);
+    const detailParams = { names: names.join(", ") };
     issues.push({
       id: "partnership-end-before-start",
       severity: "warning",
       category: "dates",
-      title: `${partnershipsOutOfOrder.length} ${
-        partnershipsOutOfOrder.length === 1 ? "partnership ends" : "partnerships end"
-      } before they start`,
-      detail: names.join(", "),
+      title: translate(locale, "research.issue.partnershipEndBeforeStart.title", {
+        count,
+      }),
+      titleKey: "research.issue.partnershipEndBeforeStart.title",
+      titleParams: { count },
+      detail: translate(
+        locale,
+        "research.issue.partnershipEndBeforeStart.detail",
+        detailParams,
+      ),
+      detailKey: "research.issue.partnershipEndBeforeStart.detail",
+      detailParams,
       personIds: partnershipsOutOfOrder.flatMap(relationship => [
         relationship.source,
         relationship.target,
@@ -149,11 +188,11 @@ export function buildResearchIssues(index: ResearchIndex): ResearchIssue[] {
         "parent-too-young",
         "warning",
         "relationships",
-        `${earlyParents.length} ${
-          earlyParents.length === 1 ? "person has" : "people have"
-        } a parent under ${MINIMUM_PARENT_AGE}`,
+        "research.issue.parentTooYoung.title",
+        { count: earlyParents.length, age: MINIMUM_PARENT_AGE },
         earlyParents,
-        "Check the birth year of the child, the parent, or the relationship.",
+        "research.issue.parentTooYoung.detail",
+        locale,
       ),
     );
   }
@@ -163,11 +202,11 @@ export function buildResearchIssues(index: ResearchIndex): ResearchIssue[] {
         "child-after-parent-death",
         "warning",
         "relationships",
-        `${posthumousChildren.length} ${
-          posthumousChildren.length === 1 ? "child is born" : "children are born"
-        } more than a year after a parent died`,
+        "research.issue.childAfterParentDeath.title",
+        { count: posthumousChildren.length },
         posthumousChildren,
-        "A posthumous birth is possible, but a gap this size usually means a wrong date or the wrong parent.",
+        "research.issue.childAfterParentDeath.detail",
+        locale,
       ),
     );
   }
@@ -193,11 +232,11 @@ export function buildResearchIssues(index: ResearchIndex): ResearchIssue[] {
         "partnership-before-birth",
         "warning",
         "dates",
-        `${marriedBeforeBirth.length} ${
-          marriedBeforeBirth.length === 1 ? "person" : "people"
-        } in a partnership that starts before they were born`,
+        "research.issue.partnershipBeforeBirth.title",
+        { count: marriedBeforeBirth.length },
         [...new Map(marriedBeforeBirth.map(person => [person.id, person])).values()],
-        "The partnership start year is earlier than a partner's birth year.",
+        "research.issue.partnershipBeforeBirth.detail",
+        locale,
       ),
     );
   }
@@ -215,11 +254,11 @@ export function buildResearchIssues(index: ResearchIndex): ResearchIssue[] {
         "too-many-parents",
         "warning",
         "relationships",
-        `${crowdedParentSets.length} ${
-          crowdedParentSets.length === 1 ? "person has" : "people have"
-        } more than two parents`,
+        "research.issue.tooManyParents.title",
+        { count: crowdedParentSets.length },
         crowdedParentSets,
-        "Adoptive, foster, and step parents are valid, but the pedigree chart can only place two.",
+        "research.issue.tooManyParents.detail",
+        locale,
       ),
     );
   }
@@ -237,11 +276,11 @@ export function buildResearchIssues(index: ResearchIndex): ResearchIssue[] {
         "unconnected-people",
         "info",
         "relationships",
-        `${unconnected.length} ${
-          unconnected.length === 1 ? "person has" : "people have"
-        } no recorded relationships`,
+        "research.issue.unconnected.title",
+        { count: unconnected.length },
         unconnected,
-        "They may be additions waiting for a link, or a scan the tree missed.",
+        "research.issue.unconnected.detail",
+        locale,
       ),
     );
   }
@@ -253,11 +292,11 @@ export function buildResearchIssues(index: ResearchIndex): ResearchIssue[] {
         "missing-birth-date",
         "info",
         "records",
-        `${missingBirthDate.length} ${
-          missingBirthDate.length === 1 ? "person has" : "people have"
-        } no birth date`,
+        "research.issue.missingBirthDate.title",
+        { count: missingBirthDate.length },
         missingBirthDate,
-        "Even an approximate year makes ordering and duplicate checks work.",
+        "research.issue.missingBirthDate.detail",
+        locale,
       ),
     );
   }
@@ -271,11 +310,11 @@ export function buildResearchIssues(index: ResearchIndex): ResearchIssue[] {
         "missing-birth-place",
         "info",
         "records",
-        `${missingBirthPlace.length} ${
-          missingBirthPlace.length === 1 ? "birth has" : "births have"
-        } no place`,
+        "research.issue.missingBirthPlace.title",
+        { count: missingBirthPlace.length },
         missingBirthPlace,
-        "The place index is how most record searches start.",
+        "research.issue.missingBirthPlace.detail",
+        locale,
       ),
     );
   }
@@ -292,15 +331,15 @@ export function buildResearchIssues(index: ResearchIndex): ResearchIssue[] {
         "event-without-place",
         "info",
         "records",
-        `${datedEventsWithoutPlace.length} ${
-          datedEventsWithoutPlace.length === 1 ? "event has" : "events have"
-        } a date but no place`,
+        "research.issue.eventWithoutPlace.title",
+        { count: datedEventsWithoutPlace.length },
         [
           ...new Map(
             datedEventsWithoutPlace.map(entry => [entry.person.id, entry.person]),
           ).values(),
         ],
-        "Add the place so the event shows up in the place index.",
+        "research.issue.eventWithoutPlace.detail",
+        locale,
       ),
     );
   }
@@ -325,14 +364,22 @@ export function buildResearchIssues(index: ResearchIndex): ResearchIssue[] {
   });
   if (possibleDuplicates.length) {
     const people = possibleDuplicates.flat();
+    const count = possibleDuplicates.length;
+    const detailParams = { names: sampleNames(people, locale) };
     issues.push({
       id: "possible-duplicates",
       severity: "info",
       category: "duplicates",
-      title: `${possibleDuplicates.length} ${
-        possibleDuplicates.length === 1 ? "name appears" : "names appear"
-      } more than once`,
-      detail: sampleNames(people),
+      title: translate(locale, "research.issue.possibleDuplicates.title", { count }),
+      titleKey: "research.issue.possibleDuplicates.title",
+      titleParams: { count },
+      detail: translate(
+        locale,
+        "research.issue.possibleDuplicates.detail",
+        detailParams,
+      ),
+      detailKey: "research.issue.possibleDuplicates.detail",
+      detailParams,
       personIds: people.map(person => person.id),
     });
   }
@@ -343,9 +390,16 @@ export function buildResearchIssues(index: ResearchIndex): ResearchIssue[] {
   });
 }
 
+export const ISSUE_CATEGORY_KEYS: Record<ResearchIssueCategory, TranslationKey> = {
+  dates: "research.issues.category.dates",
+  relationships: "research.issues.category.relationships",
+  records: "research.issues.category.records",
+  duplicates: "research.issues.category.duplicates",
+};
+
 export const ISSUE_CATEGORY_LABELS: Record<ResearchIssueCategory, string> = {
-  dates: "Dates",
-  relationships: "Relationships",
-  records: "Records",
-  duplicates: "Duplicates",
+  dates: translate("en", ISSUE_CATEGORY_KEYS.dates),
+  relationships: translate("en", ISSUE_CATEGORY_KEYS.relationships),
+  records: translate("en", ISSUE_CATEGORY_KEYS.records),
+  duplicates: translate("en", ISSUE_CATEGORY_KEYS.duplicates),
 };

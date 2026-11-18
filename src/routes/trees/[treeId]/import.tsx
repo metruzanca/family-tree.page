@@ -12,6 +12,8 @@ import { LoadingScreen } from "~/components/ui/Loading";
 import { useToast } from "~/components/ui/Toast";
 import { attemptAction } from "~/lib/action-result";
 import { formatFuzzyYearRange } from "~/lib/fuzzy-date";
+import { useI18n } from "~/i18n/LocaleProvider";
+import type { Locale, TranslationKey } from "~/i18n";
 import {
   parseGedcom,
   MAX_GEDCOM_CHARS,
@@ -27,7 +29,6 @@ import {
   planImport,
   type ImportDecision,
 } from "~/lib/gedcom-plan";
-import { personSexLabel } from "~/lib/person-sex";
 
 export const route = {
   preload: ({ params }: { params: { treeId: string } }) => {
@@ -37,13 +38,14 @@ export const route = {
 };
 
 export default function TreeImportPage() {
+  const { t } = useI18n();
   return (
     <Suspense fallback={<LoadingScreen />}>
       <AppErrorBoundary
-        title="We could not load the import page"
-        message="The tree may be temporarily unavailable. Try again in a moment."
+        title={t("tree.import.into.errorTitle")}
+        message={t("tree.error.unavailable")}
         revalidateKeys={[requireUserPage.key, getTreeGraph.key]}
-        back={{ href: "/trees", label: "Back to your trees" }}
+        back={{ href: "/trees", label: t("tree.error.backToTrees") }}
       >
         <TreeImportInner />
       </AppErrorBoundary>
@@ -55,6 +57,7 @@ function TreeImportInner() {
   const params = useParams<{ treeId: string }>();
   const navigate = useNavigate();
   const toast = useToast();
+  const { t, locale } = useI18n();
   const user = createAsync(() => requireUserPage());
   const graph = createAsync(() => getTreeGraph(params.treeId));
 
@@ -140,7 +143,7 @@ function TreeImportInner() {
     setDecisions({});
     setFileName(file.name);
     if (file.size > MAX_GEDCOM_CHARS) {
-      setError("That file is larger than 5 MB.");
+      setError(t("tree.import.errorTooLarge"));
       return;
     }
     setReading(true);
@@ -175,10 +178,10 @@ function TreeImportInner() {
       setParsed(result);
       setDecisions(initial);
       if (!result.people.length) {
-        setError("No people were found in that file.");
+        setError(t("tree.import.into.noPeople"));
       }
     } catch {
-      setError("That file could not be read as text.");
+      setError(t("tree.import.errorUnreadable"));
     } finally {
       setReading(false);
     }
@@ -196,7 +199,7 @@ function TreeImportInner() {
     const current = plan();
     if (!parsed() || !current || current.errors.length || applying()) return;
     if (!current.counts.create && !current.counts.merge) {
-      setError("Choose at least one person to add or merge.");
+      setError(t("tree.import.into.errorNothingSelected"));
       return;
     }
     setApplying(true);
@@ -215,7 +218,10 @@ function TreeImportInner() {
       return;
     }
     toast.show(
-      `Import finished: ${result.data.created} added, ${result.data.merged} merged.`,
+      t("tree.import.into.finished", {
+        created: result.data.created,
+        merged: result.data.merged,
+      }),
       "success",
     );
     navigate(`/trees/${params.treeId}`);
@@ -229,7 +235,7 @@ function TreeImportInner() {
             <div class="page-shell min-h-[100dvh]" data-testid="import-page">
               <AppHeader
                 user={currentUser()}
-                back={{ href: `/trees/${params.treeId}`, label: "Back to tree" }}
+                back={{ href: `/trees/${params.treeId}`, label: t("tree.backToTree") }}
                 center={data().tree.name}
               />
               <main class="mx-auto max-w-5xl px-4 pb-20 pt-8 sm:px-6">
@@ -237,15 +243,13 @@ function TreeImportInner() {
                   <div>
                     <p class="eyebrow mb-2 flex items-center gap-1.5">
                       <FileUp size={13} />
-                      Import GEDCOM
+                      {t("tree.import.into.eyebrow")}
                     </p>
                     <h1 class="font-display text-4xl tracking-tight">
-                      Add to {data().tree.name}
+                      {t("tree.import.into.heading", { tree: data().tree.name })}
                     </h1>
                     <p class="mt-2 max-w-2xl text-sm text-muted-foreground">
-                      Review every person before anything is written. New people
-                      are added, merged people only have empty fields filled, and
-                      existing relationships and identical events are left alone.
+                      {t("tree.import.into.description")}
                     </p>
                   </div>
                   <A
@@ -254,7 +258,7 @@ function TreeImportInner() {
                     data-testid="import-open-graph"
                   >
                     <ArrowLeft size={15} />
-                    Back to graph
+                    {t("tree.import.into.backToGraph")}
                   </A>
                 </div>
 
@@ -264,18 +268,17 @@ function TreeImportInner() {
                     <div class="mt-8 rounded-3xl border border-dashed border-border p-10 text-center">
                       <TriangleAlert class="mx-auto text-muted-foreground" />
                       <p class="mt-3 text-sm font-medium">
-                        Only editors and owners can import
+                        {t("tree.import.into.editorsOnlyTitle")}
                       </p>
                       <p class="mt-1 text-xs text-muted-foreground">
-                        Ask a tree editor to merge this file, or download the tree
-                        as GEDCOM instead.
+                        {t("tree.import.into.editorsOnlyBody")}
                       </p>
                     </div>
                   }
                 >
                   <section class="mt-6 rounded-3xl border border-border bg-card p-5 shadow-card">
                     <label class="block text-sm font-semibold" for="import-file">
-                      GEDCOM file
+                      {t("tree.import.fileLabel")}
                       <input
                         id="import-file"
                         type="file"
@@ -286,8 +289,11 @@ function TreeImportInner() {
                       />
                     </label>
                     <p class="mt-2 text-xs text-muted-foreground">
-                      Up to 5 MB. {fileName() ? `Selected ${fileName()}.` : "No file selected."}
-                      <Show when={reading()}> Reading…</Show>
+                      {t("tree.import.into.fileHint")}{" "}
+                      {fileName()
+                        ? t("tree.import.into.selectedFile", { name: fileName() })
+                        : t("tree.import.into.noFile")}
+                      <Show when={reading()}> {t("tree.import.reading")}</Show>
                     </p>
                     <Show when={error()}>
                       <p class="mt-3 text-sm text-destructive" data-testid="import-error">
@@ -304,22 +310,20 @@ function TreeImportInner() {
                           data-testid="import-summary"
                         >
                           <div class="grid grid-cols-2 gap-2 sm:grid-cols-5">
-                            <Stat label="New" value={plan()?.counts.create ?? 0} />
-                            <Stat label="Merge" value={plan()?.counts.merge ?? 0} />
-                            <Stat label="Skip" value={plan()?.counts.skip ?? 0} />
-                            <Stat label="Links" value={plan()?.counts.parentLinks ?? 0} />
-                            <Stat label="Events" value={plan()?.counts.events ?? 0} />
+                            <Stat label={t("tree.import.into.stat.new")} value={plan()?.counts.create ?? 0} />
+                            <Stat label={t("tree.import.into.stat.merge")} value={plan()?.counts.merge ?? 0} />
+                            <Stat label={t("tree.import.into.stat.skip")} value={plan()?.counts.skip ?? 0} />
+                            <Stat label={t("tree.import.into.stat.links")} value={plan()?.counts.parentLinks ?? 0} />
+                            <Stat label={t("tree.import.stats.events")} value={plan()?.counts.events ?? 0} />
                           </div>
                           <p class="mt-2 text-xs text-muted-foreground">
-                            Existing people, links, and identical events are kept.
-                            Links counts the parent links in the file; only missing
-                            ones are added.
+                            {t("tree.import.into.summaryNote")}
                           </p>
                           <Show when={result().stats.warnings}>
                             <p class="mt-3 text-xs text-muted-foreground">
-                              {result().stats.warnings} file{" "}
-                              {result().stats.warnings === 1 ? "warning" : "warnings"}.
-                              The review below shows the records that were read.
+                              {t("tree.import.into.warnings", {
+                                count: result().stats.warnings,
+                              })}
                             </p>
                           </Show>
                           <Show when={plan()?.errors.length}>
@@ -349,12 +353,16 @@ function TreeImportInner() {
 
                         <div class="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-border bg-card p-4">
                           <p class="text-sm text-muted-foreground">
-                            {plan()?.counts.create ?? 0} new,{" "}
-                            {plan()?.counts.merge ?? 0} merged,{" "}
-                            {plan()?.counts.skip ?? 0} skipped.
+                            {t("tree.import.into.footer", {
+                              created: plan()?.counts.create ?? 0,
+                              merged: plan()?.counts.merge ?? 0,
+                              skipped: plan()?.counts.skip ?? 0,
+                            })}
                             <Show when={(plan()?.counts.eventsSkipped ?? 0) > 0}>
                               {" "}
-                              {plan()!.counts.eventsSkipped} identical events skipped.
+                              {t("tree.import.into.eventsSkipped", {
+                                count: plan()!.counts.eventsSkipped,
+                              })}
                             </Show>
                           </p>
                           <Button
@@ -368,7 +376,9 @@ function TreeImportInner() {
                             }
                             data-testid="import-apply"
                           >
-                            {applying() ? "Applying…" : "Apply import"}
+                            {applying()
+                              ? t("tree.import.into.applying")
+                              : t("tree.import.into.apply")}
                           </Button>
                         </div>
                       </>
@@ -391,6 +401,7 @@ function ReviewRow(props: {
   people: GraphPerson[];
   onDecision: (patch: Partial<ImportDecision>) => void;
 }) {
+  const { t, locale } = useI18n();
   const action = () => props.decision?.action ?? "create";
   return (
     <div
@@ -403,14 +414,19 @@ function ReviewRow(props: {
             {props.person.firstName} {props.person.lastName}
           </p>
           <p class="text-xs text-muted-foreground">
-            {formatFuzzyYearRange(props.person.birthDate, props.person.deathDate) ||
-              "No dates"}
+            {formatFuzzyYearRange(
+              props.person.birthDate,
+              props.person.deathDate,
+              locale(),
+            ) || t("tree.import.into.noDates")}
             {" · "}
-            {personSexLabel(props.person.sex)}
+            {t(sexKey(props.person.sex))}
           </p>
           <Show when={props.suggestion?.personId}>
             <p class="mt-1 text-xs text-muted-foreground">
-              Possible match: {props.suggestion!.displayName}
+              {t("tree.import.into.possibleMatch", {
+                name: props.suggestion!.displayName ?? "",
+              })}
               <Show when={props.suggestion!.reasons.length}>
                 {" · "}
                 {props.suggestion!.reasons.join(", ")}
@@ -426,7 +442,7 @@ function ReviewRow(props: {
             onClick={() => props.onDecision({ action: "create", personId: null })}
             data-testid={`import-create-${props.person.xref}`}
           >
-            Create
+            {t("tree.import.into.create")}
           </Button>
           <Button
             type="button"
@@ -441,7 +457,7 @@ function ReviewRow(props: {
             }
             data-testid={`import-merge-${props.person.xref}`}
           >
-            Merge
+            {t("tree.import.into.merge")}
           </Button>
           <Button
             type="button"
@@ -450,14 +466,14 @@ function ReviewRow(props: {
             onClick={() => props.onDecision({ action: "skip", personId: null })}
             data-testid={`import-skip-${props.person.xref}`}
           >
-            Skip
+            {t("tree.import.into.skip")}
           </Button>
         </div>
       </div>
 
       <Show when={action() === "merge"}>
         <label class="mt-3 flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Merge into
+          {t("tree.import.into.mergeInto")}
           <select
             class="input text-sm normal-case tracking-normal"
             value={props.decision?.personId ?? ""}
@@ -469,12 +485,12 @@ function ReviewRow(props: {
             }
             data-testid={`import-target-${props.person.xref}`}
           >
-            <option value="">Choose a person</option>
+            <option value="">{t("tree.import.into.choosePerson")}</option>
             <For each={props.people}>
               {person => (
                 <option value={person.id}>
                   {renderName(person)}
-                  {parseYears(person)}
+                  {parseYears(person, locale())}
                 </option>
               )}
             </For>
@@ -489,8 +505,18 @@ function renderName(person: GraphPerson) {
   return person.displayName || `${person.firstName} ${person.lastName}`.trim();
 }
 
-function parseYears(person: GraphPerson) {
-  const range = formatFuzzyYearRange(person.birthDate, person.deathDate);
+function sexKey(sex: GraphPerson["sex"]): TranslationKey {
+  return sex === "female"
+    ? "person.sex.female"
+    : sex === "male"
+      ? "person.sex.male"
+      : sex === "other"
+        ? "person.sex.other"
+        : "common.unknown";
+}
+
+function parseYears(person: GraphPerson, locale: Locale) {
+  const range = formatFuzzyYearRange(person.birthDate, person.deathDate, locale);
   return range ? ` (${range})` : "";
 }
 

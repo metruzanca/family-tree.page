@@ -1,11 +1,12 @@
 import { For, Show, createMemo } from "solid-js";
 import { TriangleAlert } from "lucide-solid";
 import {
-  ISSUE_CATEGORY_LABELS,
+  ISSUE_CATEGORY_KEYS,
   type ResearchIssue,
   type ResearchIssueCategory,
 } from "~/lib/research/issues";
 import { personName, type ResearchIndex } from "~/lib/research/graph";
+import { useI18n } from "~/i18n/LocaleProvider";
 import { researchHref } from "./views";
 import { Badge } from "../ui/badge";
 
@@ -21,6 +22,7 @@ export function ResearchIssuesView(props: {
   issues: ResearchIssue[];
   index: ResearchIndex;
 }) {
+  const { t } = useI18n();
   const warnings = createMemo(
     () => props.issues.filter(issue => issue.severity === "warning").length,
   );
@@ -31,8 +33,8 @@ export function ResearchIssuesView(props: {
   return (
     <div class="space-y-5">
       <div class="grid gap-2 sm:grid-cols-2">
-        <Stat label="Warnings" value={warnings()} tone="warning" />
-        <Stat label="Gaps to chase" value={info()} tone="info" />
+        <Stat label={t("tree.import.stats.warnings")} value={warnings()} tone="warning" />
+        <Stat label={t("research.issues.gaps")} value={info()} tone="info" />
       </div>
 
       <Show
@@ -43,10 +45,9 @@ export function ResearchIssuesView(props: {
             data-testid="research-issues-empty"
           >
             <TriangleAlert class="mx-auto text-muted-foreground" />
-            <p class="mt-3 text-sm font-medium">No contradictions found</p>
+            <p class="mt-3 text-sm font-medium">{t("research.issues.emptyTitle")}</p>
             <p class="mt-1 text-xs text-muted-foreground">
-              Every date and relationship this desk can check is consistent. Gaps
-              appear here as the tree grows.
+              {t("research.issues.emptyBody")}
             </p>
           </div>
         }
@@ -61,7 +62,7 @@ export function ResearchIssuesView(props: {
                 <Show when={rows().length}>
                   <section data-testid={`research-issues-${category}`}>
                     <h2 class="mb-2 text-sm font-semibold">
-                      {ISSUE_CATEGORY_LABELS[category]}
+                      {t(ISSUE_CATEGORY_KEYS[category])}
                       <span class="ml-2 text-xs font-normal text-muted-foreground">
                         {rows().length}
                       </span>
@@ -93,6 +94,7 @@ function IssueCard(props: {
   treeId: string;
   index: ResearchIndex;
 }) {
+  const { t } = useI18n();
   const people = createMemo(() =>
     props.issue.personIds
       .map(id => props.index.peopleById.get(id))
@@ -106,15 +108,21 @@ function IssueCard(props: {
       data-testid={`research-issue-${props.issue.id}`}
     >
       <div class="flex flex-wrap items-start justify-between gap-2">
-        <h3 class="text-sm font-semibold">{props.issue.title}</h3>
+        <h3 class="text-sm font-semibold">
+          {t(props.issue.titleKey, props.issue.titleParams)}
+        </h3>
         <Badge
           variant={props.issue.severity === "warning" ? "destructive" : "secondary"}
         >
-          {props.issue.severity === "warning" ? "Warning" : "Gap"}
+          {props.issue.severity === "warning"
+            ? t("research.issues.warning")
+            : t("research.issues.gap")}
         </Badge>
       </div>
       <Show when={props.issue.detail}>
-        <p class="mt-1 text-sm text-muted-foreground">{props.issue.detail}</p>
+        <p class="mt-1 text-sm text-muted-foreground">
+          {t(props.issue.detailKey, props.issue.detailParams)}
+        </p>
       </Show>
       <Show when={visible().length}>
         <div class="mt-2 flex flex-wrap gap-x-3 gap-y-1">
@@ -131,7 +139,7 @@ function IssueCard(props: {
           </For>
           <Show when={people().length > visible().length}>
             <span class="text-xs text-muted-foreground">
-              and {people().length - visible().length} more
+              {t("common.moreCount", { count: people().length - visible().length })}
             </span>
           </Show>
         </div>

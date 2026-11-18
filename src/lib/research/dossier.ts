@@ -3,6 +3,7 @@ import type {
   GraphPerson,
   GraphPersonEvent,
 } from "~/api/people-server";
+import { translate, type Locale, type TranslationKey } from "../../i18n";
 import {
   formatFuzzyDate,
   formatFuzzyYears,
@@ -10,7 +11,7 @@ import {
   fuzzyYear,
   type FuzzyDate,
 } from "../fuzzy-date";
-import { personEventKindLabel, type PersonEventKind } from "../person-events";
+import { personEventKey, personEventKindLabel, type PersonEventKind } from "../person-events";
 import {
   childrenOf,
   eventsOf,
@@ -28,6 +29,8 @@ export type TimelineItem = {
   id: string;
   kind: "birth" | "death" | "event";
   label: string;
+  /** Set for labels the desk generates; event labels keep the user's title. */
+  labelKey: TranslationKey | null;
   date: FuzzyDate | null;
   place: string | null;
   description: string | null;
@@ -49,6 +52,8 @@ export type PersonDossier = {
   files: GraphFile[];
   events: GraphPersonEvent[];
   missing: string[];
+  /** Keys for the same gaps, so views can translate them. */
+  missingKeys: TranslationKey[];
   lifespan: string;
   ageAtDeath: number | null;
   ageAtDeathApproximate: boolean;
@@ -67,6 +72,7 @@ const KIND_ORDER: Record<TimelineItem["kind"], number> = {
 export function buildTimeline(
   person: GraphPerson,
   events: GraphPersonEvent[],
+  locale: Locale = "en",
 ): TimelineItem[] {
   const items: TimelineItem[] = [];
 
@@ -74,7 +80,8 @@ export function buildTimeline(
     items.push({
       id: `${person.id}:birth`,
       kind: "birth",
-      label: "Birth",
+      label: translate(locale, "research.timeline.birth"),
+      labelKey: "research.timeline.birth",
       date: person.birthDate,
       place: person.birthPlace,
       description: null,
@@ -87,7 +94,8 @@ export function buildTimeline(
     items.push({
       id: `${person.id}:death`,
       kind: "death",
-      label: "Death",
+      label: translate(locale, "research.timeline.death"),
+      labelKey: "research.timeline.death",
       date: person.deathDate,
       place: person.deathPlace,
       description: null,
@@ -100,7 +108,8 @@ export function buildTimeline(
     items.push({
       id: event.id,
       kind: "event",
-      label: event.title || personEventKindLabel(event.kind),
+      label: event.title || personEventKindLabel(event.kind, locale),
+      labelKey: event.title ? null : personEventKey(event.kind),
       date: event.date,
       place: event.place,
       description: event.description,
@@ -127,6 +136,7 @@ function wholeYears(birthYear: number, deathYear: number) {
 export function buildDossier(
   index: ResearchIndex,
   personId: string,
+  locale: Locale = "en",
 ): PersonDossier | null {
   const person = index.peopleById.get(personId);
   if (!person) return null;
@@ -151,18 +161,21 @@ export function buildDossier(
     ageAtDeath !== null &&
     (!isExact(person.birthDate) || !isExact(person.deathDate));
 
-  const missing: string[] = [];
-  if (!person.birthDate) missing.push("No birth date");
-  if (!person.birthPlace) missing.push("No birth place");
-  if (!parentsOf(index, personId).length) missing.push("No parents recorded");
-  if (!partners.length && !children.length) {
-    missing.push("No partner or children recorded");
+  const missingKeys: TranslationKey[] = [];
+  if (!person.birthDate) missingKeys.push("research.dossier.missing.birthDate");
+  if (!person.birthPlace) missingKeys.push("research.dossier.missing.birthPlace");
+  if (!parentsOf(index, personId).length) {
+    missingKeys.push("research.dossier.noParents");
   }
-  if (!events.length) missing.push("No life events recorded");
-  if (!files.length) missing.push("No photos or documents");
-  if (!person.bio) missing.push("No biography");
+  if (!partners.length && !children.length) {
+    missingKeys.push("research.dossier.missing.partnerOrChildren");
+  }
+  if (!events.length) missingKeys.push("research.dossier.missing.events");
+  if (!files.length) missingKeys.push("research.dossier.missing.files");
+  if (!person.bio) missingKeys.push("research.dossier.missing.bio");
+  const missing = missingKeys.map(key => translate(locale, key));
 
-  const lifespan = formatFuzzyYears(person.birthDate, person.deathDate);
+  const lifespan = formatFuzzyYears(person.birthDate, person.deathDate, locale);
 
   return {
     person,
@@ -170,20 +183,21 @@ export function buildDossier(
     partners,
     children,
     siblings: siblingsOf(index, personId),
-    timeline: buildTimeline(person, events),
+    timeline: buildTimeline(person, events, locale),
     files,
     events,
     missing,
+    missingKeys,
     lifespan,
     ageAtDeath,
     ageAtDeathApproximate,
   };
 }
 
-export function timelineDateLabel(item: TimelineItem) {
-  return formatFuzzyDate(item.date) || "Date unknown";
+export function timelineDateLabel(item: TimelineItem, locale: Locale = "en") {
+  return formatFuzzyDate(item.date, { locale }) || translate(locale, "research.noDate");
 }
 
-export function placeLabel(item: TimelineItem) {
-  return item.place?.trim() || "Place not recorded";
+export function placeLabel(item: TimelineItem, locale: Locale = "en") {
+  return item.place?.trim() || translate(locale, "research.place.notRecorded");
 }

@@ -10,9 +10,11 @@ import {
   Users,
 } from "lucide-solid";
 import { cx } from "~/lib/utils";
+import { useI18n } from "~/i18n/LocaleProvider";
 import {
   RESEARCH_VIEWS,
   researchHref,
+  researchViewDescriptionKey,
   type ResearchView,
 } from "./views";
 
@@ -31,10 +33,11 @@ export function ResearchNav(props: {
   view: ResearchView;
   personId: string | null;
 }) {
+  const { t } = useI18n();
   return (
     <nav
       class="scroll-thin flex gap-1 overflow-x-auto rounded-full border border-border bg-muted/60 p-1"
-      aria-label="Research views"
+      aria-label={t("research.nav.aria")}
       data-testid="research-nav"
     >
       <For each={RESEARCH_VIEWS}>
@@ -54,7 +57,7 @@ export function ResearchNav(props: {
               data-testid={`research-view-tab-${item.value}`}
             >
               <Icon size={15} />
-              {item.label}
+              {t(item.labelKey)}
             </A>
           );
         }}
@@ -64,10 +67,10 @@ export function ResearchNav(props: {
 }
 
 export function ResearchViewIntro(props: { view: ResearchView }) {
-  const entry = () => RESEARCH_VIEWS.find(item => item.value === props.view);
+  const { t } = useI18n();
   return (
     <p class="mt-2 max-w-2xl text-sm text-muted-foreground" data-testid="research-view-description">
-      {entry()?.description}
+      {t(researchViewDescriptionKey(props.view))}
     </p>
   );
 }

@@ -3,23 +3,23 @@ import type { Pedigree, PedigreeSlot } from "~/lib/research/numbering";
 import { pedigreeSlotLabel } from "~/lib/research/numbering";
 import { formatFuzzyYearRange } from "~/lib/fuzzy-date";
 import { personName } from "~/lib/research/graph";
+import { useI18n } from "~/i18n/LocaleProvider";
 import { researchHref } from "./views";
 import { Badge } from "../ui/badge";
 
 export function PedigreeOutline(props: { treeId: string; pedigree: Pedigree }) {
+  const { t } = useI18n();
   return (
     <div class="space-y-4" data-testid="research-pedigree">
       <div class="rounded-2xl border border-dashed border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
-        Ahnentafel numbering: the subject is 1, each parent doubles the number, so
-        slots 2 and 3 are the two parents and 4 to 7 are their parents. A known
-        male parent is labelled father, a known female parent is labelled mother,
-        and other or unknown sex reads as parent.
+        {t("research.pedigree.note")}
       </div>
 
       <Show when={props.pedigree.truncated}>
         <p class="text-xs text-muted-foreground">
-          The chart stops after {props.pedigree.generations.length} generations. Raise the
-          limit to keep walking back.
+          {t("research.pedigree.truncated", {
+            count: props.pedigree.generations.length,
+          })}
         </p>
       </Show>
 
@@ -30,9 +30,14 @@ export function PedigreeOutline(props: { treeId: string; pedigree: Pedigree }) {
             data-testid={`research-pedigree-generation-${row.generation}`}
           >
             <div class="mb-3 flex items-baseline justify-between gap-3">
-              <h2 class="font-display text-xl tracking-tight">Generation {row.generation}</h2>
+              <h2 class="font-display text-xl tracking-tight">
+                {t("research.pedigree.generation", { number: row.generation })}
+              </h2>
               <span class="text-xs text-muted-foreground">
-                {row.slots.filter(slot => slot.person).length} of {row.slots.length} slots
+                {t("research.pedigree.slots", {
+                  present: row.slots.filter(slot => slot.person).length,
+                  total: row.slots.length,
+                })}
               </span>
             </div>
             <ul class="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
@@ -48,6 +53,7 @@ export function PedigreeOutline(props: { treeId: string; pedigree: Pedigree }) {
 }
 
 function PedigreeSlotCard(props: { treeId: string; slot: PedigreeSlot }) {
+  const { t, locale } = useI18n();
   return (
     <li
       class="rounded-2xl border border-border bg-background/50 px-3 py-2.5"
@@ -60,7 +66,11 @@ function PedigreeSlotCard(props: { treeId: string; slot: PedigreeSlot }) {
         <div class="min-w-0">
           <Show
             when={props.slot.person}
-            fallback={<p class="text-sm text-muted-foreground">Slot not recorded</p>}
+            fallback={
+              <p class="text-sm text-muted-foreground">
+                {t("research.pedigree.slotEmpty")}
+              </p>
+            }
           >
             {person => (
               <>
@@ -73,9 +83,19 @@ function PedigreeSlotCard(props: { treeId: string; slot: PedigreeSlot }) {
                 </a>
                 <p class="text-xs text-muted-foreground">
                   {pedigreeSlotLabel(props.slot)}
-                  <Show when={formatFuzzyYearRange(person().birthDate, person().deathDate)}>
+                  <Show
+                    when={formatFuzzyYearRange(
+                      person().birthDate,
+                      person().deathDate,
+                      locale(),
+                    )}
+                  >
                     {" · "}
-                    {formatFuzzyYearRange(person().birthDate, person().deathDate)}
+                    {formatFuzzyYearRange(
+                      person().birthDate,
+                      person().deathDate,
+                      locale(),
+                    )}
                   </Show>
                 </p>
                 <Show when={person().birthPlace}>
@@ -87,8 +107,9 @@ function PedigreeSlotCard(props: { treeId: string; slot: PedigreeSlot }) {
           <Show when={props.slot.extraParents.length}>
             <div class="mt-1.5 flex flex-wrap gap-1">
               <Badge variant="outline">
-                {props.slot.extraParents.length} more parent
-                {props.slot.extraParents.length === 1 ? "" : "s"} not placed
+                {t("research.pedigree.extraParents", {
+                  count: props.slot.extraParents.length,
+                })}
               </Badge>
             </div>
           </Show>

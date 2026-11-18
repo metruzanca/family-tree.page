@@ -10,17 +10,9 @@ import {
   type FamilyUnit,
   type ResearchIndex,
 } from "~/lib/research/graph";
-import { researchHref } from "./views";
+import { useI18n } from "~/i18n/LocaleProvider";
+import { partnershipStatusKey, researchHref } from "./views";
 import { Avatar } from "../ui/Avatar";
-
-const PARTNERSHIP_LABEL: Record<string, string> = {
-  married: "Married",
-  partnered: "Partners",
-  divorced: "Divorced",
-  separated: "Separated",
-  widowed: "Widowed",
-  unknown: "Relationship",
-};
 
 export function FamilyGroupSheet(props: {
   treeId: string;
@@ -28,6 +20,7 @@ export function FamilyGroupSheet(props: {
   families: FamilyUnit[];
   personId: string;
 }) {
+  const { t, locale } = useI18n();
   const [selectedKey, setSelectedKey] = createSignal("");
 
   createEffect(() => {
@@ -47,14 +40,14 @@ export function FamilyGroupSheet(props: {
     <section class="rounded-3xl border border-border bg-card shadow-card print:break-inside-avoid">
       <div class="flex flex-wrap items-end justify-between gap-3 border-b border-border px-5 py-4">
         <div>
-          <p class="eyebrow">Family group sheet</p>
+          <p class="eyebrow">{t("research.sheet.eyebrow")}</p>
           <h2 class="mt-1 font-display text-2xl tracking-tight">
-            {unit() ? familyLabel(unit()!) : "No family recorded"}
+            {unit() ? familyLabel(unit()!) : t("research.sheet.noFamily")}
           </h2>
         </div>
         <Show when={props.families.length > 1}>
           <label class="flex flex-col gap-1 text-[0.68rem] font-semibold uppercase tracking-wide text-muted-foreground">
-            Family
+            {t("research.sheet.family")}
             <select
               class="input min-w-[15rem] text-sm normal-case tracking-normal"
               value={selectedKey()}
@@ -73,7 +66,7 @@ export function FamilyGroupSheet(props: {
         when={unit()}
         fallback={
           <div class="px-5 py-10 text-center text-sm text-muted-foreground">
-            This person has no recorded parents, partners, or children yet.
+            {t("research.sheet.empty")}
           </div>
         }
       >
@@ -95,16 +88,24 @@ export function FamilyGroupSheet(props: {
               {partnership => (
                 <div class="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl border border-dashed border-border bg-muted/40 px-4 py-2.5 text-sm">
                   <span class="font-semibold">
-                    {PARTNERSHIP_LABEL[partnership().status] ?? "Relationship"}
+                    {t(partnershipStatusKey(partnership().status))}
                   </span>
                   <Show when={partnership().startDate}>
                     <span class="text-muted-foreground">
-                      from {formatFuzzyDate(partnership().startDate)}
+                      {t("research.sheet.from", {
+                        date: formatFuzzyDate(partnership().startDate, {
+                          locale: locale(),
+                        }),
+                      })}
                     </span>
                   </Show>
                   <Show when={partnership().endDate}>
                     <span class="text-muted-foreground">
-                      to {formatFuzzyDate(partnership().endDate)}
+                      {t("research.sheet.to", {
+                        date: formatFuzzyDate(partnership().endDate, {
+                          locale: locale(),
+                        }),
+                      })}
                     </span>
                   </Show>
                 </div>
@@ -113,16 +114,16 @@ export function FamilyGroupSheet(props: {
 
             <div>
               <div class="mb-2 flex items-baseline justify-between gap-3">
-                <h3 class="text-sm font-semibold">Children</h3>
+                <h3 class="text-sm font-semibold">{t("person.panel.children")}</h3>
                 <span class="text-xs text-muted-foreground">
-                  {family().children.length} recorded
+                  {t("research.sheet.recorded", { count: family().children.length })}
                 </span>
               </div>
               <Show
                 when={family().children.length}
                 fallback={
                   <p class="rounded-2xl border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
-                    No children recorded for this family.
+                    {t("research.sheet.noChildren")}
                   </p>
                 }
               >
@@ -131,10 +132,10 @@ export function FamilyGroupSheet(props: {
                     <thead>
                       <tr class="border-b border-border text-left text-[0.68rem] uppercase tracking-wide text-muted-foreground">
                         <th class="w-8 py-2 pr-2 font-semibold">#</th>
-                        <th class="py-2 pr-3 font-semibold">Child</th>
-                        <th class="py-2 pr-3 font-semibold">Born</th>
-                        <th class="py-2 pr-3 font-semibold">Died</th>
-                        <th class="py-2 font-semibold">Partner</th>
+                        <th class="py-2 pr-3 font-semibold">{t("person.relation.child")}</th>
+                        <th class="py-2 pr-3 font-semibold">{t("person.field.born")}</th>
+                        <th class="py-2 pr-3 font-semibold">{t("person.field.died")}</th>
+                        <th class="py-2 font-semibold">{t("person.relation.partner")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -157,20 +158,24 @@ export function FamilyGroupSheet(props: {
                               </a>
                               <Show when={child.maidenName}>
                                 <span class="ml-1.5 text-xs text-muted-foreground">
-                                  née {child.maidenName}
+                                  {t("research.dossier.nee", {
+                                    name: child.maidenName ?? "",
+                                  })}
                                 </span>
                               </Show>
                             </td>
                             <td class="py-2 pr-3 text-muted-foreground">
-                              {formatFuzzyDate(child.birthDate) || "Not recorded"}
+                              {formatFuzzyDate(child.birthDate, { locale: locale() }) ||
+                                t("research.notRecorded")}
                             </td>
                             <td class="py-2 pr-3 text-muted-foreground">
-                              {formatFuzzyDate(child.deathDate) || "Not recorded"}
+                              {formatFuzzyDate(child.deathDate, { locale: locale() }) ||
+                                t("research.notRecorded")}
                             </td>
                             <td class="py-2 text-muted-foreground">
                               {partnersOf(props.index, child.id)
                                 .map(link => personName(link.person))
-                                .join(", ") || "Not recorded"}
+                                .join(", ") || t("research.notRecorded")}
                             </td>
                           </tr>
                         )}
@@ -192,6 +197,7 @@ function ParentCard(props: {
   events: GraphPersonEvent[];
   href: string;
 }) {
+  const { t, locale } = useI18n();
   return (
     <article
       class="rounded-2xl border border-border bg-background/50 p-4 print:break-inside-avoid"
@@ -208,11 +214,15 @@ function ParentCard(props: {
             {personName(props.parent)}
           </a>
           <Show when={props.parent.maidenName}>
-            <p class="text-xs text-muted-foreground">née {props.parent.maidenName}</p>
+            <p class="text-xs text-muted-foreground">
+              {t("research.dossier.nee", { name: props.parent.maidenName ?? "" })}
+            </p>
           </Show>
           <Show when={props.parent.nickname}>
             <p class="text-xs text-muted-foreground">
-              known as {props.parent.nickname}
+              {t("research.dossier.knownAs", {
+                name: props.parent.nickname ?? "",
+              })}
             </p>
           </Show>
         </div>
@@ -221,10 +231,11 @@ function ParentCard(props: {
       <dl class="mt-3 space-y-1.5 text-sm">
         <div class="flex gap-2">
           <dt class="w-12 shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Born
+            {t("person.field.born")}
           </dt>
           <dd>
-            {formatFuzzyDate(props.parent.birthDate) || "Not recorded"}
+            {formatFuzzyDate(props.parent.birthDate, { locale: locale() }) ||
+              t("research.notRecorded")}
             <Show when={props.parent.birthPlace}>
               <span class="text-muted-foreground">, {props.parent.birthPlace}</span>
             </Show>
@@ -232,10 +243,11 @@ function ParentCard(props: {
         </div>
         <div class="flex gap-2">
           <dt class="w-12 shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Died
+            {t("person.field.died")}
           </dt>
           <dd>
-            {formatFuzzyDate(props.parent.deathDate) || "Not recorded"}
+            {formatFuzzyDate(props.parent.deathDate, { locale: locale() }) ||
+              t("research.notRecorded")}
             <Show when={props.parent.deathPlace}>
               <span class="text-muted-foreground">, {props.parent.deathPlace}</span>
             </Show>
@@ -249,10 +261,11 @@ function ParentCard(props: {
             {event => (
               <li class="flex gap-2">
                 <span class="w-12 shrink-0 text-xs text-muted-foreground">
-                  {formatFuzzyDate(event.date) || "No date"}
+                  {formatFuzzyDate(event.date, { locale: locale() }) ||
+                    t("research.noDate")}
                 </span>
                 <span>
-                  {event.title || personEventKindLabel(event.kind)}
+                  {event.title || personEventKindLabel(event.kind, locale())}
                   <Show when={event.place}>
                     <span class="text-muted-foreground">, {event.place}</span>
                   </Show>

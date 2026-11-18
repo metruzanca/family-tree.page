@@ -2,6 +2,7 @@ import { For, Show, createMemo, createSignal } from "solid-js";
 import { Search } from "lucide-solid";
 import { personName } from "~/lib/research/graph";
 import type { SurnameGroup } from "~/lib/research/indexes";
+import { useI18n } from "~/i18n/LocaleProvider";
 import { researchHref, slugify } from "./views";
 import { Badge } from "../ui/badge";
 import { PersonLine } from "./PersonLine";
@@ -10,6 +11,7 @@ export function SurnameIndexView(props: {
   treeId: string;
   groups: SurnameGroup[];
 }) {
+  const { t } = useI18n();
   const [query, setQuery] = createSignal("");
   const needle = createMemo(() => query().trim().toLowerCase());
 
@@ -42,15 +44,15 @@ export function SurnameIndexView(props: {
           <input
             type="search"
             class="input pl-9"
-            placeholder="Filter by surname or person"
+            placeholder={t("research.surnames.filter")}
             value={query()}
             onInput={event => setQuery(event.currentTarget.value)}
             data-testid="research-surname-search"
           />
         </label>
         <p class="text-xs text-muted-foreground" data-testid="research-surname-count">
-          {filtered().length} surname {filtered().length === 1 ? "group" : "groups"},{" "}
-          {peopleCount()} {peopleCount() === 1 ? "record" : "records"}
+          {t("research.surnames.groupCount", { count: filtered().length })},{" "}
+          {t("common.record", { count: peopleCount() })}
         </p>
       </div>
 
@@ -61,9 +63,9 @@ export function SurnameIndexView(props: {
             class="rounded-3xl border border-dashed border-border p-10 text-center"
             data-testid="research-surname-empty"
           >
-            <p class="text-sm font-medium">No surnames match</p>
+            <p class="text-sm font-medium">{t("research.surnames.emptyTitle")}</p>
             <p class="mt-1 text-xs text-muted-foreground">
-              Try a shorter search, or clear the filter to see every group.
+              {t("research.surnames.emptyBody")}
             </p>
           </div>
         }
@@ -78,19 +80,20 @@ export function SurnameIndexView(props: {
                 <div class="flex flex-wrap items-baseline justify-between gap-2">
                   <h2 class="font-display text-2xl tracking-tight">{group.label}</h2>
                   <p class="text-xs text-muted-foreground">
-                    {group.people.length}{" "}
-                    {group.people.length === 1 ? "record" : "records"}
+                    {t("common.record", { count: group.people.length })}
                     <Show when={group.earliestYear !== null}>
                       {" · "}
-                      {group.earliestYear}
                       <Show
                         when={
                           group.latestYear !== null &&
                           group.latestYear !== group.earliestYear
                         }
+                        fallback={group.earliestYear}
                       >
-                        {" to "}
-                        {group.latestYear}
+                        {t("date.between", {
+                          start: group.earliestYear ?? "",
+                          end: group.latestYear ?? "",
+                        })}
                       </Show>
                     </Show>
                   </p>
@@ -116,7 +119,9 @@ export function SurnameIndexView(props: {
                         <PersonLine
                           person={entry.person}
                           href={researchHref(props.treeId, "dossier", entry.person.id)}
-                          note={`Recorded as ${entry.surname}`}
+                          note={t("research.surnames.recordedAs", {
+                            surname: entry.surname,
+                          })}
                           compact
                           testId={`research-surname-person-${entry.person.id}-${slugify(entry.surname)}`}
                         />

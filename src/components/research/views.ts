@@ -1,11 +1,14 @@
+import { translate, type Locale, type TranslationKey } from "~/i18n";
+import type { ParentType, PartnershipStatus } from "~/lib/research/graph";
+
 export const RESEARCH_VIEWS = [
-  { value: "sheet", label: "Family sheet", description: "One couple and their children" },
-  { value: "dossier", label: "Dossier", description: "Everything known about one person" },
-  { value: "pedigree", label: "Pedigree", description: "Ancestors with Ahnentafel numbers" },
-  { value: "register", label: "Descendants", description: "Register and NGSQ numbering" },
-  { value: "surnames", label: "Surnames", description: "Spellings grouped together" },
-  { value: "places", label: "Places", description: "Records grouped by place" },
-  { value: "issues", label: "Issues", description: "Contradictions and gaps to chase" },
+  { value: "sheet", labelKey: "research.view.sheet.label", descriptionKey: "research.view.sheet.description" },
+  { value: "dossier", labelKey: "research.view.dossier.label", descriptionKey: "research.view.dossier.description" },
+  { value: "pedigree", labelKey: "research.view.pedigree.label", descriptionKey: "research.view.pedigree.description" },
+  { value: "register", labelKey: "research.view.register.label", descriptionKey: "research.view.register.description" },
+  { value: "surnames", labelKey: "research.view.surnames.label", descriptionKey: "research.view.surnames.description" },
+  { value: "places", labelKey: "research.view.places.label", descriptionKey: "research.view.places.description" },
+  { value: "issues", labelKey: "research.view.issues.label", descriptionKey: "research.view.issues.description" },
 ] as const;
 
 export type ResearchView = (typeof RESEARCH_VIEWS)[number]["value"];
@@ -19,8 +22,47 @@ export function isResearchView(value: unknown): value is ResearchView {
   );
 }
 
-export function researchViewLabel(view: ResearchView) {
-  return RESEARCH_VIEWS.find(entry => entry.value === view)?.label ?? "Research";
+export function researchViewLabelKey(view: ResearchView): TranslationKey {
+  return (
+    RESEARCH_VIEWS.find(entry => entry.value === view)?.labelKey ??
+    "research.view.fallback"
+  );
+}
+
+export function researchViewDescriptionKey(view: ResearchView): TranslationKey {
+  return (
+    RESEARCH_VIEWS.find(entry => entry.value === view)?.descriptionKey ??
+    "research.view.fallback"
+  );
+}
+
+export function researchViewLabel(view: ResearchView, locale: Locale = "en") {
+  return translate(locale, researchViewLabelKey(view));
+}
+
+const PARTNERSHIP_STATUS_KEYS: Record<PartnershipStatus, TranslationKey> = {
+  married: "person.partnership.married",
+  partnered: "person.partnership.partnered",
+  divorced: "person.partnership.divorced",
+  separated: "person.partnership.separated",
+  widowed: "person.partnership.widowed",
+  unknown: "research.partnership.unknown",
+};
+
+export function partnershipStatusKey(status: PartnershipStatus): TranslationKey {
+  return PARTNERSHIP_STATUS_KEYS[status] ?? "research.partnership.unknown";
+}
+
+const PARENT_TYPE_KEYS: Record<ParentType, TranslationKey> = {
+  biological: "person.parentType.biological",
+  adoptive: "person.parentType.adoptive",
+  foster: "person.parentType.foster",
+  step: "person.parentType.step",
+  unknown: "common.unknown",
+};
+
+export function parentTypeKey(parentType: ParentType): TranslationKey {
+  return PARENT_TYPE_KEYS[parentType] ?? "common.unknown";
 }
 
 export function researchHref(

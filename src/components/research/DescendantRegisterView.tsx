@@ -6,6 +6,7 @@ import type {
   DescendantRegister,
   RegisterMode,
 } from "~/lib/research/numbering";
+import { useI18n } from "~/i18n/LocaleProvider";
 import { researchHref } from "./views";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -16,13 +17,14 @@ export function DescendantRegisterView(props: {
   mode: RegisterMode;
   onModeChange: (mode: RegisterMode) => void;
 }) {
+  const { t } = useI18n();
   return (
     <div class="space-y-4" data-testid="research-register">
       <div class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-card px-4 py-3">
         <p class="max-w-2xl text-sm text-muted-foreground">
           {props.mode === "register"
-            ? "Register system: only the people whose line continues get a number. Children keep lowercase Roman labels in birth order."
-            : "NGSQ system: everyone gets a number in reading order, and a plus marks a line that continues."}
+            ? t("research.register.registerDescription")
+            : t("research.register.ngsqDescription")}
         </p>
         <div class="flex gap-1 rounded-full border border-border bg-muted/60 p-1">
           <Button
@@ -33,7 +35,7 @@ export function DescendantRegisterView(props: {
             onClick={() => props.onModeChange("register")}
             data-testid="research-register-mode-register"
           >
-            Register
+            {t("research.register.mode.register")}
           </Button>
           <Button
             type="button"
@@ -43,14 +45,16 @@ export function DescendantRegisterView(props: {
             onClick={() => props.onModeChange("ngsq")}
             data-testid="research-register-mode-ngsq"
           >
-            NGSQ
+            {t("research.register.mode.ngsq")}
           </Button>
         </div>
       </div>
 
       <Show when={props.register.truncated}>
         <p class="text-xs text-muted-foreground">
-          The list stops after {maxGeneration(props.register.root)} generations.
+          {t("research.register.truncated", {
+            count: maxGeneration(props.register.root),
+          })}
         </p>
       </Show>
 
@@ -79,6 +83,7 @@ function RegisterNode(props: {
   treeId: string;
   mode: RegisterMode;
 }) {
+  const { t, locale } = useI18n();
   const entry = () => props.entry;
   return (
     <li data-testid={`research-register-entry-${entry().person.id}`}>
@@ -107,13 +112,17 @@ function RegisterNode(props: {
         </a>
 
         <Show when={props.mode === "ngsq" && entry().hasDescendants}>
-          <Badge variant="secondary" aria-label="Line continues">
+          <Badge variant="secondary" aria-label={t("research.register.lineContinues")}>
             +
           </Badge>
         </Show>
 
         <span class="text-xs text-muted-foreground">
-          {formatFuzzyYearRange(entry().person.birthDate, entry().person.deathDate)}
+          {formatFuzzyYearRange(
+            entry().person.birthDate,
+            entry().person.deathDate,
+            locale(),
+          )}
         </span>
 
         <Show when={entry().person.birthPlace}>

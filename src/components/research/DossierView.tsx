@@ -7,7 +7,9 @@ import {
 } from "~/lib/research/graph";
 import type { PersonDossier, TimelineItem } from "~/lib/research/dossier";
 import { describeKinship, pathLabel } from "~/lib/research/kinship";
-import { researchHref } from "./views";
+import { useI18n } from "~/i18n/LocaleProvider";
+import { Trans } from "~/i18n/Trans";
+import { parentTypeKey, partnershipStatusKey, researchHref } from "./views";
 import { Avatar } from "../ui/Avatar";
 import { Badge } from "../ui/badge";
 import { PersonLine } from "./PersonLine";
@@ -18,6 +20,7 @@ export function DossierView(props: {
   dossier: PersonDossier;
   viewerPersonId: string | null;
 }) {
+  const { t, locale } = useI18n();
   const person = () => props.dossier.person;
 
   const kinship = createMemo(() => {
@@ -28,10 +31,12 @@ export function DossierView(props: {
 
   const partnerNote = (link: PersonDossier["partners"][number]) => {
     const shared = link.children.length;
-    const status =
-      link.status.charAt(0).toUpperCase() + link.status.slice(1);
+    const status = t(partnershipStatusKey(link.status));
     return shared
-      ? `${status} · ${shared} ${shared === 1 ? "child" : "children"}`
+      ? t("research.dossier.partnerNote", {
+          status,
+          children: t("research.childCount", { count: shared }),
+        })
       : status;
   };
 
@@ -50,18 +55,25 @@ export function DossierView(props: {
               </h2>
               <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
                 <Show when={person().maidenName}>
-                  <span>née {person().maidenName}</span>
+                  <span>{t("research.dossier.nee", { name: person().maidenName ?? "" })}</span>
                 </Show>
                 <Show when={person().nickname}>
-                  <span>known as {person().nickname}</span>
+                  <span>
+                    {t("research.dossier.knownAs", { name: person().nickname ?? "" })}
+                  </span>
                 </Show>
                 <Show when={props.dossier.lifespan}>
                   <span>{props.dossier.lifespan}</span>
                 </Show>
                 <Show when={props.dossier.ageAtDeath !== null}>
                   <span>
-                    aged {props.dossier.ageAtDeath}
-                    {props.dossier.ageAtDeathApproximate ? " (approx.)" : ""}
+                    {props.dossier.ageAtDeathApproximate
+                      ? t("research.dossier.agedApprox", {
+                          age: props.dossier.ageAtDeath ?? 0,
+                        })
+                      : t("research.dossier.aged", {
+                          age: props.dossier.ageAtDeath ?? 0,
+                        })}
                   </span>
                 </Show>
               </div>
@@ -73,8 +85,14 @@ export function DossierView(props: {
                     data-testid="research-kinship"
                   >
                     <p class="text-sm">
-                      Relative to you:{" "}
-                      <span class="font-semibold">{result().label}</span>
+                      <Trans
+                        key="research.dossier.relativeToYou"
+                        components={{
+                          relation: (
+                            <span class="font-semibold">{result().label}</span>
+                          ),
+                        }}
+                      />
                     </p>
                     <p class="mt-0.5 text-xs text-muted-foreground">{result().detail}</p>
                     <Show when={result().path.length > 1}>
@@ -95,17 +113,16 @@ export function DossierView(props: {
 
         <section class="rounded-3xl border border-border bg-card p-5 shadow-card print:break-inside-avoid">
           <div class="mb-3 flex items-baseline justify-between gap-3">
-            <h3 class="text-sm font-semibold">Chronology</h3>
+            <h3 class="text-sm font-semibold">{t("research.dossier.chronology")}</h3>
             <span class="text-xs text-muted-foreground">
-              {props.dossier.timeline.length}{" "}
-              {props.dossier.timeline.length === 1 ? "entry" : "entries"}
+              {t("research.dossier.entries", { count: props.dossier.timeline.length })}
             </span>
           </div>
           <Show
             when={props.dossier.timeline.length}
             fallback={
               <p class="rounded-2xl border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
-                No dates or life events recorded yet.
+                {t("research.dossier.timelineEmpty")}
               </p>
             }
           >
@@ -119,7 +136,7 @@ export function DossierView(props: {
 
         <Show when={props.dossier.files.length}>
           <section class="rounded-3xl border border-border bg-card p-5 shadow-card">
-            <h3 class="mb-3 text-sm font-semibold">Photos and documents</h3>
+            <h3 class="mb-3 text-sm font-semibold">{t("research.dossier.files")}</h3>
             <div class="grid grid-cols-3 gap-2 sm:grid-cols-4">
               <For each={props.dossier.files}>
                 {file => (
@@ -151,13 +168,19 @@ export function DossierView(props: {
       </div>
 
       <aside class="space-y-4">
-        <SideSection title="Parents" empty="No parents recorded" isEmpty={!props.dossier.parents.length}>
+        <SideSection
+          title={t("person.panel.parents")}
+          empty={t("research.dossier.noParents")}
+          isEmpty={!props.dossier.parents.length}
+        >
           <For each={props.dossier.parents}>
             {parent => (
               <PersonLine
                 person={parent.person}
                 href={researchHref(props.treeId, "dossier", parent.person.id)}
-                note={`Parent · ${parent.parentType}`}
+                note={t("research.dossier.parentNote", {
+                  type: t(parentTypeKey(parent.parentType)),
+                })}
                 compact
                 testId={`research-dossier-parent-${parent.person.id}`}
               />
@@ -165,7 +188,11 @@ export function DossierView(props: {
           </For>
         </SideSection>
 
-        <SideSection title="Partners" empty="No partners recorded" isEmpty={!props.dossier.partners.length}>
+        <SideSection
+          title={t("person.panel.partners")}
+          empty={t("research.dossier.noPartners")}
+          isEmpty={!props.dossier.partners.length}
+        >
           <For each={props.dossier.partners}>
             {partner => (
               <PersonLine
@@ -179,13 +206,17 @@ export function DossierView(props: {
           </For>
         </SideSection>
 
-        <SideSection title="Children" empty="No children recorded" isEmpty={!props.dossier.children.length}>
+        <SideSection
+          title={t("person.panel.children")}
+          empty={t("research.dossier.noChildren")}
+          isEmpty={!props.dossier.children.length}
+        >
           <For each={props.dossier.children}>
             {child => (
               <PersonLine
                 person={child}
                 href={researchHref(props.treeId, "dossier", child.id)}
-                note={formatFuzzyYearRange(child.birthDate, child.deathDate)}
+                note={formatFuzzyYearRange(child.birthDate, child.deathDate, locale())}
                 compact
                 testId={`research-dossier-child-${child.id}`}
               />
@@ -193,13 +224,17 @@ export function DossierView(props: {
           </For>
         </SideSection>
 
-        <SideSection title="Siblings" empty="No siblings recorded" isEmpty={!props.dossier.siblings.length}>
+        <SideSection
+          title={t("research.dossier.siblings")}
+          empty={t("research.dossier.noSiblings")}
+          isEmpty={!props.dossier.siblings.length}
+        >
           <For each={props.dossier.siblings}>
             {sibling => (
               <PersonLine
                 person={sibling}
                 href={researchHref(props.treeId, "dossier", sibling.id)}
-                note={formatFuzzyYearRange(sibling.birthDate, sibling.deathDate)}
+                note={formatFuzzyYearRange(sibling.birthDate, sibling.deathDate, locale())}
                 compact
                 testId={`research-dossier-sibling-${sibling.id}`}
               />
@@ -211,18 +246,18 @@ export function DossierView(props: {
           class="rounded-2xl border border-border bg-card p-4"
           data-testid="research-dossier-missing"
         >
-          <h3 class="text-sm font-semibold">Open questions</h3>
+          <h3 class="text-sm font-semibold">{t("research.dossier.openQuestions")}</h3>
           <Show
-            when={props.dossier.missing.length}
+            when={props.dossier.missingKeys.length}
             fallback={
               <p class="mt-2 text-xs text-muted-foreground">
-                Every field this desk can check is filled in.
+                {t("research.dossier.noGaps")}
               </p>
             }
           >
             <div class="mt-2 flex flex-wrap gap-1.5">
-              <For each={props.dossier.missing}>
-                {gap => <Badge variant="outline">{gap}</Badge>}
+              <For each={props.dossier.missingKeys}>
+                {gapKey => <Badge variant="outline">{t(gapKey)}</Badge>}
               </For>
             </div>
           </Show>
@@ -252,20 +287,23 @@ function SideSection(props: {
 }
 
 function TimelineRow(props: { item: TimelineItem }) {
+  const { t, locale } = useI18n();
   return (
     <li
       class="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-3 rounded-xl px-2 py-2 odd:bg-muted/40"
       data-testid={`research-timeline-item-${props.item.id}`}
     >
       <span class="text-xs text-muted-foreground">
-        {formatFuzzyDate(props.item.date) || "No date"}
+        {formatFuzzyDate(props.item.date, { locale: locale() }) || t("research.noDate")}
       </span>
       <div class="min-w-0">
         <p class="text-sm font-medium">
-          {props.item.label}
+          {props.item.labelKey ? t(props.item.labelKey) : props.item.label}
           <Show when={props.item.kind === "event"}>
             <span class="ml-1.5 text-xs font-normal text-muted-foreground">
-              {props.item.eventKind ? personEventKindLabel(props.item.eventKind) : "Event"}
+              {props.item.eventKind
+                ? personEventKindLabel(props.item.eventKind, locale())
+                : t("research.dossier.event")}
             </span>
           </Show>
         </p>

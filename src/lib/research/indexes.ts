@@ -1,6 +1,11 @@
 import type { GraphPerson, GraphPersonEvent } from "~/api/people-server";
+import { translate, type Locale, type TranslationKey } from "../../i18n";
 import { fuzzyYear, type FuzzyDate } from "../fuzzy-date";
-import { personEventKindLabel, type PersonEventKind } from "../person-events";
+import {
+  personEventKey,
+  personEventKindLabel,
+  type PersonEventKind,
+} from "../person-events";
 import { eventsOf, personName, type ResearchIndex } from "./graph";
 
 export type SurnameVariant = {
@@ -28,6 +33,8 @@ export type PlaceEntry = {
   person: GraphPerson;
   kind: PlaceEntryKind;
   label: string;
+  /** Set for labels the desk generates; event labels keep the user's title. */
+  labelKey: TranslationKey | null;
   place: string;
   date: FuzzyDate | null;
   eventKind: PersonEventKind | null;
@@ -243,7 +250,10 @@ type InternalPlaceGroup = {
   people: Set<string>;
 };
 
-export function buildPlaceIndex(index: ResearchIndex): PlaceIndex {
+export function buildPlaceIndex(
+  index: ResearchIndex,
+  locale: Locale = "en",
+): PlaceIndex {
   const groups = new Map<string, InternalPlaceGroup>();
   const missingPeople = new Map<string, GraphPerson>();
   let missingBirths = 0;
@@ -269,7 +279,8 @@ export function buildPlaceIndex(index: ResearchIndex): PlaceIndex {
       add({
         person,
         kind: "birth",
-        label: "Birth",
+        label: translate(locale, "research.timeline.birth"),
+        labelKey: "research.timeline.birth",
         place: person.birthPlace,
         date: person.birthDate,
         eventKind: null,
@@ -283,7 +294,8 @@ export function buildPlaceIndex(index: ResearchIndex): PlaceIndex {
       add({
         person,
         kind: "death",
-        label: "Death",
+        label: translate(locale, "research.timeline.death"),
+        labelKey: "research.timeline.death",
         place: person.deathPlace,
         date: person.deathDate,
         eventKind: null,
@@ -295,7 +307,7 @@ export function buildPlaceIndex(index: ResearchIndex): PlaceIndex {
         if (event.date) missingEvents += 1;
         continue;
       }
-      add(placeEntryFromEvent(person, event));
+      add(placeEntryFromEvent(person, event, locale));
     }
   }
 
@@ -337,11 +349,13 @@ export function buildPlaceIndex(index: ResearchIndex): PlaceIndex {
 export function placeEntryFromEvent(
   person: GraphPerson,
   event: GraphPersonEvent,
+  locale: Locale = "en",
 ): PlaceEntry {
   return {
     person,
     kind: "event",
-    label: event.title || personEventKindLabel(event.kind),
+    label: event.title || personEventKindLabel(event.kind, locale),
+    labelKey: event.title ? null : personEventKey(event.kind),
     place: event.place ?? "",
     date: event.date,
     eventKind: event.kind,
