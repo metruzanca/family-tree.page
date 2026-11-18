@@ -319,6 +319,29 @@ describe("arrowHead", () => {
     expect([head![1].x, head![2].x].sort((a, b) => a - b)).toEqual([-3, 3]);
   });
 
+  it("keeps the head the same size on links of different length", () => {
+    const short = arrowHead(
+      [
+        { x: 0, y: 0 },
+        { x: 30, y: 0 },
+      ],
+      10,
+      4.6,
+    );
+    const long = arrowHead(
+      [
+        { x: 0, y: 0 },
+        { x: 200, y: 0 },
+        { x: 400, y: 0 },
+      ],
+      10,
+      4.6,
+    );
+    expect(short![1].x).toBeCloseTo(20);
+    expect(long![1].x).toBeCloseTo(390);
+    expect(short![1].x - short![0].x).toBeCloseTo(long![1].x - long![0].x);
+  });
+
   it("shrinks the head on a short run", () => {
     const head = arrowHead(
       [

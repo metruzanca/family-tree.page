@@ -275,7 +275,7 @@ A force layout can put an edge behind a person who is not on it, and two edges c
 - Each link stops `ENDPOINT_GAP` short of the two avatars it connects, so it looks attached without smearing into the portrait.
 - Any other person or junction the line would cross gets a `PASS_THROUGH_PAD` gap and the stroke is cut there. A line visibly interrupted by an avatar is a line that does not belong to it.
 - Partner links arc above the couple, sibling arms fan out of their junction in birth order, and parent arms alternate their small curve, so no two edges can be collinear.
-- Every child link ends in a small arrowhead, so the line reads from parent to child even when the couple and the joint sit close together.
+- Every child link ends in an arrowhead, so the line reads from parent to child even when the couple and the joint sit close together.
 - Junctions are painted as a small knot. Arms terminate at a visible joint instead of reading as one line running straight through it.
 - Dimmed links paint first and the hovered or selected family's links paint last, so tracing a relative never runs under a stranger's line.
 - A clearance force pushes people out of the corridor of links that do not belong to them, and a weak generation force pulls each level into its own loose band. Partners already share a level, so a couple is never split across bands.
