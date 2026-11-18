@@ -24,6 +24,7 @@ import {
 import type { FuzzyDate } from "../lib/fuzzy-date";
 import type { PersonLink } from "../lib/person-links";
 import type { PersonSex } from "../lib/person-sex";
+import type { TranslationKey } from "../i18n";
 import { requireTreeMember, type TreeRole } from "../server/guards";
 import {
   AppError,
@@ -501,6 +502,8 @@ export async function createPerson(
         entityId: created.id,
         personId: created.id,
         summary: `Added ${personName(created)}`,
+        summaryKey: "tree.activity.summary.personAdded",
+        summaryParams: { name: personName(created) },
       });
       return created;
     });
@@ -561,6 +564,8 @@ export async function updatePerson(
           entityId: updated.id,
           personId: updated.id,
           summary: `Updated ${personName(updated)}`,
+          summaryKey: "tree.activity.summary.personUpdated",
+          summaryParams: { name: personName(updated) },
           changes,
         });
       }
@@ -616,6 +621,8 @@ export async function deletePerson(input: {
         entityId: person.id,
         personId: person.id,
         summary: `Deleted ${personName(person)}`,
+        summaryKey: "tree.activity.summary.personDeleted",
+        summaryParams: { name: personName(person) },
       });
     });
     await touchTree(access.tree.id);
@@ -673,6 +680,8 @@ export async function createParentChild(input: {
         parsed.parentId,
         parsed.childId,
       ]);
+      const parentName = names.get(parsed.parentId) ?? "someone";
+      const childName = names.get(parsed.childId) ?? "someone";
       await logActivity(tx, {
         treeId: access.tree.id,
         actor: access.user,
@@ -680,9 +689,9 @@ export async function createParentChild(input: {
         entityType: "relationship",
         entityId: relationship.id,
         personId: parsed.childId,
-        summary: `Connected ${names.get(parsed.parentId) ?? "someone"} as a parent of ${
-          names.get(parsed.childId) ?? "someone"
-        }`,
+        summary: `Connected ${parentName} as a parent of ${childName}`,
+        summaryKey: "tree.activity.summary.relationshipParentAdded",
+        summaryParams: { parent: parentName, child: childName },
       });
       await tx.update(trees).set({ updatedAt: new Date() }).where(eq(trees.id, access.tree.id));
       return { id: relationship.id };
@@ -717,6 +726,8 @@ export async function deleteParentChild(input: {
         )
         .returning({ id: parentChild.id });
       if (!deleted.length) throw new AppError(userMessage("person.error.relationshipNotFound"));
+      const parentName = names.get(relationship.parentId) ?? "someone";
+      const childName = names.get(relationship.childId) ?? "someone";
       await logActivity(tx, {
         treeId: access.tree.id,
         actor: access.user,
@@ -724,9 +735,9 @@ export async function deleteParentChild(input: {
         entityType: "relationship",
         entityId: relationship.id,
         personId: relationship.childId,
-        summary: `Removed the parent link between ${
-          names.get(relationship.parentId) ?? "someone"
-        } and ${names.get(relationship.childId) ?? "someone"}`,
+        summary: `Removed the parent link between ${parentName} and ${childName}`,
+        summaryKey: "tree.activity.summary.relationshipParentRemoved",
+        summaryParams: { parent: parentName, child: childName },
       });
     });
     await touchTree(access.tree.id);
@@ -781,15 +792,17 @@ export async function createPartnership(input: {
         })
         .returning();
       const names = await peopleNames(tx, access.tree.id, [personAId, personBId]);
+      const nameA = names.get(personAId) ?? "someone";
+      const nameB = names.get(personBId) ?? "someone";
       await logActivity(tx, {
         treeId: access.tree.id,
         actor: access.user,
         action: "relationship.created",
         entityType: "relationship",
         entityId: relationship.id,
-        summary: `Connected ${names.get(personAId) ?? "someone"} and ${
-          names.get(personBId) ?? "someone"
-        } as partners`,
+        summary: `Connected ${nameA} and ${nameB} as partners`,
+        summaryKey: "tree.activity.summary.relationshipPartnersAdded",
+        summaryParams: { a: nameA, b: nameB },
       });
       await tx.update(trees).set({ updatedAt: new Date() }).where(eq(trees.id, access.tree.id));
       return { id: relationship.id };
@@ -858,15 +871,17 @@ export async function deletePartnership(input: {
         )
         .returning({ id: partnerships.id });
       if (!deleted.length) throw new AppError(userMessage("person.error.relationshipNotFound"));
+      const nameA = names.get(relationship.personAId) ?? "someone";
+      const nameB = names.get(relationship.personBId) ?? "someone";
       await logActivity(tx, {
         treeId: access.tree.id,
         actor: access.user,
         action: "relationship.removed",
         entityType: "relationship",
         entityId: relationship.id,
-        summary: `Removed the partnership between ${
-          names.get(relationship.personAId) ?? "someone"
-        } and ${names.get(relationship.personBId) ?? "someone"}`,
+        summary: `Removed the partnership between ${nameA} and ${nameB}`,
+        summaryKey: "tree.activity.summary.relationshipPartnersRemoved",
+        summaryParams: { a: nameA, b: nameB },
       });
     });
     await touchTree(access.tree.id);
@@ -1066,22 +1081,50 @@ export async function addRelative(input: {
           entityId: relativeId,
           personId: relativeId,
           summary: `Added ${relativeName}`,
+          summaryKey: "tree.activity.summary.personAdded",
+          summaryParams: { name: relativeName },
         });
       }
 
       const verb = parsed.mode === "new" ? "Added" : "Connected";
+      const otherName = parsed.otherParentId
+        ? (names.get(parsed.otherParentId) ?? "someone")
+        : null;
       let summary: string;
+      let summaryKey: TranslationKey;
+      let summaryParams: Record<string, string | number>;
       if (parsed.relation === "partner") {
         summary = `Connected ${relativeName} and ${anchorName} as partners`;
+        summaryKey = "tree.activity.summary.relationshipPartnersAdded";
+        summaryParams = { a: relativeName, b: anchorName };
       } else if (parsed.relation === "parent") {
         summary = `${verb} ${relativeName} as a parent of ${anchorName}`;
+        summaryKey =
+          parsed.mode === "new"
+            ? "tree.activity.summary.relativeParentAdded"
+            : "tree.activity.summary.relativeParentConnected";
+        summaryParams = { relative: relativeName, anchor: anchorName };
       } else {
-        const otherName = parsed.otherParentId
-          ? names.get(parsed.otherParentId)
-          : null;
         summary = `${verb} ${relativeName} as a child of ${anchorName}${
           otherName ? ` and ${otherName}` : ""
         }`;
+        if (otherName) {
+          summaryKey =
+            parsed.mode === "new"
+              ? "tree.activity.summary.relativeChildAddedWithOther"
+              : "tree.activity.summary.relativeChildConnectedWithOther";
+          summaryParams = {
+            relative: relativeName,
+            anchor: anchorName,
+            other: otherName,
+          };
+        } else {
+          summaryKey =
+            parsed.mode === "new"
+              ? "tree.activity.summary.relativeChildAdded"
+              : "tree.activity.summary.relativeChildConnected";
+          summaryParams = { relative: relativeName, anchor: anchorName };
+        }
       }
       await logActivity(tx, {
         treeId: access.tree.id,
@@ -1091,6 +1134,8 @@ export async function addRelative(input: {
         entityId: relationshipIds[0] ?? null,
         personId: relativeId,
         summary,
+        summaryKey,
+        summaryParams,
       });
 
       await tx.update(trees).set({ updatedAt: new Date() }).where(eq(trees.id, access.tree.id));
@@ -1136,6 +1181,7 @@ export async function createPersonEvent(
         parsed.kind === "other"
           ? (parsed.title ?? "an event")
           : personEventKindLabel(parsed.kind);
+      const personLabel = names.get(parsed.personId) ?? "someone";
       await logActivity(tx, {
         treeId: access.tree.id,
         actor: access.user,
@@ -1143,7 +1189,9 @@ export async function createPersonEvent(
         entityType: "event",
         entityId: created.id,
         personId: parsed.personId,
-        summary: `Added ${label} for ${names.get(parsed.personId) ?? "someone"}`,
+        summary: `Added ${label} for ${personLabel}`,
+        summaryKey: "tree.activity.summary.eventAdded",
+        summaryParams: { event: label, person: personLabel },
       });
       return created;
     });
@@ -1198,6 +1246,7 @@ export async function updatePersonEvent(
           updated.kind === "other"
             ? (updated.title ?? "an event")
             : personEventKindLabel(updated.kind);
+        const personLabel = names.get(updated.personId) ?? "someone";
         await logActivity(tx, {
           treeId: access.tree.id,
           actor: access.user,
@@ -1205,7 +1254,9 @@ export async function updatePersonEvent(
           entityType: "event",
           entityId: updated.id,
           personId: updated.personId,
-          summary: `Updated ${label} for ${names.get(updated.personId) ?? "someone"}`,
+          summary: `Updated ${label} for ${personLabel}`,
+          summaryKey: "tree.activity.summary.eventUpdated",
+          summaryParams: { event: label, person: personLabel },
           changes,
         });
       }
@@ -1249,6 +1300,7 @@ export async function deletePersonEvent(input: {
         )
         .returning({ id: personEvents.id });
       if (!deleted.length) throw new AppError(userMessage("person.error.eventNotFound"));
+      const personLabel = names.get(event.personId) ?? "someone";
       await logActivity(tx, {
         treeId: access.tree.id,
         actor: access.user,
@@ -1256,9 +1308,9 @@ export async function deletePersonEvent(input: {
         entityType: "event",
         entityId: event.id,
         personId: event.personId,
-        summary: `Deleted ${label} for ${
-          names.get(event.personId) ?? "someone"
-        }`,
+        summary: `Deleted ${label} for ${personLabel}`,
+        summaryKey: "tree.activity.summary.eventDeleted",
+        summaryParams: { event: label, person: personLabel },
       });
     });
     await touchTree(access.tree.id);

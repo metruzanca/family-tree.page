@@ -635,6 +635,10 @@ export const treeActivity = pgTable(
     entityId: uuid("entity_id"),
     personId: uuid("person_id"),
     summary: text("summary").notNull(),
+    /** Dictionary key for the summary, so the UI can render it in any locale. */
+    summaryKey: text("summary_key"),
+    /** Values interpolated into summary_key, such as names and counts. */
+    summaryParams: jsonb("summary_params").$type<Record<string, string | number>>(),
     changes: jsonb("changes").$type<ActivityChange[]>(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },

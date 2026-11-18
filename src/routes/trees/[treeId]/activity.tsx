@@ -7,8 +7,13 @@ import {
   getTreeMembers,
   requireUserPage,
 } from "~/api";
-import type { ActivityAction, ActivityGroup, ActivityItem } from "~/lib/activity";
-import { ACTIVITY_GROUPS, activityGroupFor } from "~/lib/activity";
+import type { ActivityGroup, ActivityItem } from "~/lib/activity";
+import {
+  ACTIVITY_GROUPS,
+  activityActionKey,
+  activityGroupFor,
+  activityGroupKey,
+} from "~/lib/activity";
 import { formatDate, formatRelative } from "~/lib/format";
 import { AppHeader } from "~/components/app/AppHeader";
 import { Avatar } from "~/components/ui/Avatar";
@@ -18,45 +23,6 @@ import { LoadingScreen } from "~/components/ui/Loading";
 import { useToast } from "~/components/ui/Toast";
 import { useI18n } from "~/i18n/LocaleProvider";
 import type { TranslationKey } from "~/i18n";
-
-const groupKeys: Record<ActivityGroup | "", TranslationKey> = {
-  "": "tree.activity.group.all",
-  people: "tree.activity.group.people",
-  relationships: "tree.activity.group.relationships",
-  events: "tree.activity.group.events",
-  media: "tree.activity.group.media",
-  members: "tree.activity.group.members",
-  tree: "tree.activity.group.tree",
-};
-
-const actionKeys: Record<ActivityAction, TranslationKey> = {
-  "person.created": "tree.activity.action.personCreated",
-  "person.updated": "tree.activity.action.personUpdated",
-  "person.deleted": "tree.activity.action.personDeleted",
-  "relationship.created": "tree.activity.action.relationshipCreated",
-  "relationship.removed": "tree.activity.action.relationshipRemoved",
-  "event.created": "tree.activity.action.eventCreated",
-  "event.updated": "tree.activity.action.eventUpdated",
-  "event.deleted": "tree.activity.action.eventDeleted",
-  "file.uploaded": "tree.activity.action.fileUploaded",
-  "file.updated": "tree.activity.action.fileUpdated",
-  "file.deleted": "tree.activity.action.fileDeleted",
-  "group.renamed": "tree.activity.action.groupRenamed",
-  "group.deleted": "tree.activity.action.groupDeleted",
-  "member.role_changed": "tree.activity.action.memberRoleChanged",
-  "member.removed": "tree.activity.action.memberRemoved",
-  "member.left": "tree.activity.action.memberLeft",
-  "invite.created": "tree.activity.action.inviteCreated",
-  "invite.revoked": "tree.activity.action.inviteRevoked",
-  "invite.accepted": "tree.activity.action.inviteAccepted",
-  "tree.updated": "tree.activity.action.treeUpdated",
-  "tree.deletion_requested": "tree.activity.action.treeDeletionRequested",
-  "tree.deletion_approved": "tree.activity.action.treeDeletionApproved",
-  "tree.deletion_cancelled": "tree.activity.action.treeDeletionCancelled",
-  "tree.deletion_scheduled": "tree.activity.action.treeDeletionScheduled",
-  "tree.restored": "tree.activity.action.treeRestored",
-  "tree.imported": "tree.activity.action.treeImported",
-};
 
 export const route = {
   preload: ({ params }: { params: { treeId: string } }) => {
@@ -209,7 +175,9 @@ function TreeActivityInner() {
                     >
                       <For each={ACTIVITY_GROUPS}>
                         {option => (
-                          <option value={option.value}>{t(groupKeys[option.value])}</option>
+                          <option value={option.value}>
+                            {t(activityGroupKey(option.value))}
+                          </option>
                         )}
                       </For>
                     </select>
@@ -262,6 +230,10 @@ function TreeActivityInner() {
 function ActivityRow(props: { item: ActivityItem }) {
   const { t, locale } = useI18n();
   const group = () => activityGroupFor(props.item.action);
+  const summary = () =>
+    props.item.summaryKey
+      ? t(props.item.summaryKey, props.item.summaryParams ?? undefined)
+      : props.item.summary;
   return (
     <li
       class="rounded-2xl border border-border bg-card/60 px-4 py-3"
@@ -271,9 +243,9 @@ function ActivityRow(props: { item: ActivityItem }) {
         <Avatar name={props.item.actorName} fileId={null} size={34} />
         <div class="min-w-0 flex-1">
           <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <p class="text-sm font-semibold">{props.item.summary}</p>
+            <p class="text-sm font-semibold">{summary()}</p>
             <Badge variant="secondary" class="px-2 py-0.5 text-[0.62rem] normal-case">
-              {t(actionKeys[props.item.action])}
+              {t(activityActionKey(props.item.action))}
             </Badge>
           </div>
           <p class="mt-0.5 text-xs text-muted-foreground">
@@ -286,18 +258,23 @@ function ActivityRow(props: { item: ActivityItem }) {
               data-testid={`activity-changes-${props.item.id}`}
             >
               <For each={props.item.changes ?? []}>
-                {change => (
-                  <li class="text-xs leading-relaxed text-muted-foreground">
-                    <span class="font-medium text-foreground">{change.label}:</span>{" "}
-                    {change.from ?? t("tree.activity.emptyValue")} →{" "}
-                    {change.to ?? t("tree.activity.emptyValue")}
-                  </li>
-                )}
+                {change => {
+                  const label = change.labelKey
+                    ? t(change.labelKey as TranslationKey)
+                    : change.label;
+                  return (
+                    <li class="text-xs leading-relaxed text-muted-foreground">
+                      <span class="font-medium text-foreground">{`${label}:`}</span>{" "}
+                      {change.from ?? t("tree.activity.emptyValue")} →{" "}
+                      {change.to ?? t("tree.activity.emptyValue")}
+                    </li>
+                  );
+                }}
               </For>
             </ul>
           </Show>
           <p class="mt-1 text-[0.62rem] uppercase tracking-wide text-muted-foreground">
-            {t(groupKeys[group()])}
+            {t(activityGroupKey(group()))}
           </p>
         </div>
       </div>

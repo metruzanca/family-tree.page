@@ -1,3 +1,5 @@
+import type { TranslationKey } from "../i18n";
+
 export type ActivityAction =
   | "person.created"
   | "person.updated"
@@ -39,10 +41,15 @@ export type ActivityEntityType =
 export type ActivityGroup = "people" | "relationships" | "events" | "media" | "members" | "tree";
 
 export type ActivityChange = {
+  /** English label, kept for older rows and API consumers. */
   label: string;
+  /** Dictionary key for the same label; preferred by the UI. */
+  labelKey?: TranslationKey;
   from: string | null;
   to: string | null;
 };
+
+export type ActivitySummaryParams = Record<string, string | number>;
 
 export type ActivityItem = {
   id: string;
@@ -52,7 +59,10 @@ export type ActivityItem = {
   entityType: ActivityEntityType;
   entityId: string | null;
   personId: string | null;
+  /** English summary, kept for exports, older rows, and API consumers. */
   summary: string;
+  summaryKey?: TranslationKey | null;
+  summaryParams?: ActivitySummaryParams | null;
   changes: ActivityChange[] | null;
   createdAt: Date;
 };
@@ -103,6 +113,82 @@ export function activityGroupFor(action: ActivityAction): ActivityGroup {
   if (action.startsWith("file.") || action.startsWith("group.")) return "media";
   if (action.startsWith("member.") || action.startsWith("invite.")) return "members";
   return "tree";
+}
+
+export function activityActionKey(action: ActivityAction): TranslationKey {
+  switch (action) {
+    case "person.created":
+      return "tree.activity.action.personCreated";
+    case "person.updated":
+      return "tree.activity.action.personUpdated";
+    case "person.deleted":
+      return "tree.activity.action.personDeleted";
+    case "relationship.created":
+      return "tree.activity.action.relationshipCreated";
+    case "relationship.removed":
+      return "tree.activity.action.relationshipRemoved";
+    case "event.created":
+      return "tree.activity.action.eventCreated";
+    case "event.updated":
+      return "tree.activity.action.eventUpdated";
+    case "event.deleted":
+      return "tree.activity.action.eventDeleted";
+    case "file.uploaded":
+      return "tree.activity.action.fileUploaded";
+    case "file.updated":
+      return "tree.activity.action.fileUpdated";
+    case "file.deleted":
+      return "tree.activity.action.fileDeleted";
+    case "group.renamed":
+      return "tree.activity.action.groupRenamed";
+    case "group.deleted":
+      return "tree.activity.action.groupDeleted";
+    case "member.role_changed":
+      return "tree.activity.action.memberRoleChanged";
+    case "member.removed":
+      return "tree.activity.action.memberRemoved";
+    case "member.left":
+      return "tree.activity.action.memberLeft";
+    case "invite.created":
+      return "tree.activity.action.inviteCreated";
+    case "invite.revoked":
+      return "tree.activity.action.inviteRevoked";
+    case "invite.accepted":
+      return "tree.activity.action.inviteAccepted";
+    case "tree.updated":
+      return "tree.activity.action.treeUpdated";
+    case "tree.deletion_requested":
+      return "tree.activity.action.treeDeletionRequested";
+    case "tree.deletion_approved":
+      return "tree.activity.action.treeDeletionApproved";
+    case "tree.deletion_cancelled":
+      return "tree.activity.action.treeDeletionCancelled";
+    case "tree.deletion_scheduled":
+      return "tree.activity.action.treeDeletionScheduled";
+    case "tree.restored":
+      return "tree.activity.action.treeRestored";
+    case "tree.imported":
+      return "tree.activity.action.treeImported";
+  }
+}
+
+export function activityGroupKey(group: ActivityGroup | ""): TranslationKey {
+  switch (group) {
+    case "":
+      return "tree.activity.group.all";
+    case "people":
+      return "tree.activity.group.people";
+    case "relationships":
+      return "tree.activity.group.relationships";
+    case "events":
+      return "tree.activity.group.events";
+    case "media":
+      return "tree.activity.group.media";
+    case "members":
+      return "tree.activity.group.members";
+    case "tree":
+      return "tree.activity.group.tree";
+  }
 }
 
 export function activityActionLabel(action: ActivityAction) {

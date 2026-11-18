@@ -36,6 +36,8 @@ import {
 } from "../server/email-templates";
 import { recordUsage } from "../server/usage";
 import { logActivity } from "../server/activity";
+import type { ActivitySummaryParams } from "../lib/activity";
+import type { TranslationKey } from "../i18n";
 import { notifyTreeChanged } from "../server/presence";
 import {
   allOwnersApproved,
@@ -254,6 +256,7 @@ export async function updateTree(input: {
         entityType: "tree",
         entityId: updated.id,
         summary: "Updated tree settings",
+        summaryKey: "tree.activity.summary.treeUpdated",
       });
       notifyTreeChanged(access.tree.id);
     }
@@ -345,6 +348,8 @@ async function scheduleTreeDeletion(
     actor: { id: string; displayName: string };
     deletedBy?: string | null;
     summary: string;
+    summaryKey: TranslationKey;
+    summaryParams?: ActivitySummaryParams;
   },
 ): Promise<Date> {
   const now = new Date();
@@ -367,6 +372,8 @@ async function scheduleTreeDeletion(
     entityType: "tree",
     entityId: input.treeId,
     summary: input.summary,
+    summaryKey: input.summaryKey,
+    summaryParams: input.summaryParams,
   });
   return purgeAfter;
 }
@@ -402,6 +409,7 @@ export async function requestTreeDeletion(input: {
           treeId: input.treeId,
           actor: access.user,
           summary: "Scheduled the tree for deletion. The only owner approved it.",
+          summaryKey: "tree.activity.summary.deletionScheduledBySoleOwner",
         });
         return { scheduled: true, purgeAfter, ownersAwaiting: 0, expiresAt: null };
       }
@@ -427,6 +435,7 @@ export async function requestTreeDeletion(input: {
         entityType: "tree",
         entityId: input.treeId,
         summary: "Asked every owner to approve deleting the tree",
+        summaryKey: "tree.activity.summary.deletionRequested",
       });
       return {
         scheduled: false,
@@ -528,6 +537,7 @@ export async function approveTreeDeletion(
           entityType: "tree",
           entityId: treeId,
           summary: "Approved deleting the tree",
+          summaryKey: "tree.activity.summary.deletionApproved",
         });
         return { scheduled: false, purgeAfter: null, ownersAwaiting: awaiting.length };
       }
@@ -546,6 +556,7 @@ export async function approveTreeDeletion(
         actor: access.user,
         deletedBy: request.requestedBy,
         summary: "Every owner approved. The tree is scheduled for deletion.",
+        summaryKey: "tree.activity.summary.deletionScheduled",
       });
       return { scheduled: true, purgeAfter, ownersAwaiting: 0 };
     });
@@ -594,6 +605,7 @@ export async function cancelTreeDeletionRequest(
           entityType: "tree",
           entityId: treeId,
           summary: "Cancelled the tree deletion request",
+          summaryKey: "tree.activity.summary.deletionCancelled",
         });
       }
       return rows.length;
@@ -631,6 +643,7 @@ export async function restoreTree(treeId: string): Promise<ActionResult<{ name: 
         entityType: "tree",
         entityId: treeId,
         summary: "Restored the tree before its deletion date",
+        summaryKey: "tree.activity.summary.treeRestored",
       });
     });
 
@@ -733,13 +746,21 @@ export async function updateMemberRole(input: {
         .from(users)
         .where(eq(users.id, input.userId))
         .limit(1);
+      const targetName = target?.displayName ?? "a member";
       await logActivity(tx, {
         treeId: access.tree.id,
         actor: access.user,
         action: "member.role_changed",
         entityType: "member",
         entityId: input.userId,
-        summary: `Changed ${target?.displayName ?? "a member"}'s role to ${role}`,
+        summary: `Changed ${targetName}'s role to ${role}`,
+        summaryKey:
+          role === "owner"
+            ? "tree.activity.summary.memberRoleChangedOwner"
+            : role === "editor"
+              ? "tree.activity.summary.memberRoleChangedEditor"
+              : "tree.activity.summary.memberRoleChangedViewer",
+        summaryParams: { name: targetName },
       });
     });
     notifyTreeChanged(input.treeId);
@@ -780,6 +801,8 @@ export async function removeMember(input: {
         entityType: "member",
         entityId: input.userId,
         summary: `Removed ${targetUser?.displayName ?? "a member"} from the tree`,
+        summaryKey: "tree.activity.summary.memberRemoved",
+        summaryParams: { name: targetUser?.displayName ?? "a member" },
       });
     });
     notifyTreeChanged(input.treeId);
@@ -808,6 +831,8 @@ export async function leaveTree(treeId: string): Promise<ActionResult<undefined>
         entityType: "member",
         entityId: access.user.id,
         summary: `${access.user.displayName} left the tree`,
+        summaryKey: "tree.activity.summary.memberLeft",
+        summaryParams: { name: access.user.displayName },
       });
     });
     notifyTreeChanged(treeId);
@@ -907,6 +932,18 @@ async function issueInvite(input: {
       summary: input.email
         ? `Invited ${input.email} as ${input.role}`
         : `Created an invite link as ${input.role}`,
+      summaryKey: input.email
+        ? input.role === "owner"
+          ? "tree.activity.summary.inviteCreatedEmailOwner"
+          : input.role === "editor"
+            ? "tree.activity.summary.inviteCreatedEmailEditor"
+            : "tree.activity.summary.inviteCreatedEmailViewer"
+        : input.role === "owner"
+          ? "tree.activity.summary.inviteLinkCreatedOwner"
+          : input.role === "editor"
+            ? "tree.activity.summary.inviteLinkCreatedEditor"
+            : "tree.activity.summary.inviteLinkCreatedViewer",
+      summaryParams: input.email ? { email: input.email } : {},
     });
     return created;
   });
@@ -1075,6 +1112,10 @@ export async function revokeInvite(input: {
       summary: updated.email
         ? `Revoked the invite for ${updated.email}`
         : "Revoked an invite link",
+      summaryKey: updated.email
+        ? "tree.activity.summary.inviteRevoked"
+        : "tree.activity.summary.inviteLinkRevoked",
+      summaryParams: updated.email ? { email: updated.email } : {},
     });
     return undefined;
   });
@@ -1172,6 +1213,10 @@ export async function acceptInvite(token: string): Promise<ActionResult<{ treeId
         summary: existing.length
           ? `${user.displayName} accepted an invite`
           : `${user.displayName} joined the tree`,
+        summaryKey: existing.length
+          ? "tree.activity.summary.inviteAcceptedExisting"
+          : "tree.activity.summary.inviteAcceptedJoined",
+        summaryParams: { name: user.displayName },
       });
 
       return { treeId: invite.treeId };

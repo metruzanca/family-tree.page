@@ -166,6 +166,8 @@ export async function importGedcom(input: {
         summary: `Imported ${parsed.people.length} ${
           parsed.people.length === 1 ? "person" : "people"
         } from GEDCOM`,
+        summaryKey: "tree.activity.summary.gedcomImported",
+        summaryParams: { count: parsed.people.length },
       });
 
       return tree.id;

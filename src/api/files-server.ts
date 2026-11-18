@@ -188,6 +188,7 @@ export async function finalizeUpload(fileId: string): Promise<ActionResult<{ id:
     if (file.status !== "ready") {
       const personId = updated.personId;
       const names = await peopleNames(db, updated.treeId, personId ? [personId] : []);
+      const personName = (personId && names.get(personId)) || "someone";
       await logActivityBestEffort({
         treeId: updated.treeId,
         actor: user,
@@ -196,8 +197,14 @@ export async function finalizeUpload(fileId: string): Promise<ActionResult<{ id:
         entityId: updated.id,
         personId,
         summary: personId
-          ? `Uploaded ${updated.originalName} to ${names.get(personId) ?? "someone"}`
+          ? `Uploaded ${updated.originalName} to ${personName}`
           : `Uploaded ${updated.originalName} to the tree inbox`,
+        summaryKey: personId
+          ? "tree.activity.summary.fileUploadedToPerson"
+          : "tree.activity.summary.fileUploadedToInbox",
+        summaryParams: personId
+          ? { file: updated.originalName, person: personName }
+          : { file: updated.originalName },
       });
       await recordUsage({
         userId: user.id,
@@ -234,6 +241,7 @@ export async function deleteFile(input: {
     if (!file || file.treeId !== access.tree.id) throw new AppError(userMessage("media.error.fileNotFound"));
     const names = await peopleNames(db, access.tree.id, file.personId ? [file.personId] : []);
     const usage = await deleteFileRecord(input.fileId, access.user.id);
+    const personName = (file.personId && names.get(file.personId)) || "someone";
     await logActivityBestEffort({
       treeId: access.tree.id,
       actor: access.user,
@@ -242,8 +250,14 @@ export async function deleteFile(input: {
       entityId: file.id,
       personId: file.personId,
       summary: file.personId
-        ? `Deleted ${file.originalName} from ${names.get(file.personId) ?? "someone"}`
+        ? `Deleted ${file.originalName} from ${personName}`
         : `Deleted ${file.originalName} from the tree inbox`,
+      summaryKey: file.personId
+        ? "tree.activity.summary.fileDeletedFromPerson"
+        : "tree.activity.summary.fileDeletedFromInbox",
+      summaryParams: file.personId
+        ? { file: file.originalName, person: personName }
+        : { file: file.originalName },
     });
     await recordUsage({
       userId: access.user.id,
@@ -302,6 +316,14 @@ export async function deleteFiles(input: {
         rows.length === 1
           ? `Deleted ${rows[0].originalName}`
           : `Deleted ${rows.length} files`,
+      summaryKey:
+        rows.length === 1
+          ? "tree.activity.summary.fileDeleted"
+          : "tree.activity.summary.filesDeleted",
+      summaryParams:
+        rows.length === 1
+          ? { file: rows[0].originalName }
+          : { count: rows.length },
     });
     return { deleted: count };
   });
@@ -413,6 +435,20 @@ export async function assignFilesToPerson(input: {
         : changed.length === 1
           ? `Moved ${changed[0].originalName} to the tree inbox`
           : `Moved ${changed.length} files to the tree inbox`,
+      summaryKey: parsed.personId
+        ? changed.length === 1
+          ? "tree.activity.summary.fileFiledUnderPerson"
+          : "tree.activity.summary.filesFiledUnderPerson"
+        : changed.length === 1
+          ? "tree.activity.summary.fileMovedToInbox"
+          : "tree.activity.summary.filesMovedToInbox",
+      summaryParams: parsed.personId
+        ? changed.length === 1
+          ? { file: changed[0].originalName, person: destination }
+          : { count: changed.length, person: destination }
+        : changed.length === 1
+          ? { file: changed[0].originalName }
+          : { count: changed.length },
     });
     notifyTreeChanged(access.tree.id);
     return { moved: changed.length };
@@ -479,6 +515,8 @@ export async function renameFileGroup(input: {
       entityId: updated.id,
       personId: group.personId,
       summary: `Renamed album ${group.name} to ${updated.name}`,
+      summaryKey: "tree.activity.summary.albumRenamed",
+      summaryParams: { from: group.name, to: updated.name },
     });
     return { id: updated.id, name: updated.name };
   });
@@ -503,6 +541,8 @@ export async function deleteFileGroup(groupId: string): Promise<ActionResult<und
       entityId: group.id,
       personId: group.personId,
       summary: `Deleted album ${group.name}`,
+      summaryKey: "tree.activity.summary.albumDeleted",
+      summaryParams: { name: group.name },
     });
     await recordUsage({
       userId: access.user.id,
@@ -536,6 +576,7 @@ export async function setAvatar(input: {
       userId: access.user.id,
     });
     notifyTreeChanged(access.tree.id);
+    const personName = names.get(input.personId) ?? "someone";
     await logActivityBestEffort({
       treeId: access.tree.id,
       actor: access.user,
@@ -544,8 +585,12 @@ export async function setAvatar(input: {
       entityId: input.fileId,
       personId: input.personId,
       summary: input.fileId
-        ? `Set a portrait for ${names.get(input.personId) ?? "someone"}`
-        : `Removed the portrait for ${names.get(input.personId) ?? "someone"}`,
+        ? `Set a portrait for ${personName}`
+        : `Removed the portrait for ${personName}`,
+      summaryKey: input.fileId
+        ? "tree.activity.summary.portraitSet"
+        : "tree.activity.summary.portraitRemoved",
+      summaryParams: { person: personName },
     });
     return undefined;
   });
@@ -659,6 +704,10 @@ export async function updateFileTags(input: {
       summary: autoFilePersonId
         ? `Filed ${file.originalName} and tagged the people in it`
         : `Updated the people tagged in ${file.originalName}`,
+      summaryKey: autoFilePersonId
+        ? "tree.activity.summary.fileFiledAndTagged"
+        : "tree.activity.summary.fileTagsUpdated",
+      summaryParams: { file: file.originalName },
     });
 
     return desired;
@@ -699,6 +748,12 @@ export async function updateFileTakenAt(input: {
       summary: parsed.takenAt
         ? `Changed the date taken for ${file.originalName} to ${formatFuzzyDate(parsed.takenAt)}`
         : `Cleared the date taken for ${file.originalName}`,
+      summaryKey: parsed.takenAt
+        ? "tree.activity.summary.fileTakenAtChanged"
+        : "tree.activity.summary.fileTakenAtCleared",
+      summaryParams: parsed.takenAt
+        ? { file: file.originalName, date: formatFuzzyDate(parsed.takenAt) }
+        : { file: file.originalName },
     });
     return undefined;
   });

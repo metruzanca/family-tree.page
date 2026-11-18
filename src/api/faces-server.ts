@@ -56,7 +56,7 @@ export async function assignFileFace(input: {
       personId: parsed.personId,
       userId: access.user.id,
     });
-    await logLink(access, parsed.fileId, parsed.personId, "Linked a face to");
+    await logLink(access, parsed.fileId, parsed.personId, "linked");
     return undefined;
   });
 }
@@ -77,7 +77,7 @@ export async function addManualFileFace(input: {
       box: parsed.box,
       userId: access.user.id,
     });
-    await logLink(access, parsed.fileId, parsed.personId, "Drew a face for");
+    await logLink(access, parsed.fileId, parsed.personId, "drawn");
     return undefined;
   });
 }
@@ -160,7 +160,7 @@ async function logLink(
   access: TreeAccess,
   fileId: string,
   personId: string,
-  verb: string,
+  kind: "linked" | "drawn",
 ) {
   const [name, label] = await Promise.all([
     personLabel(access, personId),
@@ -173,7 +173,15 @@ async function logLink(
     entityType: "file",
     entityId: fileId,
     personId,
-    summary: `${verb} ${name} in ${label}`,
+    summary:
+      kind === "linked"
+        ? `Linked a face to ${name} in ${label}`
+        : `Drew a face for ${name} in ${label}`,
+    summaryKey:
+      kind === "linked"
+        ? "tree.activity.summary.faceLinked"
+        : "tree.activity.summary.faceDrawn",
+    summaryParams: { person: name, file: label },
   });
 }
 
@@ -190,5 +198,7 @@ async function logUnlink(access: TreeAccess, fileId: string, personId: string) {
     entityId: fileId,
     personId,
     summary: `Unlinked ${name} from a face in ${label}`,
+    summaryKey: "tree.activity.summary.faceUnlinked",
+    summaryParams: { person: name, file: label },
   });
 }

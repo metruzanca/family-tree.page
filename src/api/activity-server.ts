@@ -11,6 +11,7 @@ import {
   type ActivityGroup,
   type ActivityItem,
 } from "../lib/activity";
+import type { TranslationKey } from "../i18n";
 
 export type TreeActivityFilters = {
   personId?: string | null;
@@ -68,6 +69,8 @@ export async function getTreeActivity(
     entityId: row.entityId,
     personId: row.personId,
     summary: row.summary,
+    summaryKey: row.summaryKey as TranslationKey | null,
+    summaryParams: row.summaryParams,
     changes: row.changes,
     createdAt: row.createdAt,
   }));

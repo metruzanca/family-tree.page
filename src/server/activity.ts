@@ -11,7 +11,9 @@ import type {
   ActivityAction,
   ActivityChange,
   ActivityEntityType,
+  ActivitySummaryParams,
 } from "../lib/activity";
+import type { TranslationKey } from "../i18n";
 import { formatFuzzyDate, type FuzzyDate } from "../lib/fuzzy-date";
 import { personSexLabel, type PersonSex } from "../lib/person-sex";
 import { log } from "./logger";
@@ -33,6 +35,10 @@ type ActivityInput = {
   entityId?: string | null;
   personId?: string | null;
   summary: string;
+  /** Dictionary key for `summary`; the UI prefers it over the English text. */
+  summaryKey?: TranslationKey;
+  /** Values interpolated into `summaryKey`. */
+  summaryParams?: ActivitySummaryParams;
   changes?: ActivityChange[];
 };
 
@@ -75,6 +81,8 @@ export async function logActivity(client: ActivityClient, input: ActivityInput) 
     entityId: input.entityId ?? null,
     personId: input.personId ?? null,
     summary: input.summary,
+    summaryKey: input.summaryKey ?? null,
+    summaryParams: input.summaryParams ?? null,
     changes: input.changes?.length ? input.changes : null,
   });
 }
@@ -88,20 +96,24 @@ export async function logActivityBestEffort(input: ActivityInput) {
   }
 }
 
-const PERSON_FIELDS: { key: keyof PersonInput; label: string }[] = [
-  { key: "firstName", label: "First name" },
-  { key: "lastName", label: "Last name" },
-  { key: "maidenName", label: "Maiden name" },
-  { key: "nickname", label: "Nickname" },
-  { key: "sex", label: "Sex" },
-  { key: "birthDate", label: "Born" },
-  { key: "deathDate", label: "Died" },
-  { key: "birthPlace", label: "Birthplace" },
-  { key: "deathPlace", label: "Resting place" },
-  { key: "bio", label: "Life notes" },
-  { key: "links", label: "Links" },
-  { key: "contactEmail", label: "Contact email" },
-  { key: "contactPhone", label: "Contact phone" },
+const PERSON_FIELDS: {
+  key: keyof PersonInput;
+  label: string;
+  labelKey: TranslationKey;
+}[] = [
+  { key: "firstName", label: "First name", labelKey: "tree.activity.field.firstName" },
+  { key: "lastName", label: "Last name", labelKey: "tree.activity.field.lastName" },
+  { key: "maidenName", label: "Maiden name", labelKey: "tree.activity.field.maidenName" },
+  { key: "nickname", label: "Nickname", labelKey: "tree.activity.field.nickname" },
+  { key: "sex", label: "Sex", labelKey: "tree.activity.field.sex" },
+  { key: "birthDate", label: "Born", labelKey: "tree.activity.field.born" },
+  { key: "deathDate", label: "Died", labelKey: "tree.activity.field.died" },
+  { key: "birthPlace", label: "Birthplace", labelKey: "tree.activity.field.birthPlace" },
+  { key: "deathPlace", label: "Resting place", labelKey: "tree.activity.field.restingPlace" },
+  { key: "bio", label: "Life notes", labelKey: "tree.activity.field.lifeNotes" },
+  { key: "links", label: "Links", labelKey: "tree.activity.field.links" },
+  { key: "contactEmail", label: "Contact email", labelKey: "tree.activity.field.contactEmail" },
+  { key: "contactPhone", label: "Contact phone", labelKey: "tree.activity.field.contactPhone" },
 ];
 
 export function personChanges(before: Person, after: PersonInput): ActivityChange[] {
@@ -112,6 +124,7 @@ export function personChanges(before: Person, after: PersonInput): ActivityChang
     if (sameValue(from, to)) continue;
     changes.push({
       label: field.label,
+      labelKey: field.labelKey,
       from: displayValue(field.key, from),
       to: displayValue(field.key, to),
     });
@@ -119,12 +132,16 @@ export function personChanges(before: Person, after: PersonInput): ActivityChang
   return changes;
 }
 
-const EVENT_FIELDS: { key: keyof PersonEventInput; label: string }[] = [
-  { key: "kind", label: "Type" },
-  { key: "title", label: "Title" },
-  { key: "place", label: "Place" },
-  { key: "date", label: "Date" },
-  { key: "description", label: "Notes" },
+const EVENT_FIELDS: {
+  key: keyof PersonEventInput;
+  label: string;
+  labelKey: TranslationKey;
+}[] = [
+  { key: "kind", label: "Type", labelKey: "tree.activity.field.type" },
+  { key: "title", label: "Title", labelKey: "tree.activity.field.title" },
+  { key: "place", label: "Place", labelKey: "tree.activity.field.place" },
+  { key: "date", label: "Date", labelKey: "tree.activity.field.date" },
+  { key: "description", label: "Notes", labelKey: "tree.activity.field.notes" },
 ];
 
 export function personEventChanges(
@@ -138,6 +155,7 @@ export function personEventChanges(
     if (sameValue(from, to)) continue;
     changes.push({
       label: field.label,
+      labelKey: field.labelKey,
       from: displayEventValue(field.key, from),
       to: displayEventValue(field.key, to),
     });
