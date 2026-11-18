@@ -69,6 +69,7 @@ function person(
     lastName,
     maidenName: null,
     nickname: null,
+    sex: "unknown",
     birthDate: exactFuzzyDate(1920),
     deathDate: null,
     birthPlace: "Springfield",

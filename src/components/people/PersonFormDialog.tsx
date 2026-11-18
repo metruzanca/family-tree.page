@@ -1,4 +1,4 @@
-import { Show, createEffect, createSignal } from "solid-js";
+import { For, Show, createEffect, createSignal } from "solid-js";
 import { createStore } from "solid-js/store";
 import { revalidate } from "@solidjs/router";
 import type { GraphPerson } from "~/api/people-server";
@@ -18,12 +18,17 @@ import { FuzzyDateField } from "../ui/FuzzyDateField";
 import { attemptAction } from "~/lib/action-result";
 import { track } from "~/lib/analytics";
 import type { FuzzyDate } from "~/lib/fuzzy-date";
+import {
+  PERSON_SEX_OPTIONS,
+  type PersonSex,
+} from "~/lib/person-sex";
 
 export type PersonFormState = {
   firstName: string;
   lastName: string;
   maidenName: string;
   nickname: string;
+  sex: PersonSex;
   birthDate: FuzzyDate | null;
   deathDate: FuzzyDate | null;
   birthPlace: string;
@@ -36,6 +41,7 @@ const emptyForm: PersonFormState = {
   lastName: "",
   maidenName: "",
   nickname: "",
+  sex: "unknown",
   birthDate: null,
   deathDate: null,
   birthPlace: "",
@@ -67,6 +73,7 @@ export function PersonFormDialog(props: {
             lastName: person.lastName,
             maidenName: person.maidenName ?? "",
             nickname: person.nickname ?? "",
+            sex: person.sex,
             birthDate: person.birthDate,
             deathDate: person.deathDate,
             birthPlace: person.birthPlace ?? "",
@@ -92,6 +99,7 @@ export function PersonFormDialog(props: {
       lastName: form.lastName,
       maidenName: form.maidenName,
       nickname: form.nickname,
+      sex: form.sex,
       birthDate: form.birthDate,
       deathDate: form.deathDate,
       birthPlace: form.birthPlace,
@@ -214,6 +222,25 @@ export function PersonFormDialog(props: {
               maxlength={80}
               data-testid="person-form-maiden-name"
             />
+          </Field>
+          <Field
+            label="Sex"
+            for="person-sex"
+            hint="Used for father and mother labels and GEDCOM."
+          >
+            <select
+              id="person-sex"
+              class="input"
+              value={form.sex}
+              onChange={event =>
+                setForm("sex", event.currentTarget.value as PersonSex)
+              }
+              data-testid="person-form-sex"
+            >
+              <For each={PERSON_SEX_OPTIONS}>
+                {option => <option value={option.value}>{option.label}</option>}
+              </For>
+            </select>
           </Field>
           <Field label="Born" for="person-birth">
             <FuzzyDateField

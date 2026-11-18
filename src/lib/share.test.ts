@@ -15,6 +15,7 @@ function person(id: string, overrides: Partial<GraphPerson> = {}): GraphPerson {
     displayName: `${id} Test`,
     maidenName: null,
     nickname: null,
+    sex: "unknown",
     birthDate: null,
     deathDate: null,
     birthPlace: "Springfield",

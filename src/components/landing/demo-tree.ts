@@ -6,6 +6,7 @@ import type {
   TreeGraph,
 } from "~/api/people-server";
 import { exactDateFromISO } from "~/lib/fuzzy-date";
+import type { PersonSex } from "~/lib/person-sex";
 
 /**
  * A static demo tree for the landing page. It is deliberately separate from the
@@ -129,6 +130,20 @@ const personSeeds: PersonSeed[] = [
   },
 ];
 
+const demoSex: Record<string, PersonSex> = {
+  abraham: "male",
+  mona: "female",
+  jackie: "female",
+  clancy: "male",
+  homer: "male",
+  marge: "female",
+  selma: "female",
+  patty: "female",
+  bart: "male",
+  lisa: "female",
+  maggie: "female",
+};
+
 export const demoPeople: GraphPerson[] = personSeeds.map(person => ({
   id: person.id,
   firstName: person.firstName,
@@ -136,6 +151,7 @@ export const demoPeople: GraphPerson[] = personSeeds.map(person => ({
   displayName: `${person.firstName} ${person.lastName}`,
   maidenName: null,
   nickname: null,
+  sex: demoSex[person.id] ?? "unknown",
   birthDate: exactDateFromISO(person.birthDate),
   deathDate: null,
   birthPlace: person.birthPlace,

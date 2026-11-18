@@ -22,6 +22,7 @@ import {
   type StoredFile,
 } from "../../drizzle/schema";
 import type { FuzzyDate } from "../lib/fuzzy-date";
+import type { PersonSex } from "../lib/person-sex";
 import { requireTreeMember, type TreeRole } from "../server/guards";
 import { AppError, runAction, type ActionResult } from "../server/errors";
 import { log } from "../server/logger";
@@ -104,6 +105,7 @@ export type GraphPerson = {
   displayName: string;
   maidenName: string | null;
   nickname: string | null;
+  sex: PersonSex;
   birthDate: FuzzyDate | null;
   deathDate: FuzzyDate | null;
   birthPlace: string | null;
@@ -283,6 +285,7 @@ export async function loadTreeGraph(tree: {
       displayName: personDisplayName(person),
       maidenName: person.maidenName,
       nickname: person.nickname,
+      sex: person.sex,
       birthDate: person.birthDate,
       deathDate: person.deathDate,
       birthPlace: person.birthPlace,
@@ -471,6 +474,7 @@ export async function createPerson(
           lastName: parsed.lastName,
           maidenName: parsed.maidenName,
           nickname: parsed.nickname,
+          sex: parsed.sex,
           birthDate: parsed.birthDate,
           deathDate: parsed.deathDate,
           birthPlace: parsed.birthPlace,
@@ -522,6 +526,7 @@ export async function updatePerson(
           lastName: parsed.lastName,
           maidenName: parsed.maidenName,
           nickname: parsed.nickname,
+          sex: parsed.sex,
           birthDate: parsed.birthDate,
           deathDate: parsed.deathDate,
           birthPlace: parsed.birthPlace,

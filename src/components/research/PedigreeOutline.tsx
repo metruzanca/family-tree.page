@@ -1,6 +1,6 @@
 import { For, Show } from "solid-js";
 import type { Pedigree, PedigreeSlot } from "~/lib/research/numbering";
-import { pedigreeRoleLabel } from "~/lib/research/numbering";
+import { pedigreeSlotLabel } from "~/lib/research/numbering";
 import { formatFuzzyYearRange } from "~/lib/fuzzy-date";
 import { personName } from "~/lib/research/graph";
 import { researchHref } from "./views";
@@ -11,9 +11,9 @@ export function PedigreeOutline(props: { treeId: string; pedigree: Pedigree }) {
     <div class="space-y-4" data-testid="research-pedigree">
       <div class="rounded-2xl border border-dashed border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
         Ahnentafel numbering: the subject is 1, each parent doubles the number, so
-        slots 2 and 3 are the two parents and 4 to 7 are their parents. The tree
-        does not record sex, so the slots read as parent A and parent B instead of
-        father and mother.
+        slots 2 and 3 are the two parents and 4 to 7 are their parents. A known
+        male parent is labelled father, a known female parent is labelled mother,
+        and other or unknown sex reads as parent.
       </div>
 
       <Show when={props.pedigree.truncated}>
@@ -72,7 +72,7 @@ function PedigreeSlotCard(props: { treeId: string; slot: PedigreeSlot }) {
                   {personName(person())}
                 </a>
                 <p class="text-xs text-muted-foreground">
-                  {pedigreeRoleLabel(props.slot.role)}
+                  {pedigreeSlotLabel(props.slot)}
                   <Show when={formatFuzzyYearRange(person().birthDate, person().deathDate)}>
                     {" · "}
                     {formatFuzzyYearRange(person().birthDate, person().deathDate)}

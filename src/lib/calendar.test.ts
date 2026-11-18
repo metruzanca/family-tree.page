@@ -20,6 +20,7 @@ function person(overrides: Partial<GraphPerson> & { id: string }): GraphPerson {
     displayName: overrides.displayName ?? `${overrides.firstName ?? overrides.id} Simpson`,
     maidenName: null,
     nickname: null,
+    sex: "unknown",
     birthDate: overrides.birthDate ?? null,
     deathDate: overrides.deathDate ?? null,
     birthPlace: null,

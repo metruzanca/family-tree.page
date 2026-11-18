@@ -297,7 +297,8 @@
                       "living": true,
                       "avatar": null,
                       "createdAt": "2025-11-01T12:00:00.000Z",
-                      "updatedAt": "2026-01-02T08:30:00.000Z"
+                      "updatedAt": "2026-01-02T08:30:00.000Z",
+                      "sex": "male"
                     }
                   ],
                   "nextCursor": null,
@@ -371,7 +372,8 @@
                     "living": true,
                     "avatar": null,
                     "createdAt": "2025-11-01T12:00:00.000Z",
-                    "updatedAt": "2026-01-02T08:30:00.000Z"
+                    "updatedAt": "2026-01-02T08:30:00.000Z",
+                    "sex": "male"
                   },
                   "parents": [],
                   "children": [],
@@ -807,7 +809,8 @@
                       "living": true,
                       "avatar": null,
                       "createdAt": "2025-11-01T12:00:00.000Z",
-                      "updatedAt": "2026-01-02T08:30:00.000Z"
+                      "updatedAt": "2026-01-02T08:30:00.000Z",
+                      "sex": "male"
                     }
                   ],
                   "relationships": [],
@@ -1289,7 +1292,8 @@
           "living",
           "avatar",
           "createdAt",
-          "updatedAt"
+          "updatedAt",
+          "sex"
         ],
         "properties": {
           "id": {
@@ -1376,6 +1380,16 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "sex": {
+            "type": "string",
+            "enum": [
+              "female",
+              "male",
+              "other",
+              "unknown"
+            ],
+            "description": "Used for father and mother labels and GEDCOM SEX. Unknown is the default."
           }
         }
       },

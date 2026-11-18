@@ -208,6 +208,7 @@ export function AddRelativeDialog(props: {
                 firstName: form.firstName,
                 lastName: form.lastName,
                 nickname: form.nickname,
+                sex: "unknown",
                 birthDate: form.birthDate,
                 deathDate: form.deathDate,
                 maidenName: "",

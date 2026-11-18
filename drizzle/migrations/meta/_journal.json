@@ -127,6 +127,13 @@
       "when": 1794971952554,
       "tag": "0017_abnormal_cammi",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1794978491305,
+      "tag": "0018_optimal_wraith",
+      "breakpoints": true
     }
   ]
 }

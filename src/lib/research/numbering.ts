@@ -42,15 +42,11 @@ export type Pedigree = {
 
 export const MAX_PEDIGREE_GENERATIONS = 7;
 
-export function pedigreeRoleLabel(role: PedigreeRole) {
-  switch (role) {
-    case "self":
-      return "Subject";
-    case "parent-a":
-      return "Parent A";
-    case "parent-b":
-      return "Parent B";
-  }
+export function pedigreeSlotLabel(slot: PedigreeSlot) {
+  if (slot.role === "self") return "Subject";
+  if (slot.person?.sex === "male") return "Father";
+  if (slot.person?.sex === "female") return "Mother";
+  return "Parent";
 }
 
 export function generationOfAhnentafel(number: number) {

@@ -170,6 +170,7 @@ export function toGedcomInput(data: ApiTreeData): GedcomInput {
       lastName: person.lastName,
       maidenName: person.maidenName,
       nickname: person.nickname,
+      sex: person.sex,
       birthDate: person.birthDate ?? null,
       deathDate: person.deathDate ?? null,
       birthPlace: person.birthPlace,

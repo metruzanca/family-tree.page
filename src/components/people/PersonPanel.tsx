@@ -12,6 +12,7 @@ import {
   Trash2,
   Upload,
   UserCheck,
+  UserRound,
   X,
 } from "lucide-solid";
 import type {
@@ -23,6 +24,7 @@ import type {
   TreeGraph,
 } from "~/api/people-server";
 import type { TreeRole } from "~/server/guards";
+import { personSexLabel } from "~/lib/person-sex";
 import { Avatar } from "../ui/Avatar";
 import { Badge } from "../ui/badge";
 import { Button, buttonVariants } from "../ui/button";
@@ -209,6 +211,15 @@ export function PersonPanel(props: PersonPanelProps) {
             <p class="mt-1 flex items-center gap-1.5 truncate text-xs text-muted-foreground">
               <MapPin size={12} />
               {props.person.birthPlace ?? props.person.deathPlace}
+            </p>
+          </Show>
+          <Show when={props.person.sex !== "unknown"}>
+            <p
+              class="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground"
+              data-testid="person-panel-sex"
+            >
+              <UserRound size={12} />
+              {personSexLabel(props.person.sex)}
             </p>
           </Show>
         </div>

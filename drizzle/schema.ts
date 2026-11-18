@@ -45,6 +45,12 @@ export const shareLivingVisibility = pgEnum("share_living_visibility", [
   "name",
   "full",
 ]);
+export const personSex = pgEnum("person_sex", [
+  "female",
+  "male",
+  "other",
+  "unknown",
+]);
 export const personEventKind = pgEnum("person_event_kind", [
   "residence",
   "occupation",
@@ -280,6 +286,7 @@ export const people = pgTable(
     lastName: text("last_name").notNull().default(""),
     maidenName: text("maiden_name"),
     nickname: text("nickname"),
+    sex: personSex("sex").notNull().default("unknown"),
     birthDate: jsonb("birth_date").$type<FuzzyDate>(),
     deathDate: jsonb("death_date").$type<FuzzyDate>(),
     birthPlace: text("birth_place"),

@@ -41,6 +41,7 @@ function person(
     displayName: `${firstName} Simpson`,
     maidenName: null,
     nickname: null,
+    sex: "unknown",
     birthDate:
       birthYear === null
         ? null

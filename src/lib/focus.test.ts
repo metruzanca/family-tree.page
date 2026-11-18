@@ -16,6 +16,7 @@ function person(id: string): GraphPerson {
     displayName: `${id} Test`,
     maidenName: null,
     nickname: null,
+    sex: "unknown",
     birthDate: null,
     deathDate: null,
     birthPlace: null,

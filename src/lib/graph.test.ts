@@ -24,6 +24,7 @@ function person(id: string, firstName = id, lastName = "Simpson"): GraphPerson {
     displayName: `${firstName} ${lastName}`,
     maidenName: null,
     nickname: null,
+    sex: "unknown",
     birthDate: null,
     deathDate: null,
     birthPlace: null,

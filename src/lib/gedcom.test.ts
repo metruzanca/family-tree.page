@@ -31,6 +31,7 @@ function person(
     lastName,
     maidenName: null,
     nickname: null,
+    sex: "unknown",
     birthDate: exactFuzzyDate(1900),
     deathDate: null,
     birthPlace: null,
@@ -188,6 +189,46 @@ describe("GEDCOM export", () => {
 
   it("writes sex as unknown for every person", () => {
     expect(rows.filter(line => line === "1 SEX U")).toHaveLength(5);
+  });
+
+  it("uses sex for SEX tags and mixed-sex couple roles", () => {
+    const out = buildGedcom(
+      input({
+        people: [
+          person("aaa", "Ada", "One", { sex: "female" }),
+          person("zzz", "Zed", "One", { sex: "male" }),
+          person("kid", "Kit", "One"),
+        ],
+        relationships: [
+          { id: "r1", type: "parent", source: "aaa", target: "kid" },
+          { id: "r2", type: "parent", source: "zzz", target: "kid" },
+          {
+            id: "m1",
+            type: "partner",
+            source: "aaa",
+            target: "zzz",
+            status: "married",
+            startDate: null,
+            endDate: null,
+          },
+        ],
+        events: [],
+        files: [],
+      }),
+    );
+    const outLines = lines(out);
+    expect(outLines.filter(line => line === "1 SEX F")).toHaveLength(1);
+    expect(outLines.filter(line => line === "1 SEX M")).toHaveLength(1);
+
+    const xrefs = new Map<string, string>();
+    for (let index = 0; index < outLines.length; index += 1) {
+      const line = outLines[index];
+      if (!line.startsWith("1 _ROOTS_ID ")) continue;
+      const match = /^0 (@I[A-Z0-9]+@) INDI$/.exec(outLines[index - 1] ?? "");
+      if (match) xrefs.set(line.slice("1 _ROOTS_ID ".length), match[1]);
+    }
+    expect(outLines).toContain(`1 HUSB ${xrefs.get("zzz")}`);
+    expect(outLines).toContain(`1 WIFE ${xrefs.get("aaa")}`);
   });
 
   it("writes birth, death, places, and notes", () => {

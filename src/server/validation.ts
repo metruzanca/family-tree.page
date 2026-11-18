@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { API_SCOPE_VALUES } from "../lib/api";
+import { PERSON_SEX_VALUES } from "../lib/person-sex";
 import {
   isValidFuzzyDate,
   isValidPartialDate,
@@ -195,6 +196,7 @@ export const personSchema = z.object({
   lastName: z.string().trim().max(80).optional().default(""),
   maidenName: optionalText(80),
   nickname: optionalText(80),
+  sex: z.enum(PERSON_SEX_VALUES).default("unknown"),
   birthDate: optionalFuzzyDate,
   deathDate: optionalFuzzyDate,
   birthPlace: optionalText(160),

@@ -22,6 +22,7 @@ export function person(
     displayName: `${firstName} ${lastName}`.trim(),
     maidenName: null,
     nickname: null,
+    sex: "unknown",
     birthDate: birthYear === null ? null : exactFuzzyDate(birthYear),
     deathDate: null,
     birthPlace: null,

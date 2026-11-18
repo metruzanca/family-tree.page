@@ -1,6 +1,7 @@
 import type { FuzzyDate } from "../../lib/fuzzy-date";
 import { fuzzySortValue } from "../../lib/fuzzy-date";
 import { API_VERSION } from "../../lib/api";
+import type { PersonSex } from "../../lib/person-sex";
 import type {
   ParentChild,
   Partnership,
@@ -23,6 +24,7 @@ export type ApiPerson = {
   fullName: string;
   maidenName: string | null;
   nickname: string | null;
+  sex: PersonSex;
   birthDate: FuzzyDate | null;
   deathDate: FuzzyDate | null;
   birthPlace: string | null;
@@ -152,6 +154,7 @@ export function toApiPerson(
     | "lastName"
     | "maidenName"
     | "nickname"
+    | "sex"
     | "birthDate"
     | "deathDate"
     | "birthPlace"
@@ -174,6 +177,7 @@ export function toApiPerson(
     fullName: displayName(person),
     maidenName: person.maidenName,
     nickname: person.nickname,
+    sex: person.sex,
     birthDate: person.birthDate ?? null,
     deathDate: person.deathDate ?? null,
     birthPlace: person.birthPlace,

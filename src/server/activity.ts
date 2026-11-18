@@ -13,6 +13,7 @@ import type {
   ActivityEntityType,
 } from "../lib/activity";
 import { formatFuzzyDate, type FuzzyDate } from "../lib/fuzzy-date";
+import { personSexLabel, type PersonSex } from "../lib/person-sex";
 import { log } from "./logger";
 import type { PersonEventInput, PersonInput } from "./validation";
 
@@ -92,6 +93,7 @@ const PERSON_FIELDS: { key: keyof PersonInput; label: string }[] = [
   { key: "lastName", label: "Last name" },
   { key: "maidenName", label: "Maiden name" },
   { key: "nickname", label: "Nickname" },
+  { key: "sex", label: "Sex" },
   { key: "birthDate", label: "Born" },
   { key: "deathDate", label: "Died" },
   { key: "birthPlace", label: "Birthplace" },
@@ -163,6 +165,9 @@ function displayValue(key: keyof PersonInput, value: unknown): string | null {
   if (value === null || value === undefined || value === "") return null;
   if (key === "birthDate" || key === "deathDate") {
     return formatFuzzyDate(value as FuzzyDate) || null;
+  }
+  if (key === "sex") {
+    return personSexLabel(value as PersonSex);
   }
   const text = String(value);
   return text.length > 500 ? `${text.slice(0, 500)}…` : text;

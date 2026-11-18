@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { fuzzySortValue, type FuzzyDate } from "./fuzzy-date";
 import type { PersonEventKind } from "./person-events";
+import { gedcomSex, type PersonSex } from "./person-sex";
 
 export type GedcomPerson = {
   id: string;
@@ -8,6 +9,7 @@ export type GedcomPerson = {
   lastName: string;
   maidenName: string | null;
   nickname: string | null;
+  sex: PersonSex;
   birthDate: FuzzyDate | null;
   deathDate: FuzzyDate | null;
   birthPlace: string | null;
@@ -358,7 +360,7 @@ export function buildGedcom(input: GedcomInput): string {
     lines,
     1,
     "NOTE",
-    "Sex is not recorded in this tree. Every person is exported as SEX U, and HUSB and WIFE in a family are assigned by stable partner order, not by the people themselves.",
+    "GEDCOM 5.5.1 has only HUSB and WIFE for a couple. When one partner is male and the other female, those roles follow sex. Otherwise they are assigned by stable partner order, so review same-sex and unknown-partner families after import.",
   );
 
   pushXrefLine(lines, 0, "@SUBM1@", "SUBM");
@@ -407,7 +409,7 @@ export function buildGedcom(input: GedcomInput): string {
     if (person.nickname?.trim()) {
       pushLine(lines, 2, "NICK", escapeValue(person.nickname.trim()));
     }
-    pushLine(lines, 1, "SEX", "U");
+    pushLine(lines, 1, "SEX", gedcomSex(person.sex));
 
     if (person.maidenName?.trim()) {
       pushLine(lines, 1, "NAME", gedcomName(person.firstName, person.maidenName));
@@ -481,9 +483,16 @@ export function buildGedcom(input: GedcomInput): string {
         "This family has more than two parents recorded. Only the first two are placed in HUSB and WIFE.",
       );
     }
-    const [first, second] = group.parentIds;
-    if (first) pushLine(lines, 1, "HUSB", personXref.get(first));
-    if (second) pushLine(lines, 1, "WIFE", personXref.get(second));
+    const parents = group.parentIds
+      .map(id => input.people.find(person => person.id === id))
+      .filter((person): person is GedcomPerson => Boolean(person));
+    let husband = parents[0];
+    let wife = parents[1];
+    if (husband?.sex === "female" && wife?.sex === "male") {
+      [husband, wife] = [wife, husband];
+    }
+    if (husband) pushLine(lines, 1, "HUSB", personXref.get(husband.id));
+    if (wife) pushLine(lines, 1, "WIFE", personXref.get(wife.id));
     for (const childId of group.children) {
       const child = personXref.get(childId);
       if (child) pushLine(lines, 1, "CHIL", child);
