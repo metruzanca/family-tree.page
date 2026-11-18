@@ -8,7 +8,7 @@ import {
   usageEventKind,
   type UsageEvent,
 } from "../../drizzle/schema";
-import { AppError } from "./errors";
+import { AppError, userMessage } from "./errors";
 import { optionalEnv } from "./config";
 import { formatBytes } from "../lib/format";
 
@@ -45,7 +45,7 @@ export async function getAccountUsage(userId: string): Promise<AccountUsage> {
     .from(users)
     .where(eq(users.id, userId))
     .limit(1);
-  if (!user) throw new AppError("Account not found.");
+  if (!user) throw new AppError(userMessage("auth.error.accountNotFound"));
 
   const [usage] = await db
     .select({
@@ -83,7 +83,7 @@ export async function reserveStorage(
     .from(users)
     .where(eq(users.id, input.userId))
     .limit(1);
-  if (!user) throw new AppError("Account not found.");
+  if (!user) throw new AppError(userMessage("auth.error.accountNotFound"));
 
   const [usage] = await tx
     .select({
@@ -94,14 +94,17 @@ export async function reserveStorage(
     .where(and(eq(files.uploadedBy, input.userId), ne(files.status, "failed")));
 
   if (Number(usage?.pending ?? 0) >= MAX_PENDING_UPLOADS) {
-    throw new AppError("You have too many uploads in progress. Wait for them to finish and try again.");
+    throw new AppError(userMessage("media.error.tooManyPendingUploads"));
   }
 
   const used = Number(usage?.bytes ?? 0);
   const reserved = Math.max(0, Math.round(input.bytes));
   if (used + reserved > Number(user.quota)) {
     throw new QuotaError(
-      `You have reached your ${formatBytes(Number(user.quota))} storage limit. Delete some files or email ${supportEmail()} to ask for more space.`,
+      userMessage("media.error.storageQuota", {
+        limit: formatBytes(Number(user.quota)),
+        email: supportEmail(),
+      }),
     );
   }
 }
@@ -136,7 +139,10 @@ export async function reservePersonSlot(tx: Transaction, userId: string): Promis
     .limit(1);
   const quota = user?.quota ?? DEFAULT_PEOPLE_QUOTA;
   throw new QuotaError(
-    `You have reached your limit of ${quota} people created. Email ${supportEmail()} to ask for a higher limit.`,
+    userMessage("person.error.peopleQuota", {
+      limit: quota,
+      email: supportEmail(),
+    }),
   );
 }
 

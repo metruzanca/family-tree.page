@@ -3,7 +3,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { db } from "./db";
 import { trees, treeMembers, type Tree } from "../../drizzle/schema";
 import { requireUser, type PublicUser } from "./auth-service";
-import { AppError } from "./errors";
+import { AppError, userMessage } from "./errors";
 import { isUuid } from "./ids";
 import { checkAccountRateLimit } from "./rate-limit";
 import { recordRejection } from "./usage";
@@ -41,7 +41,7 @@ export async function requireTreeMember(
       kind: "rate_limited",
       treeId: isUuid(treeId) ? treeId : null,
     });
-    throw new AppError("Too many requests. Wait a minute and try again.", 429);
+    throw new AppError(userMessage("error.rateLimited"), 429);
   }
   const rows = await db
     .select({
@@ -63,7 +63,7 @@ export async function requireTreeMember(
   const membership = rows[0];
   if (!membership) throw redirect("/trees");
   if (roleRank[membership.role] < roleRank[minRole]) {
-    throw new Error("You do not have permission to do that.");
+    throw new AppError(userMessage("error.forbidden"), 403);
   }
 
   return {

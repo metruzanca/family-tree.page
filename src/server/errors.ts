@@ -1,4 +1,14 @@
 import { ZodError } from "zod";
+import { getRequestEvent } from "solid-js/web";
+import {
+  DEFAULT_LOCALE,
+  hasTranslationKey,
+  resolveLocaleFromHeaders,
+  translate,
+  type Locale,
+  type TranslationKey,
+  type TranslationParams,
+} from "../i18n";
 import { captureServerError } from "./sentry";
 import { currentLogContext, log, withLogContext } from "./logger";
 import { currentRequestId } from "./request-context";
@@ -11,6 +21,52 @@ export class AppError extends Error {
     super(message);
     this.name = "AppError";
   }
+}
+
+/**
+ * The locale of the request being served. Server actions read it from the same
+ * cookie and `Accept-Language` header the UI uses, so a message arrives already
+ * in the reader's language. Background jobs and tests get English.
+ */
+export function requestLocale(): Locale {
+  try {
+    const headers = getRequestEvent()?.request.headers;
+    if (!headers) return DEFAULT_LOCALE;
+    return resolveLocaleFromHeaders(headers);
+  } catch {
+    return DEFAULT_LOCALE;
+  }
+}
+
+/**
+ * Translates a message that is an exact dictionary key and leaves anything else
+ * alone. Zod messages and `AppError` text can be either, depending on where the
+ * message was written.
+ */
+export function localizedMessage(message: string, locale: Locale = requestLocale()): string {
+  return hasTranslationKey(message) ? translate(locale, message) : message;
+}
+
+/** Builds a user-facing message, for text that needs parameters. */
+export function userMessage(
+  key: TranslationKey,
+  params?: TranslationParams,
+  locale: Locale = requestLocale(),
+): string {
+  return translate(locale, key, params);
+}
+
+/**
+ * The first message a person should see for a rejected form. Schema messages
+ * are dictionary keys, but a library message is already text, so both pass
+ * through the same lookup.
+ */
+export function validationMessage(
+  error: ZodError,
+  fallback: TranslationKey = "error.checkDetails",
+): string {
+  const first = error.issues[0]?.message;
+  return first ? localizedMessage(first) : userMessage(fallback);
 }
 
 export function assert(condition: unknown, message: string): asserts condition {
@@ -54,7 +110,7 @@ export async function runAction<T>(
         });
         return {
           ok: false,
-          error: error.message,
+          error: localizedMessage(error.message),
           reference: referenceFor(requestId),
         };
       }
@@ -68,7 +124,7 @@ export async function runAction<T>(
         });
         return {
           ok: false,
-          error: error.issues[0]?.message ?? "Invalid input.",
+          error: validationMessage(error),
           reference: referenceFor(requestId),
         };
       }
@@ -82,7 +138,7 @@ export async function runAction<T>(
         });
         return {
           ok: false,
-          error: "That record already exists.",
+          error: userMessage("error.duplicate"),
           reference: referenceFor(requestId),
         };
       }
@@ -95,7 +151,7 @@ export async function runAction<T>(
       });
       return {
         ok: false,
-        error: "Something went wrong. Please try again.",
+        error: userMessage("error.generic"),
         reference: referenceFor(requestId),
       };
     }

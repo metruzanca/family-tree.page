@@ -19,7 +19,12 @@ import {
   requireTreeMember,
   type TreeRole,
 } from "../server/guards";
-import { AppError, runAction, type ActionResult } from "../server/errors";
+import {
+  AppError,
+  runAction,
+  userMessage,
+  type ActionResult,
+} from "../server/errors";
 import { log } from "../server/logger";
 import { inviteEmailSchema, inviteSchema, treeRoleSchema, treeSchema } from "../server/validation";
 import { publicOrigin } from "../server/config";
@@ -234,7 +239,7 @@ export async function updateTree(input: {
 }): Promise<ActionResult<undefined>> {
   return runAction("trees.updateTree", async () => {
     const access = await requireTreeMember(input.treeId, "owner");
-    if (!canManage(access.role)) throw new AppError("Only owners can change tree settings.");
+    if (!canManage(access.role)) throw new AppError(userMessage("tree.error.ownerOnly"));
     const parsed = treeSchema.parse(input);
     const [updated] = await db
       .update(trees)
@@ -377,11 +382,11 @@ export async function requestTreeDeletion(input: {
 }): Promise<ActionResult<TreeDeletionResult>> {
   return runAction("trees.requestTreeDeletion", async () => {
     const access = await requireTreeMember(input.treeId, "owner");
-    if (!canManage(access.role)) throw new AppError("Only owners can delete a tree.");
+    if (!canManage(access.role)) throw new AppError(userMessage("tree.error.deleteOwnerOnly"));
 
     const confirmation = input.confirmationName.trim();
     if (confirmation !== access.tree.name) {
-      throw new AppError("Type the tree name exactly as it appears to continue.");
+      throw new AppError(userMessage("tree.error.confirmName"));
     }
 
     const outcome = await db.transaction(async tx => {
@@ -390,7 +395,7 @@ export async function requestTreeDeletion(input: {
         .where(eq(treeDeletionRequests.treeId, input.treeId));
 
       const owners = await currentTreeOwners(tx, input.treeId);
-      if (!owners.length) throw new AppError("A tree needs at least one owner.");
+      if (!owners.length) throw new AppError(userMessage("tree.error.needsOwner"));
 
       if (owners.length <= 1) {
         const purgeAfter = await scheduleTreeDeletion(tx, {
@@ -488,12 +493,12 @@ export async function approveTreeDeletion(
         .where(eq(treeDeletionRequests.treeId, treeId))
         .for("update")
         .limit(1);
-      if (!request) throw new AppError("There is no deletion request for this tree.");
+      if (!request) throw new AppError(userMessage("tree.error.noDeletionRequest"));
       if (request.expiresAt.getTime() <= Date.now()) {
         await tx
           .delete(treeDeletionRequests)
           .where(eq(treeDeletionRequests.id, request.id));
-        throw new AppError("That deletion request expired. Ask an owner to request it again.");
+        throw new AppError(userMessage("tree.error.deletionExpired"));
       }
 
       const inserted = await tx
@@ -502,7 +507,7 @@ export async function approveTreeDeletion(
         .onConflictDoNothing()
         .returning({ userId: treeDeletionApprovals.userId });
       if (!inserted.length) {
-        throw new AppError("You have already approved this deletion request.");
+        throw new AppError(userMessage("tree.error.deletionAlreadyApproved"));
       }
 
       const owners = await currentTreeOwners(tx, treeId);
@@ -533,7 +538,7 @@ export async function approveTreeDeletion(
           approvals.map(row => row.userId),
         )
       ) {
-        throw new AppError("Every owner must approve before the tree can be deleted.");
+        throw new AppError(userMessage("tree.error.deletionNeedsApproval"));
       }
 
       const purgeAfter = await scheduleTreeDeletion(tx, {
@@ -593,7 +598,7 @@ export async function cancelTreeDeletionRequest(
       }
       return rows.length;
     });
-    if (!deleted) throw new AppError("There is no deletion request to cancel.");
+    if (!deleted) throw new AppError(userMessage("tree.error.noDeletionRequestToCancel"));
     notifyTreeChanged(treeId);
     return undefined;
   });
@@ -603,7 +608,7 @@ export async function cancelTreeDeletionRequest(
 export async function restoreTree(treeId: string): Promise<ActionResult<{ name: string }>> {
   return runAction("trees.restoreTree", async () => {
     const access = await requireTreeMember(treeId, "owner", { includeDeleted: true });
-    if (!access.tree.deletedAt) throw new AppError("That tree is not scheduled for deletion.");
+    if (!access.tree.deletedAt) throw new AppError(userMessage("tree.error.notScheduledForDeletion"));
 
     await db.transaction(async tx => {
       await tx
@@ -694,7 +699,7 @@ export async function clearMemberPerson(input: {
         ),
       )
       .returning({ userId: treeMembers.userId });
-    if (!updated.length) throw new AppError("That person is not a member of this tree.");
+    if (!updated.length) throw new AppError(userMessage("tree.error.memberNotFound"));
     return undefined;
   });
 }
@@ -713,7 +718,7 @@ export async function updateMemberRole(input: {
         .from(treeMembers)
         .where(and(eq(treeMembers.treeId, input.treeId), eq(treeMembers.role, "owner")));
       if (role !== "owner" && owners.some(owner => owner.userId === input.userId) && owners.length <= 1) {
-        throw new AppError("A tree needs at least one owner.");
+        throw new AppError(userMessage("tree.error.needsOwner"));
       }
       const updated = await tx
         .update(treeMembers)
@@ -722,7 +727,7 @@ export async function updateMemberRole(input: {
           and(eq(treeMembers.treeId, input.treeId), eq(treeMembers.userId, input.userId)),
         )
         .returning({ userId: treeMembers.userId });
-      if (!updated.length) throw new AppError("That person is not a member of this tree.");
+      if (!updated.length) throw new AppError(userMessage("tree.error.memberNotFound"));
       const [target] = await tx
         .select({ displayName: users.displayName })
         .from(users)
@@ -754,9 +759,9 @@ export async function removeMember(input: {
         .from(treeMembers)
         .where(eq(treeMembers.treeId, input.treeId));
       const target = members.find(member => member.userId === input.userId);
-      if (!target) throw new AppError("That person is not a member of this tree.");
+      if (!target) throw new AppError(userMessage("tree.error.memberNotFound"));
       if (target.role === "owner" && members.filter(member => member.role === "owner").length <= 1) {
-        throw new AppError("A tree needs at least one owner.");
+        throw new AppError(userMessage("tree.error.needsOwner"));
       }
       const [targetUser] = await tx
         .select({ displayName: users.displayName })
@@ -791,7 +796,7 @@ export async function leaveTree(treeId: string): Promise<ActionResult<undefined>
           .select({ userId: treeMembers.userId })
           .from(treeMembers)
           .where(and(eq(treeMembers.treeId, treeId), eq(treeMembers.role, "owner")));
-        if (owners.length <= 1) throw new AppError("Promote another owner before leaving this tree.");
+        if (owners.length <= 1) throw new AppError(userMessage("tree.error.promoteOwnerBeforeLeaving"));
       }
       await tx
         .delete(treeMembers)
@@ -933,8 +938,8 @@ async function issueInvite(input: {
     } else {
       emailError =
         result.reason === "not_configured"
-          ? "Email is not configured on this server. Copy the link and send it yourself."
-          : "The email could not be sent. Copy the link and send it yourself.";
+          ? userMessage("tree.error.emailNotConfigured")
+          : userMessage("tree.invites.emailFailed");
     }
   }
 
@@ -963,10 +968,10 @@ export async function createInvite(input: {
 
     if (email) {
       if (!access.user.emailVerified) {
-        throw new AppError("Verify your email address before sending invitations.");
+        throw new AppError(userMessage("tree.error.verifyEmailFirst"));
       }
       if (email === access.user.email.toLowerCase()) {
-        throw new AppError("That is your own email address.");
+        throw new AppError(userMessage("tree.error.ownEmail"));
       }
       const existing = await db
         .select({ userId: treeMembers.userId })
@@ -974,7 +979,7 @@ export async function createInvite(input: {
         .innerJoin(users, eq(users.id, treeMembers.userId))
         .where(and(eq(treeMembers.treeId, input.treeId), eq(users.email, email)))
         .limit(1);
-      if (existing.length) throw new AppError("That person is already a member of this tree.");
+      if (existing.length) throw new AppError(userMessage("tree.error.alreadyMember"));
     }
 
     return issueInvite({
@@ -996,7 +1001,7 @@ export async function resendInvite(input: {
   return runAction("trees.resendInvite", async () => {
     const access = await requireTreeMember(input.treeId, "owner");
     if (!access.user.emailVerified) {
-      throw new AppError("Verify your email address before sending invitations.");
+      throw new AppError(userMessage("tree.error.verifyEmailFirst"));
     }
     const rows = await db
       .select()
@@ -1012,8 +1017,8 @@ export async function resendInvite(input: {
       )
       .limit(1);
     const invite = rows[0];
-    if (!invite) throw new AppError("That invite is no longer active.");
-    if (!invite.email) throw new AppError("That invite does not have an email address.");
+    if (!invite) throw new AppError(userMessage("tree.error.inviteInactive"));
+    if (!invite.email) throw new AppError(userMessage("tree.error.inviteNoEmail"));
 
     const days = Math.min(
       30,
@@ -1060,7 +1065,7 @@ export async function revokeInvite(input: {
         ),
       )
       .returning({ id: treeInvites.id, email: treeInvites.email });
-    if (!updated) throw new AppError("That invite is no longer active.");
+    if (!updated) throw new AppError(userMessage("tree.error.inviteInactive"));
     await logActivity(db, {
       treeId: access.tree.id,
       actor: access.user,
@@ -1121,7 +1126,7 @@ export async function getInvitePreview(token: string): Promise<InvitePreview> {
 export async function acceptInvite(token: string): Promise<ActionResult<{ treeId: string }>> {
   return runAction("trees.acceptInvite", async () => {
     const user = await requireUser();
-    if (!token || token.length > 200) throw new AppError("That invite link is not valid.");
+    if (!token || token.length > 200) throw new AppError(userMessage("tree.error.inviteInvalid"));
     const tokenHash = hashInviteToken(token);
 
     const result = await db.transaction(async tx => {
@@ -1132,10 +1137,10 @@ export async function acceptInvite(token: string): Promise<ActionResult<{ treeId
         .for("update")
         .limit(1);
       const invite = rows[0];
-      if (!invite) throw new AppError("That invite link is not valid.");
-      if (invite.revokedAt) throw new AppError("That invite has been revoked.");
-      if (invite.acceptedAt) throw new AppError("That invite has already been used.");
-      if (invite.expiresAt.getTime() <= Date.now()) throw new AppError("That invite has expired.");
+      if (!invite) throw new AppError(userMessage("tree.error.inviteInvalid"));
+      if (invite.revokedAt) throw new AppError(userMessage("tree.error.inviteRevoked"));
+      if (invite.acceptedAt) throw new AppError(userMessage("tree.error.inviteUsed"));
+      if (invite.expiresAt.getTime() <= Date.now()) throw new AppError(userMessage("tree.error.inviteExpired"));
 
       const existing = await tx
         .select({ userId: treeMembers.userId })

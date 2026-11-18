@@ -18,7 +18,12 @@ import {
   requireUser,
   verifyPassword,
 } from "../server/auth-service";
-import { AppError, runAction, type ActionResult } from "../server/errors";
+import {
+  AppError,
+  runAction,
+  userMessage,
+  type ActionResult,
+} from "../server/errors";
 import { log } from "../server/logger";
 import { deleteAccountSchema, emailChangeSchema } from "../server/validation";
 import {
@@ -75,22 +80,22 @@ export async function requestEmailChange(input: {
     const current = await requireUser();
     const parsed = emailChangeSchema.parse(input);
     const user = await findUserById(current.id);
-    if (!user) throw new AppError("Account not found.");
+    if (!user) throw new AppError(userMessage("auth.error.accountNotFound"));
 
     if (!checkRateLimit("email-change", current.email, 5, 60 * 60_000)) {
-      throw new AppError("Too many email change requests. Try again in an hour.");
+      throw new AppError(userMessage("auth.error.emailChangeRateLimited"));
     }
 
     if (parsed.newEmail === user.email.toLowerCase()) {
-      throw new AppError("That is already your email address.");
+      throw new AppError(userMessage("auth.error.emailUnchanged"));
     }
     if (!(await verifyPassword(parsed.currentPassword, user.passwordHash))) {
-      throw new AppError("Your current password is incorrect.");
+      throw new AppError(userMessage("auth.error.currentPasswordIncorrect"));
     }
 
     const existing = await findUserByEmail(parsed.newEmail);
     if (existing && existing.id !== user.id) {
-      throw new AppError("An account with that email already exists.");
+      throw new AppError(userMessage("auth.error.emailTaken"));
     }
 
     const { token } = await issueAuthToken(
@@ -113,9 +118,7 @@ export async function requestEmailChange(input: {
     );
 
     if (!confirmation.delivered && !confirmation.simulated) {
-      throw new AppError(
-        "The confirmation email could not be sent. Try again in a few minutes.",
-      );
+      throw new AppError(userMessage("auth.error.confirmationEmailFailed"));
     }
 
     // Best effort: the old address should see that a change was requested.
@@ -177,25 +180,25 @@ export async function confirmEmailChange(token: string): Promise<ActionResult<{ 
     const current = await requireUser();
     const state = await validateAuthToken(token, "email_change");
 
-    if (state.status === "used") throw new AppError("This link has already been used.");
+    if (state.status === "used") throw new AppError(userMessage("auth.error.linkUsed"));
     if (state.status === "expired") {
-      throw new AppError("This link has expired. Request a new one from account settings.");
+      throw new AppError(userMessage("auth.error.emailChangeExpired"));
     }
     if (state.status !== "ok" || !state.pendingEmail) {
-      throw new AppError("That email change link is not valid.");
+      throw new AppError(userMessage("auth.error.emailChangeInvalid"));
     }
     if (state.userId !== current.id) {
-      throw new AppError("This link belongs to a different account.");
+      throw new AppError(userMessage("auth.error.emailChangeWrongAccount"));
     }
 
     const pendingEmail = state.pendingEmail;
     const existing = await findUserByEmail(pendingEmail);
     if (existing && existing.id !== current.id) {
-      throw new AppError("That email address is no longer available.");
+      throw new AppError(userMessage("auth.error.emailUnavailable"));
     }
 
     const claimed = await markTokenUsed(state.tokenId);
-    if (!claimed) throw new AppError("This link has already been used.");
+    if (!claimed) throw new AppError(userMessage("auth.error.linkUsed"));
 
     await db
       .update(users)
@@ -234,16 +237,16 @@ export async function deleteAccount(input: {
     const current = await requireUser();
     const parsed = deleteAccountSchema.parse(input);
     const user = await findUserById(current.id);
-    if (!user) throw new AppError("Account not found.");
+    if (!user) throw new AppError(userMessage("auth.error.accountNotFound"));
 
     if (!checkRateLimit("delete-account", user.email, 5, 60 * 60_000)) {
-      throw new AppError("Too many attempts. Try again in an hour.");
+      throw new AppError(userMessage("auth.error.rateLimited"));
     }
     if (!(await verifyPassword(parsed.password, user.passwordHash))) {
-      throw new AppError("Your password is incorrect.");
+      throw new AppError(userMessage("auth.error.passwordIncorrect"));
     }
     if (parsed.confirmation.toLowerCase() !== user.email.toLowerCase()) {
-      throw new AppError("Type your email address exactly to confirm.");
+      throw new AppError(userMessage("auth.error.confirmEmailExact"));
     }
 
     const memberships = await db
@@ -285,7 +288,9 @@ export async function deleteAccount(input: {
             .where(eq(trees.id, membership.treeId))
             .limit(1);
           throw new AppError(
-            `You are the only owner of "${tree?.name ?? "a tree"}". Transfer ownership or delete that tree before deleting your account.`,
+            userMessage("settings.error.onlyOwnerDeleteAccount", {
+              name: tree?.name ?? userMessage("tree.settings.thisTree"),
+            }),
           );
         }
         if (members.length === 1) treesToDelete.push(membership.treeId);

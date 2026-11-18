@@ -25,7 +25,12 @@ import type { FuzzyDate } from "../lib/fuzzy-date";
 import type { PersonLink } from "../lib/person-links";
 import type { PersonSex } from "../lib/person-sex";
 import { requireTreeMember, type TreeRole } from "../server/guards";
-import { AppError, runAction, type ActionResult } from "../server/errors";
+import {
+  AppError,
+  runAction,
+  userMessage,
+  type ActionResult,
+} from "../server/errors";
 import {
   addRelativeSchema,
   parentChildSchema,
@@ -390,7 +395,7 @@ export async function setMyPerson(input: {
           and(eq(people.id, input.personId), eq(people.treeId, access.tree.id)),
         )
         .limit(1);
-      if (!rows.length) throw new AppError("That person is not part of this tree.");
+      if (!rows.length) throw new AppError(userMessage("person.error.notInTree"));
       const claimed = await db
         .select({ userId: treeMembers.userId })
         .from(treeMembers)
@@ -403,9 +408,7 @@ export async function setMyPerson(input: {
         )
         .limit(1);
       if (claimed.length) {
-        throw new AppError(
-          "That person is already linked to another member. Ask an owner to unlink them first.",
-        );
+        throw new AppError(userMessage("person.error.claimedByAnother"));
       }
     }
 
@@ -464,9 +467,7 @@ export async function createPerson(
         rows.map(row => ({ ...row, displayName: personDisplayName(row) })),
       );
       if (candidates.length) {
-        throw new AppError(
-          "A similar person is already in this tree. Confirm to add them anyway.",
-        );
+        throw new AppError(userMessage("person.error.duplicate"));
       }
     }
 
@@ -526,7 +527,7 @@ export async function updatePerson(
         .from(people)
         .where(and(eq(people.id, input.personId), eq(people.treeId, access.tree.id)))
         .limit(1);
-      if (!before) throw new AppError("That person could not be found.");
+      if (!before) throw new AppError(userMessage("person.error.notFound"));
 
       const [updated] = await tx
         .update(people)
@@ -548,7 +549,7 @@ export async function updatePerson(
         })
         .where(and(eq(people.id, input.personId), eq(people.treeId, access.tree.id)))
         .returning();
-      if (!updated) throw new AppError("That person could not be found.");
+      if (!updated) throw new AppError(userMessage("person.error.notFound"));
 
       const changes = personChanges(before, parsed);
       if (changes.length) {
@@ -580,7 +581,7 @@ export async function deletePerson(input: {
       .from(people)
       .where(and(eq(people.id, input.personId), eq(people.treeId, access.tree.id)))
       .limit(1);
-    if (!person) throw new AppError("That person could not be found.");
+    if (!person) throw new AppError(userMessage("person.error.notFound"));
 
     await db.transaction(async tx => {
       // Photos outlive the person who filed them. Clear the owner so they wait
@@ -606,7 +607,7 @@ export async function deletePerson(input: {
         .delete(people)
         .where(and(eq(people.id, input.personId), eq(people.treeId, access.tree.id)))
         .returning({ id: people.id });
-      if (!deleted.length) throw new AppError("That person could not be found.");
+      if (!deleted.length) throw new AppError(userMessage("person.error.notFound"));
       await logActivity(tx, {
         treeId: access.tree.id,
         actor: access.user,
@@ -648,7 +649,7 @@ export async function createParentChild(input: {
           edge => edge.parentId === parsed.parentId && edge.childId === parsed.childId,
         )
       ) {
-        throw new AppError("Those two people are already connected as parent and child.");
+        throw new AppError(userMessage("person.error.alreadyParentChild"));
       }
 
       assertRelationshipInvariants({
@@ -702,7 +703,7 @@ export async function deleteParentChild(input: {
         and(eq(parentChild.id, input.relationshipId), eq(parentChild.treeId, access.tree.id)),
       )
       .limit(1);
-    if (!relationship) throw new AppError("That relationship could not be found.");
+    if (!relationship) throw new AppError(userMessage("person.error.relationshipNotFound"));
 
     const names = await peopleNames(db, access.tree.id, [
       relationship.parentId,
@@ -715,7 +716,7 @@ export async function deleteParentChild(input: {
           and(eq(parentChild.id, input.relationshipId), eq(parentChild.treeId, access.tree.id)),
         )
         .returning({ id: parentChild.id });
-      if (!deleted.length) throw new AppError("That relationship could not be found.");
+      if (!deleted.length) throw new AppError(userMessage("person.error.relationshipNotFound"));
       await logActivity(tx, {
         treeId: access.tree.id,
         actor: access.user,
@@ -745,7 +746,7 @@ export async function createPartnership(input: {
     const access = await requireTreeMember(input.treeId, "editor");
     const parsed = partnershipSchema.parse(input);
     if (parsed.personAId === parsed.personBId) {
-      throw new AppError("A person cannot be their own partner.");
+      throw new AppError(userMessage("person.error.selfPartner"));
     }
     await assertPeopleInTree(access.tree.id, [parsed.personAId, parsed.personBId]);
     const [personAId, personBId] = [parsed.personAId, parsed.personBId].sort();
@@ -759,7 +760,7 @@ export async function createPartnership(input: {
           row => row.personAId === personAId && row.personBId === personBId,
         )
       ) {
-        throw new AppError("Those two people are already partners.");
+        throw new AppError(userMessage("person.error.alreadyPartners"));
       }
 
       assertRelationshipInvariants({
@@ -818,7 +819,7 @@ export async function updatePartnership(input: {
         ),
       )
       .returning({ id: partnerships.id });
-    if (!updated.length) throw new AppError("That relationship could not be found.");
+    if (!updated.length) throw new AppError(userMessage("person.error.relationshipNotFound"));
     await touchTree(access.tree.id);
     return undefined;
   });
@@ -840,7 +841,7 @@ export async function deletePartnership(input: {
         ),
       )
       .limit(1);
-    if (!relationship) throw new AppError("That relationship could not be found.");
+    if (!relationship) throw new AppError(userMessage("person.error.relationshipNotFound"));
 
     const names = await peopleNames(db, access.tree.id, [
       relationship.personAId,
@@ -856,7 +857,7 @@ export async function deletePartnership(input: {
           ),
         )
         .returning({ id: partnerships.id });
-      if (!deleted.length) throw new AppError("That relationship could not be found.");
+      if (!deleted.length) throw new AppError(userMessage("person.error.relationshipNotFound"));
       await logActivity(tx, {
         treeId: access.tree.id,
         actor: access.user,
@@ -899,18 +900,16 @@ export async function addRelative(input: {
         rows.map(row => ({ ...row, displayName: personDisplayName(row) })),
       );
       if (candidates.length) {
-        throw new AppError(
-          "A similar person is already in this tree. Confirm to add them anyway.",
-        );
+        throw new AppError(userMessage("person.error.duplicate"));
       }
     }
 
     if (parsed.otherParentId && parsed.relation !== "child") {
-      throw new AppError("Choose another parent only when adding a child.");
+      throw new AppError(userMessage("person.error.otherParentOnlyChild"));
     }
     if (parsed.otherParentId) {
       if (parsed.otherParentId === parsed.anchorPersonId) {
-        throw new AppError("Choose someone other than this person.");
+        throw new AppError(userMessage("person.error.samePerson"));
       }
       await assertPeopleInTree(access.tree.id, [parsed.otherParentId]);
     }
@@ -923,7 +922,7 @@ export async function addRelative(input: {
         .from(people)
         .where(and(eq(people.id, parsed.anchorPersonId), eq(people.treeId, access.tree.id)))
         .limit(1);
-      if (!anchorRows.length) throw new AppError("That person could not be found.");
+      if (!anchorRows.length) throw new AppError(userMessage("person.error.notFound"));
 
       let relativeId: string;
       if (parsed.mode === "existing") {
@@ -932,7 +931,7 @@ export async function addRelative(input: {
           .from(people)
           .where(and(eq(people.id, parsed.personId), eq(people.treeId, access.tree.id)))
           .limit(1);
-        if (!rows.length) throw new AppError("That person could not be found.");
+        if (!rows.length) throw new AppError(userMessage("person.error.notFound"));
         relativeId = parsed.personId;
       } else {
         await reservePersonSlot(tx, access.user.id);
@@ -959,10 +958,10 @@ export async function addRelative(input: {
       }
 
       if (relativeId === parsed.anchorPersonId) {
-        throw new AppError("Choose someone other than this person.");
+        throw new AppError(userMessage("person.error.samePerson"));
       }
       if (parsed.otherParentId && parsed.otherParentId === relativeId) {
-        throw new AppError("Choose someone other than this person.");
+        throw new AppError(userMessage("person.error.samePerson"));
       }
 
       const parentEdges = await loadParentEdges(tx, access.tree.id);
@@ -976,7 +975,7 @@ export async function addRelative(input: {
             row => row.personAId === personAId && row.personBId === personBId,
           )
         ) {
-          throw new AppError("Those two people are already partners.");
+          throw new AppError(userMessage("person.error.alreadyPartners"));
         }
 
         assertRelationshipInvariants({
@@ -1025,7 +1024,7 @@ export async function addRelative(input: {
           edge => !existing.has(`${edge.parentId}:${edge.childId}`),
         );
         if (!missing.length) {
-          throw new AppError("Those two people are already connected as parent and child.");
+          throw new AppError(userMessage("person.error.alreadyParentChild"));
         }
 
         assertRelationshipInvariants({
@@ -1171,7 +1170,7 @@ export async function updatePersonEvent(
           ),
         )
         .limit(1);
-      if (!before) throw new AppError("That event could not be found.");
+      if (!before) throw new AppError(userMessage("person.error.eventNotFound"));
 
       const [updated] = await tx
         .update(personEvents)
@@ -1190,7 +1189,7 @@ export async function updatePersonEvent(
           ),
         )
         .returning();
-      if (!updated) throw new AppError("That event could not be found.");
+      if (!updated) throw new AppError(userMessage("person.error.eventNotFound"));
 
       const changes = personEventChanges(before, parsed);
       if (changes.length) {
@@ -1232,7 +1231,7 @@ export async function deletePersonEvent(input: {
         ),
       )
       .limit(1);
-    if (!event) throw new AppError("That event could not be found.");
+    if (!event) throw new AppError(userMessage("person.error.eventNotFound"));
 
     const names = await peopleNames(db, access.tree.id, [event.personId]);
     const label =
@@ -1249,7 +1248,7 @@ export async function deletePersonEvent(input: {
           ),
         )
         .returning({ id: personEvents.id });
-      if (!deleted.length) throw new AppError("That event could not be found.");
+      if (!deleted.length) throw new AppError(userMessage("person.error.eventNotFound"));
       await logActivity(tx, {
         treeId: access.tree.id,
         actor: access.user,
@@ -1278,7 +1277,7 @@ async function assertPeopleInTree(treeId: string, personIds: string[]) {
     .select({ id: people.id })
     .from(people)
     .where(and(eq(people.treeId, treeId), inArray(people.id, unique)));
-  if (rows.length !== unique.length) throw new AppError("That person could not be found.");
+  if (rows.length !== unique.length) throw new AppError(userMessage("person.error.notFound"));
 }
 
 async function lockTree(tx: Transaction, treeId: string) {

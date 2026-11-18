@@ -22,7 +22,13 @@ import {
   verifyEmailToken,
   verifyPassword,
 } from "../server/auth-service";
-import { AppError, runAction, type ActionResult } from "../server/errors";
+import {
+  AppError,
+  runAction,
+  userMessage,
+  validationMessage,
+  type ActionResult,
+} from "../server/errors";
 import {
   changePasswordSchema,
   forgotPasswordSchema,
@@ -48,19 +54,19 @@ export async function login(formData: FormData) {
   });
   if (!parsed.success) {
     log.warn("auth.login_rejected", { reason: "validation" });
-    return new Error(parsed.error.issues[0]?.message ?? "Check your details.");
+    return new Error(validationMessage(parsed.error));
   }
   const { email, password, redirectTo } = parsed.data;
 
   if (!checkRateLimit("login", email, 10, 15 * 60_000)) {
     log.warn("auth.login_rejected", { reason: "rate_limited" });
-    return new Error("Too many attempts. Wait a few minutes and try again.");
+    return new Error(userMessage("auth.error.tooManyAttempts"));
   }
 
   const user = await findUserByEmail(email);
   if (!user || !(await verifyPassword(password, user.passwordHash))) {
     log.warn("auth.login_rejected", { reason: "bad_credentials", userId: user?.id });
-    return new Error("Invalid email or password.");
+    return new Error(userMessage("auth.error.invalidCredentials"));
   }
 
   clearRateLimit("login", email);
@@ -78,19 +84,19 @@ export async function register(formData: FormData) {
   });
   if (!parsed.success) {
     log.warn("auth.register_rejected", { reason: "validation" });
-    return new Error(parsed.error.issues[0]?.message ?? "Check your details.");
+    return new Error(validationMessage(parsed.error));
   }
   const { email, displayName, password, redirectTo } = parsed.data;
 
   if (!checkRateLimit("register", email, 5, 60 * 60_000)) {
     log.warn("auth.register_rejected", { reason: "rate_limited" });
-    return new Error("Too many accounts created from this address. Try again later.");
+    return new Error(userMessage("auth.error.registerRateLimited"));
   }
 
   const existing = await findUserByEmail(email);
   if (existing) {
     log.warn("auth.register_rejected", { reason: "duplicate_account" });
-    return new Error("An account with that email already exists.");
+    return new Error(userMessage("auth.error.emailTaken"));
   }
 
   const passwordHash = await hashPassword(password);
@@ -103,10 +109,10 @@ export async function register(formData: FormData) {
   } catch (error) {
     if (isUniqueViolation(error)) {
       log.warn("auth.register_rejected", { reason: "duplicate_account" });
-      return new Error("An account with that email already exists.");
+      return new Error(userMessage("auth.error.emailTaken"));
     }
     log.error("auth.register_failed", { error });
-    return new Error("Could not create your account. Please try again.");
+    return new Error(userMessage("auth.error.registerFailed"));
   }
 
   try {
@@ -127,13 +133,13 @@ export async function requestPasswordReset(formData: FormData) {
   const parsed = forgotPasswordSchema.safeParse({ email: formData.get("email") });
   if (!parsed.success) {
     log.warn("auth.password_reset_rejected", { reason: "validation" });
-    return new Error(parsed.error.issues[0]?.message ?? "Enter your email.");
+    return new Error(validationMessage(parsed.error, "validation.emailRequired"));
   }
   const { email } = parsed.data;
 
   if (!checkRateLimit("forgot-password", email, 5, 60 * 60_000)) {
     log.warn("auth.password_reset_rejected", { reason: "rate_limited" });
-    return new Error("Too many reset emails requested. Try again in an hour.");
+    return new Error(userMessage("auth.error.resetRateLimited"));
   }
 
   const user = await findUserByEmail(email);
@@ -158,28 +164,28 @@ export async function resetPassword(formData: FormData) {
     password: formData.get("password"),
     confirmPassword: formData.get("confirmPassword"),
   });
-  if (!parsed.success) return new Error(parsed.error.issues[0]?.message ?? "Check your details.");
+  if (!parsed.success) return new Error(validationMessage(parsed.error));
   const { token, password } = parsed.data;
 
   if (!checkRateLimit("reset-password", "reset", 15, 15 * 60_000)) {
-    return new Error("Too many attempts. Wait a few minutes and try again.");
+    return new Error(userMessage("auth.error.tooManyAttempts"));
   }
 
   const state = await validateAuthToken(token, "password_reset");
   if (state.status !== "ok") {
     if (state.status === "expired") {
-      return new Error("This reset link has expired. Request a new one.");
+      return new Error(userMessage("auth.error.resetExpired"));
     }
-    if (state.status === "used") return new Error("This reset link has already been used.");
-    return new Error("That reset link is not valid.");
+    if (state.status === "used") return new Error(userMessage("auth.error.resetUsed"));
+    return new Error(userMessage("auth.error.resetInvalid"));
   }
 
   const user = await findUserById(state.userId);
-  if (!user) return new Error("That reset link is not valid.");
+  if (!user) return new Error(userMessage("auth.error.resetInvalid"));
 
   const passwordHash = await hashPassword(password);
   const claimed = await markTokenUsed(state.tokenId);
-  if (!claimed) return new Error("This reset link has already been used.");
+  if (!claimed) return new Error(userMessage("auth.error.resetUsed"));
   await db
     .update(users)
     .set({ passwordHash, updatedAt: new Date() })
@@ -195,12 +201,12 @@ export async function resendVerificationEmail(): Promise<
 > {
   return runAction("auth.resendVerificationEmail", async () => {
     const current = await requireUser();
-    if (current.emailVerified) throw new AppError("Your email is already verified.");
+    if (current.emailVerified) throw new AppError(userMessage("auth.error.alreadyVerified"));
     if (!checkRateLimit("verification-email", current.email, 3, 60 * 60_000)) {
-      throw new AppError("We just sent a few links. Try again in an hour.");
+      throw new AppError(userMessage("auth.error.verificationRateLimited"));
     }
     const user = await findUserById(current.id);
-    if (!user) throw new AppError("Account not found.");
+    if (!user) throw new AppError(userMessage("auth.error.accountNotFound"));
     const result = await sendVerificationEmail(user);
     return { delivered: result.delivered, simulated: Boolean(result.simulated) };
   });
@@ -231,7 +237,7 @@ export async function updateProfile(input: {
       .set({ displayName: parsed.displayName, updatedAt: new Date() })
       .where(eq(users.id, current.id))
       .returning();
-    if (!updated) throw new Error("Account not found.");
+    if (!updated) throw new Error(userMessage("auth.error.accountNotFound"));
     return toPublicUser(updated);
   });
 }
@@ -254,7 +260,7 @@ export async function updateNotificationSettings(input: {
       })
       .where(eq(users.id, current.id))
       .returning();
-    if (!updated) throw new Error("Account not found.");
+    if (!updated) throw new Error(userMessage("auth.error.accountNotFound"));
     return toPublicUser(updated);
   });
 }
@@ -267,9 +273,9 @@ export async function changePassword(input: {
     const current = await requireUser();
     const parsed = changePasswordSchema.parse(input);
     const user = await findUserById(current.id);
-    if (!user) throw new Error("Account not found.");
+    if (!user) throw new Error(userMessage("auth.error.accountNotFound"));
     if (!(await verifyPassword(parsed.currentPassword, user.passwordHash))) {
-      throw new Error("Your current password is incorrect.");
+      throw new Error(userMessage("auth.error.currentPasswordIncorrect"));
     }
     const passwordHash = await hashPassword(parsed.newPassword);
     await db

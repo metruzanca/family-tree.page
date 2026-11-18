@@ -34,6 +34,20 @@ export function isLocale(value: unknown): value is Locale {
   return typeof value === "string" && (LOCALES as readonly string[]).includes(value);
 }
 
+/**
+ * True when a string is a key in the English dictionary, including the base key
+ * of a plural family. Server code uses this to tell a key apart from a message
+ * that is already written out, such as one from a library.
+ */
+export function hasTranslationKey(value: string): value is TranslationKey {
+  return (
+    Object.hasOwn(en, value) ||
+    Object.hasOwn(en, `${value}.one`) ||
+    Object.hasOwn(en, `${value}.many`) ||
+    Object.hasOwn(en, `${value}.other`)
+  );
+}
+
 /** `it-IT`, `it-CH`, `IT` and `it` all become `it`. */
 export function normalizeLocale(value: string | null | undefined): Locale | null {
   if (!value) return null;

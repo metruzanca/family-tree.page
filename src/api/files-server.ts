@@ -6,7 +6,12 @@ import { db } from "../server/db";
 import { fileGroups, fileTags, files, people, trees } from "../../drizzle/schema";
 import { requireTreeMember } from "../server/guards";
 import { requireUser } from "../server/auth-service";
-import { AppError, runAction, type ActionResult } from "../server/errors";
+import {
+  AppError,
+  runAction,
+  userMessage,
+  type ActionResult,
+} from "../server/errors";
 import {
   assignFilesSchema,
   fileGroupSchema,
@@ -90,11 +95,11 @@ export async function prepareUpload(input: {
         .from(people)
         .where(and(eq(people.id, personId), eq(people.treeId, access.tree.id)))
         .limit(1);
-      if (!personRows.length) throw new AppError("That person could not be found.");
+      if (!personRows.length) throw new AppError(userMessage("person.error.notFound"));
     }
 
     if (parsed.groupId) {
-      if (!personId) throw new AppError("Choose a person before adding an album.");
+      if (!personId) throw new AppError(userMessage("media.error.albumPersonRequired"));
       const groupRows = await db
         .select({ id: fileGroups.id })
         .from(fileGroups)
@@ -106,7 +111,7 @@ export async function prepareUpload(input: {
           ),
         )
         .limit(1);
-      if (!groupRows.length) throw new AppError("That album could not be found.");
+      if (!groupRows.length) throw new AppError(userMessage("media.error.albumNotFound"));
     }
 
     const fileId = randomUUID();
@@ -177,7 +182,7 @@ export async function finalizeUpload(fileId: string): Promise<ActionResult<{ id:
   return runAction("files.finalizeUpload", async () => {
     const user = await requireUser();
     const file = await getFileById(fileId);
-    if (!file) throw new AppError("That upload could not be found.");
+    if (!file) throw new AppError(userMessage("media.error.uploadNotFound"));
     await requireTreeMember(file.treeId, "editor");
     const updated = await finalizeFile(fileId, user.id);
     if (file.status !== "ready") {
@@ -212,7 +217,7 @@ export async function cancelUpload(fileId: string): Promise<ActionResult<undefin
     const file = await getFileById(fileId);
     if (!file) return undefined;
     await requireTreeMember(file.treeId, "editor");
-    if (file.uploadedBy !== user.id) throw new AppError("That upload does not belong to you.");
+    if (file.uploadedBy !== user.id) throw new AppError(userMessage("media.error.uploadNotYours"));
     if (file.status !== "uploading") return undefined;
     await cleanupFile(file);
     return undefined;
@@ -226,7 +231,7 @@ export async function deleteFile(input: {
   return runAction("files.deleteFile", async () => {
     const access = await requireTreeMember(input.treeId, "editor");
     const file = await getFileById(input.fileId);
-    if (!file || file.treeId !== access.tree.id) throw new AppError("That file could not be found.");
+    if (!file || file.treeId !== access.tree.id) throw new AppError(userMessage("media.error.fileNotFound"));
     const names = await peopleNames(db, access.tree.id, file.personId ? [file.personId] : []);
     const usage = await deleteFileRecord(input.fileId, access.user.id);
     await logActivityBestEffort({
@@ -269,7 +274,7 @@ export async function deleteFiles(input: {
         and(eq(files.treeId, access.tree.id), inArray(files.id, parsed.fileIds)),
       );
     if (rows.length !== parsed.fileIds.length) {
-      throw new AppError("One of those files could not be found.");
+      throw new AppError(userMessage("media.error.filesNotFound"));
     }
 
     let bytes = 0;
@@ -317,7 +322,7 @@ export async function assignFilesToPerson(input: {
         .from(people)
         .where(and(eq(people.id, parsed.personId), eq(people.treeId, access.tree.id)))
         .limit(1);
-      if (!personRows.length) throw new AppError("That person could not be found.");
+      if (!personRows.length) throw new AppError(userMessage("person.error.notFound"));
     }
 
     const rows = await db
@@ -332,7 +337,7 @@ export async function assignFilesToPerson(input: {
         and(eq(files.treeId, access.tree.id), inArray(files.id, parsed.fileIds)),
       );
     if (rows.length !== parsed.fileIds.length) {
-      throw new AppError("One of those files could not be found.");
+      throw new AppError(userMessage("media.error.filesNotFound"));
     }
 
     const changed = rows.filter(row => row.personId !== parsed.personId);
@@ -427,7 +432,7 @@ export async function createFileGroup(input: {
       .from(people)
       .where(and(eq(people.id, parsed.personId), eq(people.treeId, access.tree.id)))
       .limit(1);
-    if (!personRows.length) throw new AppError("That person could not be found.");
+    if (!personRows.length) throw new AppError(userMessage("person.error.notFound"));
     const [group] = await db
       .insert(fileGroups)
       .values({
@@ -454,7 +459,7 @@ export async function renameFileGroup(input: {
       .where(eq(fileGroups.id, parsed.groupId))
       .limit(1);
     const group = rows[0];
-    if (!group) throw new AppError("That album could not be found.");
+    if (!group) throw new AppError(userMessage("media.error.albumNotFound"));
     const access = await requireTreeMember(group.treeId, "editor");
     const [updated] = await db
       .update(fileGroups)
@@ -487,7 +492,7 @@ export async function deleteFileGroup(groupId: string): Promise<ActionResult<und
       .where(eq(fileGroups.id, groupId))
       .limit(1);
     const group = rows[0];
-    if (!group) throw new AppError("That album could not be found.");
+    if (!group) throw new AppError(userMessage("media.error.albumNotFound"));
     const access = await requireTreeMember(group.treeId, "editor");
     const usage = await deleteFileGroupRecord(group.id, access.tree.id);
     await logActivityBestEffort({
@@ -522,7 +527,7 @@ export async function setAvatar(input: {
       .from(people)
       .where(and(eq(people.id, input.personId), eq(people.treeId, access.tree.id)))
       .limit(1);
-    if (!personRows.length) throw new AppError("That person could not be found.");
+    if (!personRows.length) throw new AppError(userMessage("person.error.notFound"));
     const names = await peopleNames(db, access.tree.id, [input.personId]);
     await setAvatarRecord({
       treeId: access.tree.id,
@@ -565,7 +570,7 @@ export async function updateFileTags(input: {
       .where(and(eq(files.id, parsed.fileId), eq(files.treeId, access.tree.id)))
       .limit(1);
     const file = fileRows[0];
-    if (!file) throw new AppError("That file could not be found.");
+    if (!file) throw new AppError(userMessage("media.error.fileNotFound"));
 
     const desired = parsed.personIds.filter(personId => personId !== file.personId);
     if (desired.length) {
@@ -574,7 +579,7 @@ export async function updateFileTags(input: {
         .from(people)
         .where(and(eq(people.treeId, access.tree.id), inArray(people.id, desired)));
       if (personRows.length !== desired.length) {
-        throw new AppError("One of those people could not be found.");
+        throw new AppError(userMessage("media.error.peopleNotFound"));
       }
     }
 
@@ -673,7 +678,7 @@ export async function updateFileTakenAt(input: {
       .from(files)
       .where(and(eq(files.id, parsed.fileId), eq(files.treeId, access.tree.id)))
       .limit(1);
-    if (!file) throw new AppError("That file could not be found.");
+    if (!file) throw new AppError(userMessage("media.error.fileNotFound"));
 
     await db
       .update(files)

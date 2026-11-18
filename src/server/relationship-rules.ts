@@ -1,4 +1,4 @@
-import { AppError } from "./errors";
+import { AppError, userMessage } from "./errors";
 import {
   MAX_PARENTS,
   createChildrenMap,
@@ -36,7 +36,7 @@ export function assertRelationshipInvariants(input: RelationshipInvariantInput) 
 
   for (const edge of combined) {
     if (edge.parentId === edge.childId) {
-      throw new AppError("A person cannot be their own parent.");
+      throw new AppError(userMessage("person.error.selfParent"));
     }
   }
 
@@ -46,14 +46,14 @@ export function assertRelationshipInvariants(input: RelationshipInvariantInput) 
       if (existing.childId === edge.childId) parents.add(existing.parentId);
     }
     if (parents.size > MAX_PARENTS) {
-      throw new AppError("A person can only have two parents.");
+      throw new AppError(userMessage("person.error.tooManyParents"));
     }
   }
 
   const children = createChildrenMap(combined);
   for (const edge of addedEdges) {
     if (isAncestorInMap(children, edge.childId, edge.parentId)) {
-      throw new AppError("That relationship would create a loop in the family tree.");
+      throw new AppError(userMessage("person.error.loop"));
     }
   }
 
@@ -69,9 +69,7 @@ export function assertRelationshipInvariants(input: RelationshipInvariantInput) 
       isAncestorInMap(children, partnership.personAId, partnership.personBId) ||
       isAncestorInMap(children, partnership.personBId, partnership.personAId)
     ) {
-      throw new AppError(
-        "That relationship would make partners into ancestors of each other.",
-      );
+      throw new AppError(userMessage("person.error.partnerAncestor"));
     }
   }
 }

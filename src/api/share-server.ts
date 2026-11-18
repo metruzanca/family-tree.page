@@ -10,7 +10,12 @@ import {
   type TreeShareLink,
 } from "../../drizzle/schema";
 import { requireTreeMember } from "../server/guards";
-import { AppError, runAction, type ActionResult } from "../server/errors";
+import {
+  AppError,
+  runAction,
+  userMessage,
+  type ActionResult,
+} from "../server/errors";
 import { checkRateLimit } from "../server/auth-service";
 import { log } from "../server/logger";
 import { publicOrigin } from "../server/config";
@@ -91,7 +96,7 @@ export async function createTreeShareLink(input: {
     const access = await requireTreeMember(input.treeId, "owner");
     const parsed = shareLinkSchema.parse(input);
     if (!checkRateLimit("share-create", access.user.email, 20, 60 * 60_000)) {
-      throw new AppError("Too many share links created. Try again in an hour.");
+      throw new AppError(userMessage("share.error.rateLimited"));
     }
 
     const token = randomBytes(32).toString("base64url");
@@ -136,7 +141,7 @@ export async function revokeTreeShareLink(input: {
         ),
       )
       .returning({ id: treeShareLinks.id });
-    if (!updated) throw new AppError("That share link is no longer active.");
+    if (!updated) throw new AppError(userMessage("share.error.inactive"));
     return undefined;
   });
 }

@@ -25,15 +25,15 @@ const optionalText = (max: number) =>
 
 const partialDateSchema = z
   .object({
-    year: z.number().int().min(1, "Enter a year between 1 and 9999.").max(9999).nullable().default(null),
-    month: z.number().int().min(1, "Choose a month between 1 and 12.").max(12).nullable().default(null),
-    day: z.number().int().min(1, "Choose a day between 1 and 31.").max(31).nullable().default(null),
+    year: z.number().int().min(1, "validation.yearRange").max(9999).nullable().default(null),
+    month: z.number().int().min(1, "validation.monthRange").max(12).nullable().default(null),
+    day: z.number().int().min(1, "validation.dayRange").max(31).nullable().default(null),
   })
   .superRefine((value, context) => {
     if (!isValidPartialDate(value)) {
       context.addIssue({
         code: "custom",
-        message: "That date does not exist.",
+        message: "validation.dateNotExist",
       });
     }
   });
@@ -49,13 +49,13 @@ export const fuzzyDateSchema = z
       context.addIssue({
         code: "custom",
         path: ["end"],
-        message: "Choose an end date for the range.",
+        message: "validation.dateEndRequired",
       });
     }
     if (!isValidFuzzyDate(value as FuzzyDate)) {
       context.addIssue({
         code: "custom",
-        message: "That date is not valid.",
+        message: "validation.dateInvalid",
       });
     }
   })
@@ -76,20 +76,20 @@ export const emailSchema = z
   .string()
   .trim()
   .toLowerCase()
-  .min(3, "Enter your email address.")
-  .max(254, "That email address is too long.")
-  .email("Enter a valid email address.");
+  .min(3, "validation.emailRequired")
+  .max(254, "validation.emailTooLong")
+  .email("validation.emailInvalid");
 
 export const passwordSchema = z
   .string()
-  .min(10, "Passwords must be at least 10 characters.")
-  .max(200, "That password is too long.");
+  .min(10, "validation.passwordTooShort")
+  .max(200, "validation.passwordTooLong");
 
 export const displayNameSchema = z
   .string()
   .trim()
-  .min(1, "Enter your name.")
-  .max(80, "That name is too long.");
+  .min(1, "validation.nameRequired")
+  .max(80, "validation.nameTooLong");
 
 export const registerSchema = z.object({
   email: emailSchema,
@@ -100,12 +100,12 @@ export const registerSchema = z.object({
 
 export const loginSchema = z.object({
   email: emailSchema,
-  password: z.string().min(1, "Enter your password.").max(200),
+  password: z.string().min(1, "validation.passwordRequired").max(200),
   redirectTo: z.string().optional(),
 });
 
 export const changePasswordSchema = z.object({
-  currentPassword: z.string().min(1, "Enter your current password."),
+  currentPassword: z.string().min(1, "validation.currentPasswordRequired"),
   newPassword: passwordSchema,
 });
 
@@ -115,12 +115,12 @@ export const updateProfileSchema = z.object({
 
 export const emailChangeSchema = z.object({
   newEmail: emailSchema,
-  currentPassword: z.string().min(1, "Enter your current password.").max(200),
+  currentPassword: z.string().min(1, "validation.currentPasswordRequired").max(200),
 });
 
 export const deleteAccountSchema = z.object({
-  password: z.string().min(1, "Enter your password.").max(200),
-  confirmation: z.string().trim().min(1, "Type your email address to confirm.").max(254),
+  password: z.string().min(1, "validation.passwordRequired").max(200),
+  confirmation: z.string().trim().min(1, "validation.confirmEmailRequired").max(254),
 });
 
 export const updateNotificationSettingsSchema = z.object({
@@ -130,11 +130,11 @@ export const updateNotificationSettingsSchema = z.object({
 });
 
 export const treeSchema = z.object({
-  name: z.string().trim().min(1, "Give your tree a name.").max(80, "That name is too long."),
+  name: z.string().trim().min(1, "validation.treeNameRequired").max(80, "validation.nameTooLong"),
   description: z
     .string()
     .trim()
-    .max(500, "That description is too long.")
+    .max(500, "validation.descriptionTooLong")
     .optional()
     .nullable()
     .transform(value => (value ? value : null)),
@@ -154,8 +154,8 @@ export const importGedcomSchema = z.object({
   treeName: z
     .string()
     .trim()
-    .min(1, "Give the imported tree a name.")
-    .max(80, "That name is too long."),
+    .min(1, "validation.importTreeNameRequired")
+    .max(80, "validation.nameTooLong"),
   fileName: z
     .string()
     .trim()
@@ -165,8 +165,8 @@ export const importGedcomSchema = z.object({
     .transform(value => value || null),
   text: z
     .string()
-    .min(1, "Choose a GEDCOM file.")
-    .max(MAX_GEDCOM_CHARS, "That GEDCOM file is too large."),
+    .min(1, "validation.gedcomRequired")
+    .max(MAX_GEDCOM_CHARS, "validation.gedcomTooLarge"),
 });
 
 export const gedcomImportDecisionSchema = z.object({
@@ -186,11 +186,11 @@ export const applyGedcomImportSchema = z.object({
     .transform(value => value || null),
   text: z
     .string()
-    .min(1, "Choose a GEDCOM file.")
-    .max(MAX_GEDCOM_CHARS, "That GEDCOM file is too large."),
+    .min(1, "validation.gedcomRequired")
+    .max(MAX_GEDCOM_CHARS, "validation.gedcomTooLarge"),
   decisions: z
     .array(gedcomImportDecisionSchema)
-    .min(1, "Review at least one person.")
+    .min(1, "validation.importDecisionRequired")
     .max(MAX_IMPORT_PEOPLE),
 });
 
@@ -199,12 +199,12 @@ export const apiTokenSchema = z.object({
   name: z
     .string()
     .trim()
-    .min(1, "Give the token a name.")
-    .max(80, "That name is too long."),
+    .min(1, "validation.tokenNameRequired")
+    .max(80, "validation.nameTooLong"),
   expiresInDays: z.number().int().min(1).max(3650).nullable().optional(),
   scopes: z
     .array(z.enum(API_SCOPE_VALUES))
-    .min(1, "Choose at least one scope."),
+    .min(1, "tree.settings.api.scopeRequired"),
 });
 
 export const apiTokenRevokeSchema = z.object({
@@ -217,7 +217,7 @@ export const shareLinkSchema = z.object({
   label: z
     .string()
     .trim()
-    .max(80, "That label is too long.")
+    .max(80, "validation.labelTooLong")
     .optional()
     .nullable()
     .transform(value => value || "Shared tree"),
@@ -232,30 +232,30 @@ export const forgotPasswordSchema = z.object({
 
 export const resetPasswordSchema = z
   .object({
-    token: z.string().min(1, "That reset link is not valid.").max(200),
+    token: z.string().min(1, "validation.resetLinkInvalid").max(200),
     password: passwordSchema,
     confirmPassword: z.string(),
   })
   .refine(values => values.password === values.confirmPassword, {
-    message: "Those passwords do not match.",
+    message: "validation.passwordMismatch",
     path: ["confirmPassword"],
   });
 
 const optionalContactEmail = z
   .string()
   .trim()
-  .max(254, "That email address is too long.")
+  .max(254, "validation.emailTooLong")
   .optional()
   .nullable()
   .transform(value => (value ? value.toLowerCase() : null))
   .refine(value => value === null || emailSchema.safeParse(value).success, {
-    message: "Enter a valid email address.",
+    message: "validation.emailInvalid",
   });
 
 const optionalContactPhone = z
   .string()
   .trim()
-  .max(50, "That phone number is too long.")
+  .max(50, "validation.phoneTooLong")
   .optional()
   .nullable()
   .transform(value => (value ? value : null));
@@ -265,8 +265,8 @@ const personLinkSchema = z
     url: z
       .string()
       .trim()
-      .min(1, "Enter a link.")
-      .max(MAX_PERSON_LINK_URL_LENGTH, "That link is too long.")
+      .min(1, "validation.linkRequired")
+      .max(MAX_PERSON_LINK_URL_LENGTH, "validation.linkTooLong")
       .transform(value => normalizePersonLinkUrl(value) ?? value),
     isHome: z.boolean().optional().default(false),
   })
@@ -275,7 +275,7 @@ const personLinkSchema = z
       context.addIssue({
         code: "custom",
         path: ["url"],
-        message: "Enter a valid web address.",
+        message: "validation.linkInvalid",
       });
       return;
     }
@@ -283,14 +283,14 @@ const personLinkSchema = z
       context.addIssue({
         code: "custom",
         path: ["isHome"],
-        message: "Only a personal website can use the home icon.",
+        message: "validation.linkHomeOnly",
       });
     }
   });
 
 const personLinksSchema = z
   .array(personLinkSchema)
-  .max(MAX_PERSON_LINKS, `Add at most ${MAX_PERSON_LINKS} links.`)
+  .max(MAX_PERSON_LINKS, "validation.linksTooMany")
   .superRefine((links, context) => {
     const seen = new Set<string>();
     let homeIndex = -1;
@@ -300,7 +300,7 @@ const personLinksSchema = z
         context.addIssue({
           code: "custom",
           path: [index, "url"],
-          message: "That link has already been added.",
+          message: "validation.linkDuplicate",
         });
       } else {
         seen.add(key);
@@ -310,7 +310,7 @@ const personLinksSchema = z
           context.addIssue({
             code: "custom",
             path: [index, "isHome"],
-            message: "Only one link can be the personal website.",
+            message: "validation.linkHomeSingle",
           });
         } else {
           homeIndex = index;
@@ -323,7 +323,7 @@ const personLinksSchema = z
 
 export const personSchema = z.object({
   treeId: z.string().uuid(),
-  firstName: z.string().trim().min(1, "Enter a first name.").max(80),
+  firstName: z.string().trim().min(1, "validation.firstNameRequired").max(80),
   lastName: z.string().trim().max(80).optional().default(""),
   maidenName: optionalText(80),
   nickname: optionalText(80),
@@ -365,14 +365,14 @@ export const personEventInputSchema = z
     if (!value.title && !value.date && !value.place) {
       context.addIssue({
         code: "custom",
-        message: "Add a date, a title, or a place.",
+        message: "validation.eventDetailRequired",
       });
     }
     if (value.kind === "other" && !value.title) {
       context.addIssue({
         code: "custom",
         path: ["title"],
-        message: "Name this event.",
+        message: "validation.eventTitleRequired",
       });
     }
   });
@@ -452,12 +452,12 @@ export const addRelativeSchema = z.discriminatedUnion("mode", [
 export const fileGroupSchema = z.object({
   treeId: z.string().uuid(),
   personId: z.string().uuid(),
-  name: z.string().trim().min(1, "Give the album a name.").max(80, "That name is too long."),
+  name: z.string().trim().min(1, "validation.albumNameRequired").max(80, "validation.nameTooLong"),
 });
 
 export const renameFileGroupSchema = z.object({
   groupId: z.string().uuid(),
-  name: z.string().trim().min(1, "Give the album a name.").max(80, "That name is too long."),
+  name: z.string().trim().min(1, "validation.albumNameRequired").max(80, "validation.nameTooLong"),
 });
 
 export const prepareUploadSchema = z.object({
@@ -478,8 +478,8 @@ export const fileIdsSchema = z.object({
   treeId: z.string().uuid(),
   fileIds: z
     .array(z.string().uuid())
-    .min(1, "Choose at least one file.")
-    .max(200, "That is too many files at once.")
+    .min(1, "validation.fileRequired")
+    .max(200, "validation.filesTooMany")
     .transform(ids => [...new Set(ids)]),
 });
 
@@ -492,7 +492,7 @@ export const fileTagsSchema = z.object({
   fileId: z.string().uuid(),
   personIds: z
     .array(z.string().uuid())
-    .max(50, "That is too many people for one photo.")
+    .max(50, "validation.peopleTooMany")
     .default([])
     .transform(ids => [...new Set(ids)]),
 });
@@ -517,7 +517,7 @@ export const faceBoxSchema = z
     height: z.number().min(MIN_FACE_SIDE).max(1),
   })
   .refine(box => box.x + box.width <= 1.001 && box.y + box.height <= 1.001, {
-    message: "That face box falls outside the image.",
+    message: "validation.faceBoxOutside",
   });
 
 const detectedFaceSchema = z.object({
@@ -530,7 +530,7 @@ export const recordFacesSchema = z.object({
   fileId: z.string().uuid(),
   faces: z
     .array(detectedFaceSchema)
-    .max(25, "That is too many faces for one photo.")
+    .max(25, "validation.facesTooMany")
     .default([]),
 });
 

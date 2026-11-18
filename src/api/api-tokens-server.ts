@@ -4,7 +4,12 @@ import { and, desc, eq, isNull } from "drizzle-orm";
 import { db } from "../server/db";
 import { apiTokens, type ApiToken } from "../../drizzle/schema";
 import { requireTreeMember } from "../server/guards";
-import { AppError, runAction, type ActionResult } from "../server/errors";
+import {
+  AppError,
+  runAction,
+  userMessage,
+  type ActionResult,
+} from "../server/errors";
 import { checkRateLimit } from "../server/auth-service";
 import { generateApiToken, hashApiToken } from "../lib/api-token";
 import { apiTokenRevokeSchema, apiTokenSchema } from "../server/validation";
@@ -59,7 +64,7 @@ export async function createTreeApiToken(input: {
     const access = await requireTreeMember(input.treeId, "owner");
     const parsed = apiTokenSchema.parse(input);
     if (!checkRateLimit("api-token-create", access.user.email, 20, 60 * 60_000)) {
-      throw new AppError("Too many tokens created. Try again in an hour.");
+      throw new AppError(userMessage("apiToken.error.rateLimited"));
     }
 
     const generated = generateApiToken();
@@ -106,7 +111,7 @@ export async function revokeTreeApiToken(input: {
         ),
       )
       .returning({ id: apiTokens.id });
-    if (!updated) throw new AppError("That token is no longer active.");
+    if (!updated) throw new AppError(userMessage("apiToken.error.inactive"));
     return undefined;
   });
 }

@@ -2,7 +2,7 @@ import type { APIEvent } from "@solidjs/start/server";
 import { createHash } from "node:crypto";
 import { ZodError } from "zod";
 import type { ApiScope } from "../../lib/api";
-import { AppError } from "../errors";
+import { AppError, localizedMessage } from "../errors";
 import { currentRequestId } from "../request-context";
 import { log } from "../logger";
 import { optionalEnv } from "../config";
@@ -173,12 +173,12 @@ export function apiHandler(scope: ApiScope, handler: ApiHandler) {
       }
       if (error instanceof AppError) {
         return applyCors(
-          apiError(error.status, error.message, "request_failed"),
+          apiError(error.status, localizedMessage(error.message, "en"), "request_failed"),
           event.request,
         );
       }
       if (error instanceof ZodError) {
-        const message = error.issues[0]?.message ?? "Invalid request.";
+        const message = localizedMessage(error.issues[0]?.message ?? "Invalid request.", "en");
         return applyCors(apiError(400, message, "invalid_request"), event.request);
       }
       log.error("api.failed", { error });

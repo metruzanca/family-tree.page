@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { AppError, runAction } from "./errors";
+import {
+  AppError,
+  localizedMessage,
+  runAction,
+  userMessage,
+  validationMessage,
+} from "./errors";
 
 function capture() {
   const lines: string[] = [];
@@ -107,5 +113,33 @@ describe("runAction logging", () => {
       action: "files.finalizeUpload",
       error: { name: "Error", message: "storage exploded" },
     });
+  });
+});
+
+describe("localized messages", () => {
+  it("translates exact dictionary keys and leaves other text alone", () => {
+    expect(localizedMessage("error.forbidden", "it")).toBe("Non hai il permesso di farlo.");
+    expect(localizedMessage("Raw library message.", "it")).toBe("Raw library message.");
+  });
+
+  it("builds parameterized messages in the requested locale", () => {
+    expect(userMessage("auth.error.accountNotFound", undefined, "it")).toBe(
+      "Account non trovato.",
+    );
+    expect(
+      userMessage("tree.error.importTooManyPeople", { count: 3, max: 10 }, "it"),
+    ).toBe("Quel file contiene 3 persone. Il limite per l'importazione è 10.");
+  });
+
+  it("uses English outside a request", () => {
+    expect(localizedMessage("error.forbidden")).toBe("You do not have permission to do that.");
+  });
+
+  it("reads the first schema message through the dictionary", () => {
+    const schema = z.object({ name: z.string().min(1, "validation.nameRequired") });
+    const result = schema.safeParse({ name: "" });
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(validationMessage(result.error)).toBe("Enter your name.");
   });
 });

@@ -6,6 +6,7 @@ import { db } from "./db";
 import { users, type User } from "../../drizzle/schema";
 import { getCurrentPath, getSession } from "./session";
 import { publicOrigin } from "./config";
+import { userMessage } from "./errors";
 import { setLogContext } from "./logger";
 import { sendEmail, type SendEmailResult } from "./email";
 import { passwordResetMessage, verifyEmailMessage } from "./email-templates";
@@ -99,7 +100,7 @@ export async function requireUser(): Promise<PublicUser> {
 
 export async function startSession(userId: string) {
   const user = await findUserById(userId);
-  if (!user) throw new Error("Account not found.");
+  if (!user) throw new Error(userMessage("auth.error.accountNotFound"));
   const session = await getSession();
   await session.update({ userId: user.id, sessionVersion: user.sessionVersion });
 }
@@ -174,7 +175,7 @@ export async function bumpSessionVersion(userId: string): Promise<number> {
     .set({ sessionVersion: sql`${users.sessionVersion} + 1`, updatedAt: new Date() })
     .where(eq(users.id, userId))
     .returning({ sessionVersion: users.sessionVersion });
-  if (!updated) throw new Error("Account not found.");
+  if (!updated) throw new Error(userMessage("auth.error.accountNotFound"));
   return updated.sessionVersion;
 }
 

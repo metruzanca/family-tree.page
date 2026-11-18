@@ -9,7 +9,7 @@ import {
   trees,
   type StoredFile,
 } from "../../drizzle/schema";
-import { AppError } from "./errors";
+import { AppError, userMessage } from "./errors";
 import { notifyTreeChanged } from "./presence";
 import {
   deleteKeys,
@@ -57,14 +57,16 @@ export function maxBytesFor(mimeType: string) {
 
 export function assertAllowedUpload(mimeType: string, sizeBytes: number, hasThumb: boolean) {
   const kind = kindForMime(mimeType);
-  if (kind === "other") throw new AppError("That file type is not supported yet.");
+  if (kind === "other") throw new AppError(userMessage("media.error.unsupportedType"));
   if ((mimeType === "image/heic" || mimeType === "image/heif") && !hasThumb) {
-    throw new AppError("This phone photo needs to be converted to JPEG before it can be uploaded.");
+    throw new AppError(userMessage("media.error.heicNeedsConversion"));
   }
   const limit = maxBytesFor(mimeType);
   if (sizeBytes > limit) {
     throw new AppError(
-      kind === "image" ? "Images must be 20 MB or smaller." : "Documents must be 50 MB or smaller.",
+      kind === "image"
+        ? userMessage("media.error.imageTooLarge")
+        : userMessage("media.error.documentTooLarge"),
     );
   }
 }
@@ -113,25 +115,25 @@ export async function getFileWithAccess(fileId: string, userId: string) {
 
 export async function finalizeFile(fileId: string, userId: string): Promise<StoredFile> {
   const file = await getFileById(fileId);
-  if (!file) throw new AppError("That upload could not be found.");
-  if (file.uploadedBy !== userId) throw new AppError("That upload does not belong to you.");
+  if (!file) throw new AppError(userMessage("media.error.uploadNotFound"));
+  if (file.uploadedBy !== userId) throw new AppError(userMessage("media.error.uploadNotYours"));
   const [tree] = await db
     .select({ deletedAt: trees.deletedAt })
     .from(trees)
     .where(eq(trees.id, file.treeId))
     .limit(1);
-  if (!tree || tree.deletedAt) throw new AppError("That tree is no longer available.");
+  if (!tree || tree.deletedAt) throw new AppError(userMessage("tree.error.notAvailable"));
   if (file.status === "ready") return file;
-  if (file.status === "failed") throw new AppError("That upload failed. Please try again.");
+  if (file.status === "failed") throw new AppError(userMessage("media.error.uploadFailed"));
 
   try {
     const head = await headObject(file.storageKey);
-    if (!head) throw new AppError("The upload did not reach storage. Please try again.");
+    if (!head) throw new AppError(userMessage("media.error.uploadNotStored"));
     if (!head.ContentLength || head.ContentLength <= 0) {
-      throw new AppError("The uploaded file is empty.");
+      throw new AppError(userMessage("media.error.uploadEmpty"));
     }
     if (head.ContentLength > maxBytesFor(file.mimeType)) {
-      throw new AppError("The uploaded file is larger than the limit.");
+      throw new AppError(userMessage("media.error.uploadTooLarge"));
     }
 
     const bytes = await getObjectBytes(file.storageKey, 4100);
@@ -177,40 +179,40 @@ async function assertDetectedType(declaredMime: string, bytes: Uint8Array) {
     ) {
       return;
     }
-    throw new AppError("The file contents do not match its file type.");
+    throw new AppError(userMessage("media.error.typeMismatch"));
   }
 
   if (declaredMime.startsWith("image/")) {
     if (!detected.mime.startsWith("image/")) {
-      throw new AppError("That file is not a valid image.");
+      throw new AppError(userMessage("media.error.invalidImage"));
     }
     return;
   }
 
   if (declaredMime === "application/pdf") {
     if (detected.mime !== "application/pdf") {
-      throw new AppError("That file is not a valid PDF.");
+      throw new AppError(userMessage("media.error.invalidPdf"));
     }
     return;
   }
 
   if (declaredMime.includes("wordprocessingml") || declaredMime.includes("opendocument")) {
     if (!["application/zip", "application/x-zip-compressed"].includes(detected.mime)) {
-      throw new AppError("That document does not look valid.");
+      throw new AppError(userMessage("media.error.invalidDocument"));
     }
     return;
   }
 
   if (declaredMime === "application/msword") {
     if (!["application/x-cfb", "application/msword"].includes(detected.mime)) {
-      throw new AppError("That document does not look valid.");
+      throw new AppError(userMessage("media.error.invalidDocument"));
     }
     return;
   }
 
   if (declaredMime === "application/rtf") {
     if (!["text/rtf", "application/rtf"].includes(detected.mime)) {
-      throw new AppError("That document does not look valid.");
+      throw new AppError(userMessage("media.error.invalidDocument"));
     }
   }
 }
@@ -229,7 +231,7 @@ export type DeletedUsage = { bytes: number; count: number };
 
 export async function deleteFileRecord(fileId: string, userId: string): Promise<DeletedUsage> {
   const file = await getFileById(fileId);
-  if (!file) throw new AppError("That file could not be found.");
+  if (!file) throw new AppError(userMessage("media.error.fileNotFound"));
   const memberships = await db
     .select({ role: treeMembers.role })
     .from(treeMembers)
@@ -243,7 +245,7 @@ export async function deleteFileRecord(fileId: string, userId: string): Promise<
     )
     .limit(1);
   if (!memberships.length || memberships[0].role === "viewer") {
-    throw new AppError("You do not have permission to delete this file.");
+    throw new AppError(userMessage("media.error.deleteForbidden"));
   }
   const groupId = file.groupId;
   const usage = {
@@ -277,7 +279,7 @@ export async function deleteFileGroup(
     .where(and(eq(fileGroups.id, groupId), eq(fileGroups.treeId, treeId)))
     .limit(1);
   const group = groupRows[0];
-  if (!group) throw new AppError("That album could not be found.");
+  if (!group) throw new AppError(userMessage("media.error.albumNotFound"));
   const groupFiles = await db
     .select()
     .from(files)
@@ -331,9 +333,9 @@ export async function setAvatarRecord(input: {
         )
         .limit(1);
       const file = rows[0];
-      if (!file) throw new AppError("That photo could not be found.");
+      if (!file) throw new AppError(userMessage("media.error.photoNotFound"));
       if (file.kind !== "image" || file.status !== "ready") {
-        throw new AppError("Choose an uploaded image to use as the portrait.");
+        throw new AppError(userMessage("media.error.portraitImageRequired"));
       }
       await tx
         .update(files)

@@ -12,7 +12,12 @@ import {
 } from "../../drizzle/schema";
 import { requireUser, checkRateLimit } from "../server/auth-service";
 import { requireTreeMember } from "../server/guards";
-import { AppError, runAction, type ActionResult } from "../server/errors";
+import {
+  AppError,
+  runAction,
+  userMessage,
+  type ActionResult,
+} from "../server/errors";
 import {
   applyGedcomImportSchema,
   importGedcomSchema,
@@ -46,18 +51,19 @@ export async function importGedcom(input: {
     const parsedInput = importGedcomSchema.parse(input);
 
     if (!checkRateLimit("gedcom-import", user.email, 5, 60 * 60_000)) {
-      throw new AppError("Too many imports. Try again in an hour.");
+      throw new AppError(userMessage("tree.error.importRateLimited"));
     }
 
     const parsed = parseGedcom(parsedInput.text);
     if (!parsed.people.length) {
-      throw new AppError(
-        "No people were found in that file. Check that it is a GEDCOM file with INDI records.",
-      );
+      throw new AppError(userMessage("tree.import.errorNoPeople"));
     }
     if (parsed.people.length > MAX_IMPORT_PEOPLE) {
       throw new AppError(
-        `That file has ${parsed.people.length} people. The import limit is ${MAX_IMPORT_PEOPLE}.`,
+        userMessage("tree.error.importTooManyPeople", {
+          count: parsed.people.length,
+          max: MAX_IMPORT_PEOPLE,
+        }),
       );
     }
 
@@ -219,18 +225,19 @@ export async function applyGedcomImport(input: {
     const parsedInput = applyGedcomImportSchema.parse(input);
 
     if (!checkRateLimit("gedcom-merge", access.user.email, 10, 60 * 60_000)) {
-      throw new AppError("Too many imports. Try again in an hour.");
+      throw new AppError(userMessage("tree.error.importRateLimited"));
     }
 
     const parsed = parseGedcom(parsedInput.text);
     if (!parsed.people.length) {
-      throw new AppError(
-        "No people were found in that file. Check that it is a GEDCOM file with INDI records.",
-      );
+      throw new AppError(userMessage("tree.import.errorNoPeople"));
     }
     if (parsed.people.length > MAX_IMPORT_PEOPLE) {
       throw new AppError(
-        `That file has ${parsed.people.length} people. The import limit is ${MAX_IMPORT_PEOPLE}.`,
+        userMessage("tree.error.importTooManyPeople", {
+          count: parsed.people.length,
+          max: MAX_IMPORT_PEOPLE,
+        }),
       );
     }
 
@@ -265,7 +272,7 @@ export async function applyGedcomImport(input: {
       throw new AppError(plan.errors[0]);
     }
     if (!plan.counts.create && !plan.counts.merge) {
-      throw new AppError("Nothing would be imported. Choose at least one person to add or merge.");
+      throw new AppError(userMessage("tree.error.importNothingSelected"));
     }
 
     const result = await db.transaction(async tx => {

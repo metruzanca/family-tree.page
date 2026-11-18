@@ -7,7 +7,7 @@ import {
   people,
   type FileFace,
 } from "../../drizzle/schema";
-import { AppError } from "./errors";
+import { AppError, userMessage } from "./errors";
 import { touchTree } from "./file-service";
 import {
   clampFaceBox,
@@ -28,7 +28,7 @@ async function getFaceFile(fileId: string, treeId: string) {
     .where(and(eq(files.id, fileId), eq(files.treeId, treeId)))
     .limit(1);
   const file = rows[0];
-  if (!file) throw new AppError("That file could not be found.");
+  if (!file) throw new AppError(userMessage("media.error.fileNotFound"));
   return file;
 }
 
@@ -45,7 +45,7 @@ async function getFace(fileId: string, treeId: string, faceId: string) {
     )
     .limit(1);
   const face = rows[0];
-  if (!face) throw new AppError("That face could not be found.");
+  if (!face) throw new AppError(userMessage("media.error.faceNotFound"));
   return face;
 }
 
@@ -55,7 +55,7 @@ async function assertPersonInTree(treeId: string, personId: string) {
     .from(people)
     .where(and(eq(people.id, personId), eq(people.treeId, treeId)))
     .limit(1);
-  if (!rows.length) throw new AppError("That person could not be found.");
+  if (!rows.length) throw new AppError(userMessage("person.error.notFound"));
 }
 
 async function removeFaceTag(
@@ -102,10 +102,10 @@ export async function recordDetectedFaces(input: {
 }): Promise<FileFace[]> {
   const file = await getFaceFile(input.fileId, input.treeId);
   if (file.kind !== "image") {
-    throw new AppError("Face detection only works on images.");
+    throw new AppError(userMessage("media.error.facesImageOnly"));
   }
   if (file.status !== "ready") {
-    throw new AppError("That photo is still uploading.");
+    throw new AppError(userMessage("media.error.photoUploading"));
   }
 
   const existing = await listFileFaces(input.fileId, input.treeId);

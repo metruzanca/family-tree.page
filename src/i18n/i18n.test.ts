@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import english from "./en.json";
 import italian from "./it.json";
 import {
+  hasTranslationKey,
   localeFromAcceptLanguage,
   normalizeLocale,
   resolveLocale,
@@ -87,5 +88,17 @@ describe("translate", () => {
   it("falls back to English for unknown Italian keys", () => {
     const key = "common.appName" as const;
     expect(translate("it", key)).toBe("family-tree");
+  });
+});
+
+describe("hasTranslationKey", () => {
+  it("recognizes plain keys and plural families", () => {
+    expect(hasTranslationKey("error.forbidden")).toBe(true);
+    expect(hasTranslationKey("common.person")).toBe(true);
+  });
+
+  it("rejects text that is already a sentence", () => {
+    expect(hasTranslationKey("Too many requests.")).toBe(false);
+    expect(hasTranslationKey("error.notAKey")).toBe(false);
   });
 });
