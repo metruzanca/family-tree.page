@@ -1,3 +1,4 @@
+import { translate, type Locale, type TranslationKey } from "../i18n";
 import {
   fuzzyDatesOverlap,
   fuzzyYear,
@@ -18,10 +19,44 @@ export type DuplicatePerson = DuplicateInput & {
   displayName: string;
 };
 
+export type DuplicateReason =
+  | "fullName"
+  | "lastName"
+  | "firstName"
+  | "maidenName"
+  | "nickname"
+  | "birthYear"
+  | "birthYearOverlap"
+  | "deathYearOverlap";
+
 export type DuplicateCandidate = DuplicatePerson & {
   score: number;
   reasons: string[];
+  /** Stable codes for the reasons, so the UI can translate them again. */
+  reasonCodes: DuplicateReason[];
 };
+
+const DUPLICATE_REASON_KEYS: Record<DuplicateReason, TranslationKey> = {
+  fullName: "people.duplicate.reason.fullName",
+  lastName: "people.duplicate.reason.lastName",
+  firstName: "people.duplicate.reason.firstName",
+  maidenName: "people.duplicate.reason.maidenName",
+  nickname: "people.duplicate.reason.nickname",
+  birthYear: "people.duplicate.reason.birthYear",
+  birthYearOverlap: "people.duplicate.reason.birthYearOverlap",
+  deathYearOverlap: "people.duplicate.reason.deathYearOverlap",
+};
+
+export function duplicateReasonKey(reason: DuplicateReason): TranslationKey {
+  return DUPLICATE_REASON_KEYS[reason] ?? "people.duplicate.reason.fullName";
+}
+
+export function duplicateReasonLabel(
+  reason: DuplicateReason,
+  locale: Locale = "en",
+) {
+  return translate(locale, duplicateReasonKey(reason));
+}
 
 export function normalizeName(value: string | null | undefined) {
   return (value ?? "")
@@ -44,27 +79,34 @@ function candidateName(candidate: DuplicatePerson) {
 export function scoreDuplicate(
   input: DuplicateInput,
   candidate: DuplicatePerson,
-): { score: number; reasons: string[] } {
+  locale: Locale = "en",
+): { score: number; reasons: string[]; reasonCodes: DuplicateReason[] } {
   const reasons: string[] = [];
+  const reasonCodes: DuplicateReason[] = [];
   let score = 0;
+
+  const addReason = (code: DuplicateReason) => {
+    reasonCodes.push(code);
+    reasons.push(duplicateReasonLabel(code, locale));
+  };
 
   const inputFull = fullName(input);
   const candidateFull = candidateName(candidate);
 
   if (inputFull && inputFull === candidateFull) {
     score += 60;
-    reasons.push("Same full name");
+    addReason("fullName");
   } else if (
     normalizeName(input.lastName) &&
     normalizeName(input.lastName) === normalizeName(candidate.lastName)
   ) {
     score += 12;
-    reasons.push("Same last name");
+    addReason("lastName");
   }
 
   if (normalizeName(input.firstName) === normalizeName(candidate.firstName)) {
     score += 10;
-    reasons.push("Same first name");
+    addReason("firstName");
   }
 
   const maiden = normalizeName(input.maidenName);
@@ -74,7 +116,7 @@ export function scoreDuplicate(
       maiden === normalizeName(candidate.maidenName))
   ) {
     score += 18;
-    reasons.push("Maiden name matches");
+    addReason("maidenName");
   }
 
   const nickname = normalizeName(input.nickname);
@@ -84,7 +126,7 @@ export function scoreDuplicate(
       nickname === normalizeName(candidate.nickname))
   ) {
     score += 12;
-    reasons.push("Nickname matches");
+    addReason("nickname");
   }
 
   const inputYear = fuzzyYear(input.birthDate);
@@ -92,10 +134,10 @@ export function scoreDuplicate(
   if (inputYear !== null && candidateYear !== null) {
     if (inputYear === candidateYear) {
       score += 35;
-      reasons.push("Same birth year");
+      addReason("birthYear");
     } else if (fuzzyDatesOverlap(input.birthDate, candidate.birthDate)) {
       score += 20;
-      reasons.push("Birth years overlap");
+      addReason("birthYearOverlap");
     }
   }
 
@@ -105,10 +147,10 @@ export function scoreDuplicate(
     fuzzyDatesOverlap(input.deathDate, candidate.deathDate)
   ) {
     score += 5;
-    reasons.push("Death years overlap");
+    addReason("deathYearOverlap");
   }
 
-  return { score, reasons };
+  return { score, reasons, reasonCodes };
 }
 
 export function findDuplicateCandidates(
@@ -118,6 +160,7 @@ export function findDuplicateCandidates(
     excludePersonId?: string | null;
     threshold?: number;
     limit?: number;
+    locale?: Locale;
   } = {},
 ): DuplicateCandidate[] {
   const threshold = options.threshold ?? 55;
@@ -128,7 +171,7 @@ export function findDuplicateCandidates(
   return candidates
     .filter(candidate => candidate.id !== options.excludePersonId)
     .map(candidate => {
-      const scored = scoreDuplicate(input, candidate);
+      const scored = scoreDuplicate(input, candidate, options.locale ?? "en");
       return { ...candidate, ...scored };
     })
     .filter(candidate => candidate.score >= threshold)

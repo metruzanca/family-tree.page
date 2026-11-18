@@ -1,3 +1,5 @@
+import { translate, type Locale, type TranslationKey } from "../i18n";
+
 export const PERSON_SEX_OPTIONS = [
   {
     value: "female",
@@ -31,6 +33,13 @@ export const PERSON_SEX_VALUES = PERSON_SEX_OPTIONS.map(
   option => option.value,
 ) as [PersonSex, ...PersonSex[]];
 
+const SEX_KEYS: Record<PersonSex, TranslationKey> = {
+  female: "person.sex.female",
+  male: "person.sex.male",
+  other: "person.sex.other",
+  unknown: "person.sex.unknown",
+};
+
 export function isPersonSex(value: unknown): value is PersonSex {
   return (
     typeof value === "string" &&
@@ -38,8 +47,9 @@ export function isPersonSex(value: unknown): value is PersonSex {
   );
 }
 
-export function personSexLabel(sex: PersonSex) {
-  return PERSON_SEX_OPTIONS.find(option => option.value === sex)?.label ?? "Unknown";
+export function personSexLabel(sex: PersonSex, locale: Locale = "en") {
+  const key = SEX_KEYS[sex] ?? "person.sex.unknown";
+  return translate(locale, key);
 }
 
 /** GEDCOM 7 adds X for other; unknown remains U in both versions. */

@@ -5,6 +5,7 @@ import type {
   GraphRelationship,
   TreeGraph,
 } from "~/api/people-server";
+import { translate, type Locale } from "../../i18n";
 import { compareFuzzyDates, type FuzzyDate } from "../fuzzy-date";
 
 export type ParentType = Extract<GraphRelationship, { type: "parent" }>["parentType"];
@@ -67,9 +68,15 @@ export function familyKey(parentIds: string[]) {
 
 export function personName(
   person: Pick<GraphPerson, "displayName" | "firstName" | "lastName" | "nickname">,
+  locale: Locale = "en",
 ) {
   const full = `${person.firstName} ${person.lastName}`.trim();
-  return person.displayName || full || person.nickname || "Unnamed person";
+  return (
+    person.displayName ||
+    full ||
+    person.nickname ||
+    translate(locale, "research.person.unnamed")
+  );
 }
 
 export function buildResearchIndex(graph: Pick<TreeGraph, "people" | "relationships" | "events" | "files">): ResearchIndex {
@@ -333,12 +340,15 @@ export function buildFamilyUnits(index: ResearchIndex): FamilyUnit[] {
   });
 }
 
-export function familyLabel(unit: FamilyUnit) {
-  const names = unit.parents.map(personName);
-  const parents = names.length ? names.join(" & ") : "Unknown parents";
+export function familyLabel(unit: FamilyUnit, locale: Locale = "en") {
+  const separator = translate(locale, "research.family.separator");
+  const names = unit.parents.map(parent => personName(parent, locale));
+  const parents = names.length
+    ? names.join(separator)
+    : translate(locale, "research.family.unknownParents");
   const childCount = unit.children.length;
   const children = childCount
-    ? `${childCount} ${childCount === 1 ? "child" : "children"}`
-    : "No children recorded";
-  return `${parents} (${children})`;
+    ? translate(locale, "research.childCount", { count: childCount })
+    : translate(locale, "research.family.noChildren");
+  return translate(locale, "research.family.label", { parents, children });
 }

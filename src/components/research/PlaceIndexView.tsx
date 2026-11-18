@@ -10,7 +10,7 @@ export function PlaceIndexView(props: {
   treeId: string;
   index: PlaceIndex;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [query, setQuery] = createSignal("");
   const needle = createMemo(() => query().trim().toLowerCase());
 
@@ -21,7 +21,7 @@ export function PlaceIndexView(props: {
       if (group.label.toLowerCase().includes(term)) return true;
       if (group.parts.some(part => part.toLowerCase().includes(term))) return true;
       return group.entries.some(entry =>
-        personName(entry.person).toLowerCase().includes(term),
+        personName(entry.person, locale()).toLowerCase().includes(term),
       );
     });
   });
@@ -110,7 +110,7 @@ export function PlaceIndexView(props: {
           <p class="mt-1 text-xs text-muted-foreground">
             {props.index.missing.people
               .slice(0, 12)
-              .map(person => personName(person))
+              .map(person => personName(person, locale()))
               .join(", ")}
             <Show when={props.index.missing.people.length > 12}>
               {" "}
@@ -142,7 +142,7 @@ function PlaceRow(props: {
           class="font-medium hover:underline"
           data-testid={`${props.testId}-person`}
         >
-          {personName(props.entry.person)}
+          {personName(props.entry.person, locale())}
         </a>
         <span class="ml-2 text-xs text-muted-foreground">
           {props.entry.labelKey ? t(props.entry.labelKey) : props.entry.label}

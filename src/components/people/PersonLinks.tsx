@@ -32,7 +32,7 @@ export function PersonLinkGlyph(props: { link: PersonLink; size?: number }) {
 }
 
 export function PersonLinksSection(props: { links: PersonLink[] }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const ordered = createMemo(() =>
     props.links
       .map((link, index) => ({ link, index }))
@@ -55,7 +55,7 @@ export function PersonLinksSection(props: { links: PersonLink[] }) {
               rel="noopener noreferrer nofollow ugc"
               class="grid h-9 w-9 place-items-center rounded-full border border-border bg-card/60 text-muted-foreground transition hover:border-primary/30 hover:bg-primary/5 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
               aria-label={t("person.links.opensInNewTab", {
-                label: resolvePersonLink(link.url, link.isHome).label,
+                label: resolvePersonLink(link.url, link.isHome, locale()).label,
               })}
               data-testid={`person-panel-link-${index()}`}
             >

@@ -1,3 +1,4 @@
+import { translate, type Locale } from "../i18n";
 import {
   SIMPLE_ICONS,
   type SimpleIcon,
@@ -204,15 +205,22 @@ export function personLinkHostname(raw: string): string | null {
   return url ? hostOf(url) : null;
 }
 
-export function resolvePersonLink(raw: string, isHome: boolean): ResolvedPersonLink {
+export function resolvePersonLink(
+  raw: string,
+  isHome: boolean,
+  locale: Locale = "en",
+): ResolvedPersonLink {
   const url = safeUrl(raw);
   if (!url) {
-    return { kind: "globe", label: "Website" };
+    return { kind: "globe", label: translate(locale, "person.links.website") };
   }
 
   const rule = findBrandRule(url);
   if (isHome && !rule) {
-    return { kind: "home", label: "Personal website" };
+    return {
+      kind: "home",
+      label: translate(locale, "person.links.personalWebsite"),
+    };
   }
   if (rule?.slug) {
     const icon = SIMPLE_ICONS[rule.slug];
@@ -223,6 +231,6 @@ export function resolvePersonLink(raw: string, isHome: boolean): ResolvedPersonL
   return { kind: "globe", label: rule?.label ?? hostOf(url) };
 }
 
-export function personLinkLabel(raw: string, isHome: boolean): string {
-  return resolvePersonLink(raw, isHome).label;
+export function personLinkLabel(raw: string, isHome: boolean, locale: Locale = "en"): string {
+  return resolvePersonLink(raw, isHome, locale).label;
 }

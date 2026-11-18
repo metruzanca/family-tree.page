@@ -1,4 +1,5 @@
 import type { FuzzyDate } from "./fuzzy-date";
+import { translate, type Locale } from "../i18n";
 import type {
   GedcomImportedEvent,
   GedcomImportedFamily,
@@ -169,7 +170,9 @@ export function planImport(input: {
   existingPeople: ExistingImportPerson[];
   existingEvents: ExistingImportEvent[];
   decisions: ImportDecision[];
+  locale?: Locale;
 }): ImportPlan {
+  const locale = input.locale ?? "en";
   const errors: string[] = [];
   const personByXref = new Map(
     input.parsed.people.map(person => [person.xref, person]),
@@ -181,7 +184,11 @@ export function planImport(input: {
   const decisions = new Map<string, ImportDecision>();
   for (const decision of input.decisions) {
     if (decisions.has(decision.xref)) {
-      errors.push(`There is more than one decision for ${decision.xref}.`);
+      errors.push(
+        translate(locale, "tree.import.plan.duplicateDecision", {
+          xref: decision.xref,
+        }),
+      );
       continue;
     }
     decisions.set(decision.xref, decision);
@@ -189,12 +196,20 @@ export function planImport(input: {
 
   for (const decision of input.decisions) {
     if (!personByXref.has(decision.xref)) {
-      errors.push(`The file has no person with the id ${decision.xref}.`);
+      errors.push(
+        translate(locale, "tree.import.plan.unknownPerson", {
+          xref: decision.xref,
+        }),
+      );
     }
   }
   for (const person of input.parsed.people) {
     if (!decisions.has(person.xref)) {
-      errors.push(`Choose what to do with ${person.firstName} ${person.lastName}.`);
+      errors.push(
+        translate(locale, "tree.import.plan.chooseAction", {
+          name: `${person.firstName} ${person.lastName}`.trim(),
+        }),
+      );
     }
   }
 
@@ -224,7 +239,9 @@ export function planImport(input: {
     const existing = existingById.get(personId);
     if (!existing) {
       errors.push(
-        `Choose an existing person to merge ${person.firstName} ${person.lastName} into.`,
+        translate(locale, "tree.import.plan.chooseMergeTarget", {
+          name: `${person.firstName} ${person.lastName}`.trim(),
+        }),
       );
       skips.push(person);
       continue;
@@ -232,7 +249,9 @@ export function planImport(input: {
     const previous = mergeTargets.get(personId);
     if (previous) {
       errors.push(
-        `Two imported people are set to merge into the same person (${existing.firstName} ${existing.lastName}).`,
+        translate(locale, "tree.import.plan.mergeConflict", {
+          name: `${existing.firstName} ${existing.lastName}`.trim(),
+        }),
       );
     }
     mergeTargets.set(personId, person.xref);

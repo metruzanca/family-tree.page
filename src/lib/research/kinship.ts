@@ -1,4 +1,5 @@
 import type { GraphPerson } from "~/api/people-server";
+import { translate, type Locale, type TranslationKey } from "../../i18n";
 import { shortestPath } from "../focus";
 import { parentsOf, personName, type ResearchIndex } from "./graph";
 
@@ -19,44 +20,72 @@ export type KinshipResult = {
   path: GraphPerson[];
 };
 
-const ORDINALS = [
-  "first",
-  "second",
-  "third",
-  "fourth",
-  "fifth",
-  "sixth",
-  "seventh",
-  "eighth",
-  "ninth",
-  "tenth",
-];
+const ORDINAL_KEYS: Record<number, TranslationKey> = {
+  2: "research.kinship.ordinal.2",
+  3: "research.kinship.ordinal.3",
+  4: "research.kinship.ordinal.4",
+  5: "research.kinship.ordinal.5",
+  6: "research.kinship.ordinal.6",
+  7: "research.kinship.ordinal.7",
+  8: "research.kinship.ordinal.8",
+  9: "research.kinship.ordinal.9",
+  10: "research.kinship.ordinal.10",
+};
 
-function ordinal(degree: number) {
-  return ORDINALS[degree - 1] ?? `${degree}th`;
+function ordinal(degree: number, locale: Locale) {
+  const key = ORDINAL_KEYS[degree];
+  return key
+    ? translate(locale, key)
+    : translate(locale, "research.kinship.ordinal.many", { degree });
 }
 
-function removedLabel(removed: number) {
-  if (removed === 1) return "once removed";
-  if (removed === 2) return "twice removed";
-  if (removed === 3) return "three times removed";
-  return `${removed} times removed`;
+/**
+ * The prefix that turns "aunt" into "great-aunt". English repeats "great-",
+ * Italian puts "pro" in front of the noun ("prozio", "pro-prozio").
+ */
+function greatPrefix(steps: number, locale: Locale) {
+  if (steps <= 0) return "";
+  if (locale === "it") return `${"pro-".repeat(steps - 1)}pro`;
+  return "great-".repeat(steps);
 }
 
-function greatPrefix(steps: number) {
-  return "great-".repeat(Math.max(0, steps));
+export function ancestorLabel(distance: number, locale: Locale = "en") {
+  if (distance <= 0) return translate(locale, "research.kinship.self");
+  if (distance === 1) return translate(locale, "research.kinship.ancestor.parent");
+  if (distance === 2)
+    return translate(locale, "research.kinship.ancestor.grandparent");
+  if (distance === 3)
+    return translate(locale, "research.kinship.ancestor.greatGrandparent");
+  return translate(locale, "research.kinship.ancestor.far", {
+    generation: distance,
+  });
 }
 
-export function ancestorLabel(distance: number) {
-  if (distance <= 0) return "self";
-  if (distance === 1) return "parent";
-  return `${greatPrefix(distance - 2)}grandparent`;
+export function descendantLabel(distance: number, locale: Locale = "en") {
+  if (distance <= 0) return translate(locale, "research.kinship.self");
+  if (distance === 1) return translate(locale, "research.kinship.descendant.child");
+  if (distance === 2)
+    return translate(locale, "research.kinship.descendant.grandchild");
+  if (distance === 3)
+    return translate(locale, "research.kinship.descendant.greatGrandchild");
+  return translate(locale, "research.kinship.descendant.far", {
+    generation: distance,
+  });
 }
 
-export function descendantLabel(distance: number) {
-  if (distance <= 0) return "self";
-  if (distance === 1) return "child";
-  return `${greatPrefix(distance - 2)}grandchild`;
+function cousinLabel(degree: number, removed: number, locale: Locale) {
+  if (degree === 1 && !removed) {
+    return translate(locale, "research.kinship.cousin.first");
+  }
+  if (degree === 1) {
+    return translate(locale, "research.kinship.cousin.firstRemoved", {
+      count: removed,
+    });
+  }
+  const params = { ordinal: ordinal(degree, locale), count: removed };
+  return removed
+    ? translate(locale, "research.kinship.cousin.otherRemoved", params)
+    : translate(locale, "research.kinship.cousin.other", params);
 }
 
 function ancestorDistances(index: ResearchIndex, personId: string) {
@@ -91,18 +120,21 @@ export function describeKinship(
   index: ResearchIndex,
   fromId: string,
   toId: string,
+  locale: Locale = "en",
 ): KinshipResult | null {
   const from = index.peopleById.get(fromId);
   const to = index.peopleById.get(toId);
   if (!from || !to) return null;
 
   const path = pathBetween(index, fromId, toId);
+  const fromName = personName(from, locale);
+  const toName = personName(to, locale);
 
   if (fromId === toId) {
     return {
       kind: "same",
-      label: "the same person",
-      detail: personName(from),
+      label: translate(locale, "research.kinship.same"),
+      detail: fromName,
       path,
     };
   }
@@ -114,8 +146,11 @@ export function describeKinship(
   if (asAncestor !== undefined) {
     return {
       kind: "ancestor",
-      label: ancestorLabel(asAncestor),
-      detail: `${personName(to)} is an ancestor of ${personName(from)}.`,
+      label: ancestorLabel(asAncestor, locale),
+      detail: translate(locale, "research.kinship.detail.ancestor", {
+        from: fromName,
+        to: toName,
+      }),
       path,
     };
   }
@@ -124,8 +159,11 @@ export function describeKinship(
   if (asDescendant !== undefined) {
     return {
       kind: "descendant",
-      label: descendantLabel(asDescendant),
-      detail: `${personName(to)} is a descendant of ${personName(from)}.`,
+      label: descendantLabel(asDescendant, locale),
+      detail: translate(locale, "research.kinship.detail.descendant", {
+        from: fromName,
+        to: toName,
+      }),
       path,
     };
   }
@@ -147,12 +185,20 @@ export function describeKinship(
 
   if (best) {
     const ancestor = index.peopleById.get(best.ancestorId);
-    const through = ancestor ? ` through ${personName(ancestor)}` : "";
+    const through = ancestor
+      ? translate(locale, "research.kinship.through", {
+          name: personName(ancestor, locale),
+        })
+      : "";
     if (best.fromDistance === 1 && best.toDistance === 1) {
       return {
         kind: "sibling",
-        label: "sibling",
-        detail: `${personName(from)} and ${personName(to)} share a parent${through}.`,
+        label: translate(locale, "research.kinship.sibling"),
+        detail: translate(locale, "research.kinship.detail.sibling", {
+          from: fromName,
+          to: toName,
+          through,
+        }),
         path,
       };
     }
@@ -160,8 +206,16 @@ export function describeKinship(
       const greats = best.toDistance - 2;
       return {
         kind: "niece-nephew",
-        label: `${greatPrefix(greats)}niece or ${greatPrefix(greats)}nephew`,
-        detail: `${personName(to)} is the child of ${personName(from)}'s sibling${through}.`,
+        label: greats > 0
+          ? translate(locale, "research.kinship.nieceNephew.great", {
+              prefix: greatPrefix(greats, locale),
+            })
+          : translate(locale, "research.kinship.nieceNephew"),
+        detail: translate(locale, "research.kinship.detail.nieceNephew", {
+          from: fromName,
+          to: toName,
+          through,
+        }),
         path,
       };
     }
@@ -169,8 +223,16 @@ export function describeKinship(
       const greats = best.fromDistance - 2;
       return {
         kind: "aunt-uncle",
-        label: `${greatPrefix(greats)}aunt or ${greatPrefix(greats)}uncle`,
-        detail: `${personName(from)} is the child of ${personName(to)}'s sibling${through}.`,
+        label: greats > 0
+          ? translate(locale, "research.kinship.auntUncle.great", {
+              prefix: greatPrefix(greats, locale),
+            })
+          : translate(locale, "research.kinship.auntUncle"),
+        detail: translate(locale, "research.kinship.detail.auntUncle", {
+          from: fromName,
+          to: toName,
+          through,
+        }),
         path,
       };
     }
@@ -178,8 +240,10 @@ export function describeKinship(
     const removed = Math.abs(best.fromDistance - best.toDistance);
     return {
       kind: "cousin",
-      label: `${ordinal(degree)} cousin${removed ? ` ${removedLabel(removed)}` : ""}`,
-      detail: `Closest shared ancestor${through || " is not recorded"}.`,
+      label: cousinLabel(degree, removed, locale),
+      detail: ancestor
+        ? translate(locale, "research.kinship.detail.cousin", { through })
+        : translate(locale, "research.kinship.detail.cousinUnknown"),
       path,
     };
   }
@@ -187,21 +251,22 @@ export function describeKinship(
   if (path.length > 1) {
     return {
       kind: "none",
-      label: "related by marriage",
-      detail:
-        "No shared ancestor is recorded. The connection runs through partners, so the exact label depends on which line you follow.",
+      label: translate(locale, "research.kinship.marriage"),
+      detail: translate(locale, "research.kinship.detail.marriage"),
       path,
     };
   }
 
   return {
     kind: "none",
-    label: "no relationship recorded",
-    detail: "The tree has no path between these two people yet.",
+    label: translate(locale, "research.kinship.none"),
+    detail: translate(locale, "research.kinship.detail.none"),
     path,
   };
 }
 
-export function pathLabel(path: GraphPerson[]) {
-  return path.map(personName).join(" > ");
+export function pathLabel(path: GraphPerson[], locale: Locale = "en") {
+  return path
+    .map(person => personName(person, locale))
+    .join(translate(locale, "research.kinship.pathSeparator"));
 }

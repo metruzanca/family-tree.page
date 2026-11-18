@@ -200,7 +200,7 @@ function ResearchWorkspace(props: {
           </p>
           <Show when={person()}>
             {selected => (
-              <h1 class="font-display text-2xl tracking-tight">{personName(selected())}</h1>
+              <h1 class="font-display text-2xl tracking-tight">{personName(selected(), locale())}</h1>
             )}
           </Show>
         </div>

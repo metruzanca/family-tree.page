@@ -108,7 +108,7 @@ function RegisterNode(props: {
           class="text-sm font-semibold hover:underline"
           data-testid={`research-register-person-${entry().person.id}`}
         >
-          {personName(entry().person)}
+          {personName(entry().person, locale())}
         </a>
 
         <Show when={props.mode === "ngsq" && entry().hasDescendants}>

@@ -1,3 +1,5 @@
+import { tClient } from "../i18n";
+
 export type Thumbnail = {
   blob: Blob;
   mime: "image/webp" | "image/jpeg";
@@ -60,7 +62,7 @@ async function loadImage(file: File): Promise<ImageBitmap | HTMLImageElement | n
     image.src = url;
     await new Promise<void>((resolve, reject) => {
       image.onload = () => resolve();
-      image.onerror = () => reject(new Error("Could not read image"));
+      image.onerror = () => reject(new Error(tClient("media.error.imageReadFailed")));
       if (image.complete && image.naturalWidth > 0) resolve();
     });
     return image;

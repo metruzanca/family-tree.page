@@ -42,7 +42,7 @@ export function FamilyGroupSheet(props: {
         <div>
           <p class="eyebrow">{t("research.sheet.eyebrow")}</p>
           <h2 class="mt-1 font-display text-2xl tracking-tight">
-            {unit() ? familyLabel(unit()!) : t("research.sheet.noFamily")}
+            {unit() ? familyLabel(unit()!, locale()) : t("research.sheet.noFamily")}
           </h2>
         </div>
         <Show when={props.families.length > 1}>
@@ -55,7 +55,7 @@ export function FamilyGroupSheet(props: {
               data-testid="research-family-select"
             >
               <For each={props.families}>
-                {family => <option value={family.key}>{familyLabel(family)}</option>}
+                {family => <option value={family.key}>{familyLabel(family, locale())}</option>}
               </For>
             </select>
           </label>
@@ -154,7 +154,7 @@ export function FamilyGroupSheet(props: {
                                 class="font-medium hover:underline"
                                 data-testid={`research-child-link-${child.id}`}
                               >
-                                {personName(child)}
+                                {personName(child, locale())}
                               </a>
                               <Show when={child.maidenName}>
                                 <span class="ml-1.5 text-xs text-muted-foreground">
@@ -174,7 +174,7 @@ export function FamilyGroupSheet(props: {
                             </td>
                             <td class="py-2 text-muted-foreground">
                               {partnersOf(props.index, child.id)
-                                .map(link => personName(link.person))
+                                .map(link => personName(link.person, locale()))
                                 .join(", ") || t("research.notRecorded")}
                             </td>
                           </tr>
@@ -211,7 +211,7 @@ function ParentCard(props: {
             class="font-display text-xl leading-tight hover:underline"
             data-testid={`research-parent-link-${props.parent.id}`}
           >
-            {personName(props.parent)}
+            {personName(props.parent, locale())}
           </a>
           <Show when={props.parent.maidenName}>
             <p class="text-xs text-muted-foreground">

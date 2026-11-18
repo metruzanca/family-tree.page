@@ -1,5 +1,8 @@
 import { For, Show } from "solid-js";
-import type { DuplicateCandidate } from "~/lib/duplicates";
+import {
+  duplicateReasonLabel,
+  type DuplicateCandidate,
+} from "~/lib/duplicates";
 import { formatFuzzyYearRange } from "~/lib/fuzzy-date";
 import { Button } from "../ui/button";
 import { useI18n } from "~/i18n/LocaleProvider";
@@ -12,6 +15,10 @@ export function DuplicateWarning(props: {
   pending?: boolean;
 }) {
   const { t, locale } = useI18n();
+  const reasons = (candidate: DuplicateCandidate) =>
+    candidate.reasonCodes?.length
+      ? candidate.reasonCodes.map(reason => duplicateReasonLabel(reason, locale()))
+      : candidate.reasons;
   return (
     <div
       class="rounded-xl border border-warning/35 bg-warning/10 px-3.5 py-3"
@@ -37,7 +44,7 @@ export function DuplicateWarning(props: {
                     </p>
                   </Show>
                   <p class="mt-0.5 text-[0.66rem] uppercase tracking-wide text-muted-foreground">
-                    {candidate.reasons.join(" · ")}
+                    {reasons(candidate).join(" · ")}
                   </p>
                 </div>
                 <Show when={props.onUseExisting}>

@@ -1,10 +1,12 @@
 import {
   findDuplicateCandidates,
   type DuplicatePerson,
+  type DuplicateReason,
 } from "./duplicates";
 import type { GedcomImportResult } from "./gedcom-import";
 import type { PersonSex } from "./person-sex";
 import type { FuzzyDate } from "./fuzzy-date";
+import type { Locale } from "../i18n";
 
 export type MatchPerson = {
   id: string;
@@ -24,6 +26,9 @@ export type GedcomMatchSuggestion = {
   displayName: string | null;
   score: number;
   reasons: string[];
+  reasonCodes?: DuplicateReason[];
+  /** True when the imported name is exactly the existing full name. */
+  exactNameMatch?: boolean;
 };
 
 /**
@@ -33,6 +38,7 @@ export type GedcomMatchSuggestion = {
 export function suggestGedcomMatches(
   parsed: GedcomImportResult,
   existing: MatchPerson[],
+  locale: Locale = "en",
 ): Map<string, GedcomMatchSuggestion> {
   const candidates: DuplicatePerson[] = existing.map(person => ({
     id: person.id,
@@ -57,7 +63,7 @@ export function suggestGedcomMatches(
         deathDate: person.deathDate,
       },
       candidates,
-      { limit: 1, threshold: 40 },
+      { limit: 1, threshold: 40, locale },
     );
     const top = matches[0] ?? null;
     suggestions.set(person.xref, {
@@ -66,6 +72,8 @@ export function suggestGedcomMatches(
       displayName: top?.displayName ?? null,
       score: top?.score ?? 0,
       reasons: top?.reasons ?? [],
+      reasonCodes: top?.reasonCodes ?? [],
+      exactNameMatch: top?.reasonCodes.includes("fullName") ?? false,
     });
   }
   return suggestions;
@@ -79,7 +87,9 @@ export function suggestGedcomMatches(
 export function defaultImportDecision(suggestion: GedcomMatchSuggestion) {
   if (
     suggestion.personId &&
-    (suggestion.score >= 90 || suggestion.reasons.includes("Same full name"))
+    (suggestion.score >= 90 ||
+      suggestion.exactNameMatch ||
+      suggestion.reasons.includes("Same full name"))
   ) {
     return { action: "merge" as const, personId: suggestion.personId };
   }

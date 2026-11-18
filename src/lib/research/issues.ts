@@ -48,7 +48,9 @@ function definiteYear(value: FuzzyDate | null | undefined) {
 }
 
 function sampleNames(people: GraphPerson[], locale: Locale = "en", limit = 4) {
-  const names = people.slice(0, limit).map(personName);
+  const names = people
+    .slice(0, limit)
+    .map(person => personName(person, locale));
   const remaining = people.length - names.length;
   if (!names.length) return "";
   if (remaining > 0) {
@@ -134,7 +136,7 @@ export function buildResearchIssues(
       .map(relationship =>
         [index.peopleById.get(relationship.source), index.peopleById.get(relationship.target)]
           .filter((person): person is GraphPerson => Boolean(person))
-          .map(personName)
+          .map(person => personName(person, locale))
           .join(" & "),
       )
       .slice(0, 4);

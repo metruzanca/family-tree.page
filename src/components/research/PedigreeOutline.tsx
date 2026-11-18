@@ -79,10 +79,10 @@ function PedigreeSlotCard(props: { treeId: string; slot: PedigreeSlot }) {
                   class="block truncate text-sm font-semibold hover:underline"
                   data-testid={`research-pedigree-person-${person().id}`}
                 >
-                  {personName(person())}
+                  {personName(person(), locale())}
                 </a>
                 <p class="text-xs text-muted-foreground">
-                  {pedigreeSlotLabel(props.slot)}
+                  {pedigreeSlotLabel(props.slot, locale())}
                   <Show
                     when={formatFuzzyYearRange(
                       person().birthDate,

@@ -94,7 +94,7 @@ function IssueCard(props: {
   treeId: string;
   index: ResearchIndex;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const people = createMemo(() =>
     props.issue.personIds
       .map(id => props.index.peopleById.get(id))
@@ -133,7 +133,7 @@ function IssueCard(props: {
                 class="text-xs font-medium text-primary underline-offset-2 hover:underline"
                 data-testid={`research-issue-person-${props.issue.id}-${person.id}`}
               >
-                {personName(person)}
+                {personName(person, locale())}
               </a>
             )}
           </For>

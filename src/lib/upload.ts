@@ -1,4 +1,5 @@
 import { cancelUpload, finalizeUpload, prepareUpload } from "~/api/files-server";
+import { tClient } from "../i18n";
 import { friendlyMessage } from "./action-result";
 import { formatExifDate } from "./exif";
 import { scanBlobForFaces } from "./face-scan";
@@ -26,7 +27,7 @@ export async function uploadFile(options: UploadOptions): Promise<UploadResult> 
     if ((mimeType === "image/heic" || mimeType === "image/heif") && !thumb) {
       return {
         ok: false,
-        error: "This phone photo format cannot be converted here. Export it as a JPEG first.",
+        error: tClient("media.error.heicNeedsConversion"),
       };
     }
   }
@@ -142,13 +143,17 @@ function postForm(
     request.upload.onprogress = event => {
       if (event.lengthComputable) onProgress(event.loaded / event.total);
     };
-    request.onerror = () => reject(new Error("Could not reach file storage."));
-    request.onabort = () => reject(new Error("Upload cancelled."));
+    request.onerror = () => reject(new Error(tClient("media.error.storageUnreachable")));
+    request.onabort = () => reject(new Error(tClient("media.error.uploadCancelled")));
     request.onload = () => {
       if (request.status >= 200 && request.status < 300) {
         resolve();
       } else {
-        reject(new Error(`Storage rejected the upload (${request.status}).`));
+        reject(
+          new Error(
+            tClient("media.error.storageRejected", { status: request.status }),
+          ),
+        );
       }
     };
     request.send(form);

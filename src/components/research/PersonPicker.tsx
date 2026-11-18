@@ -8,10 +8,10 @@ export function PersonPicker(props: {
   personId: string | null;
   onChange: (personId: string) => void;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const people = createMemo(() =>
     [...props.people].sort((left, right) =>
-      personName(left).localeCompare(personName(right)),
+      personName(left, locale()).localeCompare(personName(right, locale())),
     ),
   );
 
@@ -32,7 +32,7 @@ export function PersonPicker(props: {
               value={person.id}
               selected={person.id === props.personId}
             >
-              {personName(person)}
+              {personName(person, locale())}
               {person.birthDate?.start.year ? ` (${person.birthDate.start.year})` : ""}
             </option>
           )}

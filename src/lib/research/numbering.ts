@@ -1,4 +1,5 @@
 import type { GraphPerson } from "~/api/people-server";
+import { translate, type Locale } from "../../i18n";
 import {
   childrenOf,
   parentsOf,
@@ -42,11 +43,11 @@ export type Pedigree = {
 
 export const MAX_PEDIGREE_GENERATIONS = 7;
 
-export function pedigreeSlotLabel(slot: PedigreeSlot) {
-  if (slot.role === "self") return "Subject";
-  if (slot.person?.sex === "male") return "Father";
-  if (slot.person?.sex === "female") return "Mother";
-  return "Parent";
+export function pedigreeSlotLabel(slot: PedigreeSlot, locale: Locale = "en") {
+  if (slot.role === "self") return translate(locale, "research.pedigree.role.self");
+  if (slot.person?.sex === "male") return translate(locale, "research.pedigree.role.father");
+  if (slot.person?.sex === "female") return translate(locale, "research.pedigree.role.mother");
+  return translate(locale, "research.pedigree.role.parent");
 }
 
 export function generationOfAhnentafel(number: number) {

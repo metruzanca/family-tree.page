@@ -11,7 +11,7 @@ export function SurnameIndexView(props: {
   treeId: string;
   groups: SurnameGroup[];
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [query, setQuery] = createSignal("");
   const needle = createMemo(() => query().trim().toLowerCase());
 
@@ -24,7 +24,7 @@ export function SurnameIndexView(props: {
         return true;
       }
       return group.people.some(entry =>
-        personName(entry.person).toLowerCase().includes(term),
+        personName(entry.person, locale()).toLowerCase().includes(term),
       );
     });
   });

@@ -88,6 +88,7 @@ function TreeImportInner() {
         deathDate: person.deathDate,
         sex: person.sex,
       })),
+      locale(),
     );
   });
 
@@ -127,6 +128,7 @@ function TreeImportInner() {
         date: event.date,
       })),
       decisions: Object.values(decisions()),
+      locale: locale(),
     });
   });
 
@@ -163,6 +165,7 @@ function TreeImportInner() {
           deathDate: person.deathDate,
           sex: person.sex,
         })),
+        locale(),
       );
       const initial: Record<string, ImportDecision> = {};
       for (const person of result.people) {

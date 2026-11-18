@@ -26,7 +26,7 @@ export function DossierView(props: {
   const kinship = createMemo(() => {
     const viewerId = props.viewerPersonId;
     if (!viewerId || viewerId === person().id) return null;
-    return describeKinship(props.index, viewerId, person().id);
+    return describeKinship(props.index, viewerId, person().id, locale());
   });
 
   const partnerNote = (link: PersonDossier["partners"][number]) => {
@@ -51,7 +51,7 @@ export function DossierView(props: {
             <Avatar name={person().displayName} fileId={person().avatarFileId} size={64} />
             <div class="min-w-0 flex-1">
               <h2 class="font-display text-3xl leading-tight tracking-tight">
-                {personName(person())}
+                {personName(person(), locale())}
               </h2>
               <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
                 <Show when={person().maidenName}>
@@ -96,7 +96,7 @@ export function DossierView(props: {
                     </p>
                     <p class="mt-0.5 text-xs text-muted-foreground">{result().detail}</p>
                     <Show when={result().path.length > 1}>
-                      <p class="mt-1 text-xs text-muted-foreground">{pathLabel(result().path)}</p>
+                      <p class="mt-1 text-xs text-muted-foreground">{pathLabel(result().path, locale())}</p>
                     </Show>
                   </div>
                 )}
