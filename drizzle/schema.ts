@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import type { FuzzyDate } from "../src/lib/fuzzy-date";
 import type { ActivityChange } from "../src/lib/activity";
+import type { ApiScope } from "../src/lib/api";
 import {
   bigint,
   boolean,
@@ -567,6 +568,38 @@ export const treeShareLinks = pgTable(
 );
 
 /**
+ * Read-only tokens for the public API. A token is bound to one tree and one
+ * owner, stored hashed so a database leak does not expose working tokens, and
+ * checked against current tree membership on every request.
+ */
+export const apiTokens = pgTable(
+  "api_tokens",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    treeId: uuid("tree_id")
+      .notNull()
+      .references(() => trees.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    /** SHA-256 of the full token. The token itself is shown once. */
+    tokenHash: text("token_hash").notNull().unique(),
+    /** The first characters, so an owner can recognise a token in a list. */
+    tokenPrefix: text("token_prefix").notNull(),
+    scopes: jsonb("scopes").$type<ApiScope[]>().notNull(),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  t => [
+    index("api_tokens_user_idx").on(t.userId),
+    index("api_tokens_tree_idx").on(t.treeId),
+  ],
+);
+
+/**
  * Human-readable history of tree changes. Actor names are snapshotted so the
  * history survives an account deletion, and entity ids are intentionally not
  * foreign keys so a deleted person still keeps their timeline entry.
@@ -647,3 +680,4 @@ export type FileFace = typeof fileFaces.$inferSelect;
 export type UsageEvent = typeof usageEvents.$inferSelect;
 export type TreeActivity = typeof treeActivity.$inferSelect;
 export type TreeShareLink = typeof treeShareLinks.$inferSelect;
+export type ApiToken = typeof apiTokens.$inferSelect;

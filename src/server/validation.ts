@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { API_SCOPE_VALUES } from "../lib/api";
 import {
   isValidFuzzyDate,
   isValidPartialDate,
@@ -140,6 +141,24 @@ export const inviteSchema = z.object({
 });
 
 export const inviteEmailSchema = emailSchema;
+
+export const apiTokenSchema = z.object({
+  treeId: z.string().uuid(),
+  name: z
+    .string()
+    .trim()
+    .min(1, "Give the token a name.")
+    .max(80, "That name is too long."),
+  expiresInDays: z.number().int().min(1).max(3650).nullable().optional(),
+  scopes: z
+    .array(z.enum(API_SCOPE_VALUES))
+    .min(1, "Choose at least one scope."),
+});
+
+export const apiTokenRevokeSchema = z.object({
+  treeId: z.string().uuid(),
+  tokenId: z.string().uuid(),
+});
 
 export const shareLinkSchema = z.object({
   treeId: z.string().uuid(),

@@ -19,6 +19,11 @@ import {
   getTreeOverview as getTreeOverviewFn,
 } from "./trees-server";
 import { getTreeGraph as getTreeGraphFn } from "./people-server";
+import {
+  createTreeApiToken as createTreeApiTokenFn,
+  getTreeApiTokens as getTreeApiTokensFn,
+  revokeTreeApiToken as revokeTreeApiTokenFn,
+} from "./api-tokens-server";
 import { getTreeActivity as getTreeActivityFn } from "./activity-server";
 import {
   getSharedTree as getSharedTreeFn,
@@ -46,12 +51,16 @@ export const getTreeGraph = query(getTreeGraphFn, "tree-graph");
 export const getTreeActivity = query(getTreeActivityFn, "tree-activity");
 export const getSharedTree = query(getSharedTreeFn, "shared-tree");
 export const getTreeShareLinks = query(getTreeShareLinksFn, "tree-share-links");
+export const getTreeApiTokens = query(getTreeApiTokensFn, "tree-api-tokens");
 export const getCalendarFeed = query(getCalendarFeedFn, "calendar-feed");
 export const verifyEmail = query(verifyEmailFn, "verify-email");
 export const getPasswordResetPreview = query(getPasswordResetPreviewFn, "password-reset-preview");
 export const getPendingEmailChange = query(getPendingEmailChangeFn, "pending-email-change");
 export const getEmailChangePreview = query(getEmailChangePreviewFn, "email-change-preview");
 export const getUsage = query(getUsageFn, "account-usage");
+
+export const createTreeApiToken = action(createTreeApiTokenFn, "create-tree-api-token");
+export const revokeTreeApiToken = action(revokeTreeApiTokenFn, "revoke-tree-api-token");
 
 export const login = action(loginFn, "login");
 export const register = action(registerFn, "register");

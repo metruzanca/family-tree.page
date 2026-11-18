@@ -1,6 +1,6 @@
 import { For, Show, createEffect, createSignal } from "solid-js";
 import { A, createAsync, useNavigate, useParams, useSearchParams, revalidate } from "@solidjs/router";
-import { Copy, Download, Link2, LogOut, Mail, Plus, RotateCw, Settings, Share2, Shield, ShieldAlert, Trash2, Unlink, Users } from "lucide-solid";
+import { Copy, Download, KeyRound, Link2, LogOut, Mail, Plus, RotateCw, Settings, Share2, Shield, ShieldAlert, Trash2, Unlink, Users } from "lucide-solid";
 import {
   approveTreeDeletion,
   cancelTreeDeletionRequest,
@@ -24,6 +24,7 @@ import {
   getTreeOverview as overviewQuery,
   getTreeInvites as invitesQuery,
   getTreeShareLinks as shareLinksQuery,
+  getTreeApiTokens as apiTokensQuery,
   requireUserPage,
 } from "~/api";
 import {
@@ -32,6 +33,18 @@ import {
   type CreatedTreeShareLink,
   type TreeShareLinkView,
 } from "~/api/share-server";
+import {
+  createTreeApiToken,
+  revokeTreeApiToken,
+  type ApiTokenView,
+  type CreatedApiToken,
+} from "~/api/api-tokens-server";
+import {
+  API_SCOPES,
+  DEFAULT_API_SCOPES,
+  scopeLabel,
+  type ApiScope,
+} from "~/lib/api";
 import type { LivingVisibility } from "~/lib/share";
 import type { TreeRole } from "~/server/guards";
 import { AppErrorBoundary } from "~/components/app/AppErrorBoundary";
@@ -119,6 +132,11 @@ function TreeSettingsInner() {
       ? shareLinksQuery(params.treeId)
       : Promise.resolve([] as TreeShareLinkView[]),
   );
+  const apiTokens = createAsync(() =>
+    overview()?.role === "owner"
+      ? apiTokensQuery(params.treeId)
+      : Promise.resolve([] as ApiTokenView[]),
+  );
 
   const [name, setName] = createSignal("");
   const [description, setDescription] = createSignal("");
@@ -138,6 +156,12 @@ function TreeSettingsInner() {
   const [creatingShare, setCreatingShare] = createSignal(false);
   const [createdShare, setCreatedShare] = createSignal<CreatedTreeShareLink | null>(null);
   const [shareRows, setShareRows] = createSignal<TreeShareLinkView[] | null>(null);
+  const [apiName, setApiName] = createSignal("");
+  const [apiExpiry, setApiExpiry] = createSignal("90");
+  const [apiScopes, setApiScopes] = createSignal<ApiScope[]>([...DEFAULT_API_SCOPES]);
+  const [creatingApi, setCreatingApi] = createSignal(false);
+  const [createdApi, setCreatedApi] = createSignal<CreatedApiToken | null>(null);
+  const [apiRows, setApiRows] = createSignal<ApiTokenView[] | null>(null);
 
   createEffect(() => {
     const rows = invites();
@@ -147,6 +171,11 @@ function TreeSettingsInner() {
   createEffect(() => {
     const rows = shareLinks();
     if (rows) setShareRows(rows);
+  });
+
+  createEffect(() => {
+    const rows = apiTokens();
+    if (rows) setApiRows(rows);
   });
 
   function applyCreatedInvite(created: CreatedInvite) {
@@ -181,6 +210,7 @@ function TreeSettingsInner() {
     | { kind: "leave" }
     | { kind: "revoke"; inviteId: string }
     | { kind: "revoke-share"; linkId: string }
+    | { kind: "revoke-api"; tokenId: string }
     | null
   >(null);
   const [pending, setPending] = createSignal(false);
@@ -339,6 +369,50 @@ function TreeSettingsInner() {
     }
   }
 
+  function toggleApiScope(scope: ApiScope, checked: boolean) {
+    setApiScopes(current =>
+      checked
+        ? [...new Set([...current, scope])]
+        : current.filter(value => value !== scope),
+    );
+  }
+
+  async function copyApiToken(token: string) {
+    try {
+      await navigator.clipboard.writeText(token);
+      toast.show("API token copied.", "success");
+    } catch {
+      window.prompt("Copy this API token", token);
+    }
+  }
+
+  async function createApiToken() {
+    if (creatingApi()) return;
+    if (!apiScopes().length) {
+      toast.show("Choose at least one scope.", "error");
+      return;
+    }
+    setCreatingApi(true);
+    const result = await attemptAction(() =>
+      createTreeApiToken({
+        treeId: params.treeId,
+        name: apiName().trim() || "API token",
+        expiresInDays: apiExpiry() === "never" ? null : Number(apiExpiry()),
+        scopes: apiScopes(),
+      }),
+    );
+    setCreatingApi(false);
+    if (!result.ok) {
+      toast.show(result.error, "error");
+      return;
+    }
+    setCreatedApi(result.data);
+    setApiRows(rows => [result.data, ...(rows ?? [])]);
+    setApiName("");
+    await revalidate(apiTokensQuery.key);
+    toast.show("API token created.", "success");
+  }
+
   async function createShare() {
     if (creatingShare()) return;
     setCreatingShare(true);
@@ -396,6 +470,19 @@ function TreeSettingsInner() {
         );
         await revalidate(invitesQuery.key);
         toast.show("Invite revoked.", "success");
+      } else if (action.kind === "revoke-api") {
+        const result = await attemptAction(() =>
+          revokeTreeApiToken({ treeId: params.treeId, tokenId: action.tokenId }),
+        );
+        if (!result.ok) return toast.show(result.error, "error");
+        setApiRows(rows =>
+          rows?.map(row =>
+            row.id === action.tokenId ? { ...row, revokedAt: new Date() } : row,
+          ) ?? rows,
+        );
+        if (createdApi()?.id === action.tokenId) setCreatedApi(null);
+        await revalidate(apiTokensQuery.key);
+        toast.show("API token revoked.", "success");
       } else if (action.kind === "revoke-share") {
         const result = await attemptAction(() =>
           revokeTreeShareLink({ treeId: params.treeId, linkId: action.linkId }),
@@ -1084,6 +1171,187 @@ function TreeSettingsInner() {
                       </Show>
                     </div>
                   </SectionCard>
+
+                  <div class="mt-5">
+                    <SectionCard
+                      title="Developer API"
+                      description="Read-only tokens for scripts, notebooks, and other tools. A token can read this entire tree, including living relatives. Only owners can create one."
+                    >
+                      <div class="grid gap-3 sm:grid-cols-2 sm:items-end">
+                        <Field label="Token name" for="api-name" hint="Only you see this.">
+                          <input
+                            id="api-name"
+                            class="input"
+                            maxlength={80}
+                            placeholder="Research notebook"
+                            value={apiName()}
+                            onInput={event => setApiName(event.currentTarget.value)}
+                            data-testid="api-token-name"
+                          />
+                        </Field>
+                        <Field label="Expires" for="api-expiry">
+                          <select
+                            id="api-expiry"
+                            class="input"
+                            value={apiExpiry()}
+                            onChange={event => setApiExpiry(event.currentTarget.value)}
+                            data-testid="api-token-expiry"
+                          >
+                            <option value="30">In 30 days</option>
+                            <option value="90">In 90 days</option>
+                            <option value="365">In 1 year</option>
+                            <option value="never">Never</option>
+                          </select>
+                        </Field>
+                        <div class="sm:col-span-2">
+                          <p class="field-label mb-2">Scopes</p>
+                          <div class="grid gap-2 sm:grid-cols-2">
+                            <For each={API_SCOPES}>
+                              {scope => (
+                                <label class="flex items-start gap-2.5 rounded-xl border border-border px-3 py-2.5 text-sm">
+                                  <input
+                                    type="checkbox"
+                                    class="mt-0.5 size-4 accent-primary"
+                                    checked={apiScopes().includes(scope.value)}
+                                    onChange={event =>
+                                      toggleApiScope(scope.value, event.currentTarget.checked)
+                                    }
+                                    data-testid={`api-token-scope-${scope.value}`}
+                                  />
+                                  <span>
+                                    <span class="block font-medium">{scope.label}</span>
+                                    <span class="mt-0.5 block text-xs text-muted-foreground">
+                                      {scope.description}
+                                    </span>
+                                  </span>
+                                </label>
+                              )}
+                            </For>
+                          </div>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2 sm:col-span-2">
+                          <Button
+                            type="button"
+                            onClick={createApiToken}
+                            disabled={creatingApi()}
+                            data-testid="api-token-create"
+                          >
+                            <KeyRound size={15} />
+                            {creatingApi() ? "Creating…" : "Create token"}
+                          </Button>
+                          <A
+                            href="/docs/api"
+                            target="_blank"
+                            rel="noreferrer"
+                            class={buttonVariants({ variant: "secondary", size: "sm" })}
+                            data-testid="api-docs-link"
+                          >
+                            API docs
+                          </A>
+                          <A
+                            href="/api/v1/openapi.json"
+                            target="_blank"
+                            rel="noreferrer"
+                            class={buttonVariants({ variant: "secondary", size: "sm" })}
+                            data-testid="api-openapi-link"
+                          >
+                            OpenAPI spec
+                          </A>
+                        </div>
+                      </div>
+
+                      <Show when={createdApi()}>
+                        {created => (
+                          <div
+                            class="mt-5 rounded-xl border border-primary/25 bg-accent/50 p-3"
+                            data-testid="api-token-created"
+                          >
+                            <p class="text-xs font-semibold text-primary">
+                              Copy this token now. It is not shown again.
+                            </p>
+                            <div class="mt-2 flex flex-wrap gap-2">
+                              <input
+                                readonly
+                                class="input min-w-0 flex-1 font-mono text-xs"
+                                value={created().token}
+                                data-testid="api-token-created-value"
+                              />
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => copyApiToken(created().token)}
+                                data-testid="api-token-created-copy"
+                              >
+                                <Copy size={14} />
+                                Copy
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </Show>
+
+                      <div class="mt-6">
+                        <h3 class="field-label">Active and past tokens</h3>
+                        <Show
+                          when={apiRows()?.length}
+                          fallback={
+                            <p
+                              class="mt-2 rounded-xl border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground"
+                              data-testid="api-tokens-empty"
+                            >
+                              No API tokens yet.
+                            </p>
+                          }
+                        >
+                          <div class="mt-2 space-y-1" data-testid="api-token-list">
+                            <For each={apiRows()}>
+                              {token => (
+                                <div
+                                  class="flex flex-wrap items-center gap-3 rounded-xl px-2 py-2 text-sm transition hover:bg-accent/50"
+                                  data-testid={`api-token-row-${token.id}`}
+                                >
+                                  <KeyRound size={15} class="text-muted-foreground" />
+                                  <div class="min-w-0 flex-1">
+                                    <p class="font-medium">{token.name}</p>
+                                    <p class="text-xs text-muted-foreground">
+                                      {token.tokenPrefix}… ·{" "}
+                                      {token.scopes.map(scopeLabel).join(", ")}
+                                    </p>
+                                    <p class="text-xs text-muted-foreground">
+                                      {apiTokenStatus(token)}
+                                      <Show when={token.lastUsedAt}>
+                                        {" "}
+                                        · used {formatRelative(token.lastUsedAt)}
+                                      </Show>
+                                      <Show when={token.expiresAt}>
+                                        {" "}
+                                        · expires {formatRelative(token.expiresAt)}
+                                      </Show>
+                                    </p>
+                                  </div>
+                                  <Show when={!token.revokedAt}>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      class="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                      onClick={() =>
+                                        setConfirm({ kind: "revoke-api", tokenId: token.id })
+                                      }
+                                      data-testid={`api-token-revoke-${token.id}`}
+                                    >
+                                      Revoke
+                                    </Button>
+                                  </Show>
+                                </div>
+                              )}
+                            </For>
+                          </div>
+                        </Show>
+                      </div>
+                    </SectionCard>
+                  </div>
                 </TabsContent>
 
                 <TabsContent value="danger">
@@ -1365,7 +1633,11 @@ function TreeSettingsInner() {
             title={confirmTitle(confirm())}
             message={confirmMessage(confirm(), overview()?.tree.name ?? "this tree")}
             confirmLabel={confirmLabel(confirm())}
-            danger={confirm()?.kind === "remove" || confirm()?.kind === "revoke-share"}
+            danger={
+              confirm()?.kind === "remove" ||
+              confirm()?.kind === "revoke-share" ||
+              confirm()?.kind === "revoke-api"
+            }
             pending={pending()}
             onConfirm={runConfirm}
           />
@@ -1431,6 +1703,7 @@ function confirmTitle(action: { kind: string } | null) {
   if (action.kind === "remove") return "Remove this member?";
   if (action.kind === "leave") return "Leave this tree?";
   if (action.kind === "revoke-share") return "Revoke this share link?";
+  if (action.kind === "revoke-api") return "Revoke this API token?";
   return "Revoke this invite?";
 }
 
@@ -1439,6 +1712,7 @@ function confirmLabel(action: { kind: string } | null) {
   if (action.kind === "remove") return "Remove member";
   if (action.kind === "leave") return "Leave tree";
   if (action.kind === "revoke-share") return "Revoke link";
+  if (action.kind === "revoke-api") return "Revoke token";
   return "Revoke invite";
 }
 
@@ -1453,5 +1727,16 @@ function confirmMessage(action: { kind: string; name?: string } | null, treeName
   if (action.kind === "revoke-share") {
     return "Anyone with this link will lose access immediately. You can create a new link at any time.";
   }
+  if (action.kind === "revoke-api") {
+    return "Any script or app using this token will start receiving 401 responses immediately. This cannot be undone.";
+  }
   return "Anyone using this link will no longer be able to join.";
+}
+
+function apiTokenStatus(token: ApiTokenView) {
+  if (token.revokedAt) return "Revoked";
+  if (token.expiresAt && new Date(token.expiresAt).getTime() <= Date.now()) {
+    return "Expired";
+  }
+  return "Active";
 }
