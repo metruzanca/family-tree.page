@@ -1,6 +1,7 @@
 import { Show, type JSX } from "solid-js";
 import { X } from "lucide-solid";
 import { Button } from "./button";
+import { useI18n } from "~/i18n/LocaleProvider";
 import {
   Dialog,
   DialogContent,
@@ -23,6 +24,7 @@ type ModalProps = {
 };
 
 export function Modal(props: ModalProps) {
+  const { t } = useI18n();
   let body: HTMLDivElement | undefined;
 
   function focusFirstField(event: Event) {
@@ -54,7 +56,7 @@ export function Modal(props: ModalProps) {
             <div class="min-w-0">
               <Show
                 when={props.title}
-                fallback={<DialogTitle class="sr-only">Dialog</DialogTitle>}
+                fallback={<DialogTitle class="sr-only">{t("common.dialog")}</DialogTitle>}
               >
                 <DialogTitle class="font-display text-xl leading-tight tracking-tight">
                   {props.title}
@@ -70,7 +72,7 @@ export function Modal(props: ModalProps) {
               variant="ghost"
               size="icon-sm"
               type="button"
-              aria-label="Close dialog"
+              aria-label={t("common.closeDialog")}
               class="-mr-1.5 -mt-1"
               onClick={props.onClose}
             >

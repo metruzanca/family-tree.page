@@ -8,29 +8,16 @@ import {
   type FuzzyDateQualifier,
   type PartialDate,
 } from "~/lib/fuzzy-date";
+import { useI18n } from "~/i18n/LocaleProvider";
+import { localeTag, type TranslationKey } from "~/i18n";
 
-const qualifierOptions: { value: FuzzyDateQualifier; label: string }[] = [
-  { value: "exact", label: "Exact" },
-  { value: "about", label: "About" },
-  { value: "before", label: "Before" },
-  { value: "after", label: "After" },
-  { value: "between", label: "Between" },
-  { value: "unknown", label: "Unknown" },
-];
-
-const monthOptions = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
+const qualifierOptions: { value: FuzzyDateQualifier; labelKey: TranslationKey }[] = [
+  { value: "exact", labelKey: "date.qualifier.exact" },
+  { value: "about", labelKey: "date.qualifier.about" },
+  { value: "before", labelKey: "date.qualifier.before" },
+  { value: "after", labelKey: "date.qualifier.after" },
+  { value: "between", labelKey: "date.qualifier.between" },
+  { value: "unknown", labelKey: "date.qualifier.unknown" },
 ];
 
 type FuzzyDateFieldProps = {
@@ -43,6 +30,7 @@ type FuzzyDateFieldProps = {
 };
 
 export function FuzzyDateField(props: FuzzyDateFieldProps) {
+  const { t, locale } = useI18n();
   const value = () => props.value ?? { start: emptyPartialDate(), qualifier: "exact" as const };
   const qualifier = () => value().qualifier;
   const start = () => value().start;
@@ -51,7 +39,7 @@ export function FuzzyDateField(props: FuzzyDateFieldProps) {
   const preview = createMemo(() => {
     const current = props.value;
     if (!current) return "";
-    return formatFuzzyDate(current);
+    return formatFuzzyDate(current, { locale: locale() });
   });
 
   const invalid = createMemo(() => Boolean(props.value) && !isValidFuzzyDate(props.value!));
@@ -118,14 +106,14 @@ export function FuzzyDateField(props: FuzzyDateFieldProps) {
           class={`input ${props.compact ? "!py-1 text-xs" : ""}`}
           value={qualifier()}
           disabled={props.disabled}
-          aria-label="Date type"
+          aria-label={t("date.type")}
           data-testid={props.testId ? `${props.testId}-qualifier` : undefined}
           onChange={event =>
             changeQualifier(event.currentTarget.value as FuzzyDateQualifier)
           }
         >
           <For each={qualifierOptions}>
-            {option => <option value={option.value}>{option.label}</option>}
+            {option => <option value={option.value}>{t(option.labelKey)}</option>}
           </For>
         </select>
       </div>
@@ -143,7 +131,7 @@ export function FuzzyDateField(props: FuzzyDateFieldProps) {
         <Show when={qualifier() === "between"}>
           <div class="flex items-center gap-2">
             <span class="text-[0.68rem] font-semibold uppercase tracking-wide text-muted-foreground">
-              to
+              {t("date.to")}
             </span>
             <span class="h-px flex-1 bg-border" />
           </div>
@@ -167,7 +155,7 @@ export function FuzzyDateField(props: FuzzyDateFieldProps) {
       </Show>
 
       <Show when={invalid()}>
-        <p class="text-xs text-destructive">Check the date.</p>
+        <p class="text-xs text-destructive">{t("date.invalid")}</p>
       </Show>
     </div>
   );
@@ -181,6 +169,16 @@ function DatePartsInputs(props: {
   disabled?: boolean;
   onChange: (field: keyof PartialDate, raw: string) => void;
 }) {
+  const { t, locale } = useI18n();
+  const monthOptions = createMemo(() =>
+    Array.from({ length: 12 }, (_, index) => {
+      const date = new Date(Date.UTC(2000, index, 1));
+      return new Intl.DateTimeFormat(localeTag(locale()), {
+        month: "long",
+        timeZone: "UTC",
+      }).format(date);
+    }),
+  );
   const inputClass = () => `input min-w-0 ${props.compact ? "!py-1 text-xs" : ""}`;
   const maxDay = () =>
     props.parts.month ? daysInMonth(props.parts.year, props.parts.month) : 31;
@@ -191,13 +189,13 @@ function DatePartsInputs(props: {
         id={props.id}
         type="number"
         class={inputClass()}
-        placeholder="Year"
+        placeholder={t("date.year")}
         min={1}
         max={9999}
         inputmode="numeric"
         value={props.parts.year ?? ""}
         disabled={props.disabled}
-        aria-label="Year"
+        aria-label={t("date.year")}
         data-testid={props.testId}
         onInput={event => props.onChange("year", event.currentTarget.value)}
       />
@@ -205,25 +203,25 @@ function DatePartsInputs(props: {
         class={inputClass()}
         value={props.parts.month ?? ""}
         disabled={props.disabled}
-        aria-label="Month"
+        aria-label={t("date.month")}
         data-testid={props.testId ? `${props.testId}-month` : undefined}
         onChange={event => props.onChange("month", event.currentTarget.value)}
       >
-        <option value="">Month</option>
-        <For each={monthOptions}>
+        <option value="">{t("date.month")}</option>
+        <For each={monthOptions()}>
           {(month, index) => <option value={index() + 1}>{month}</option>}
         </For>
       </select>
       <input
         type="number"
         class={inputClass()}
-        placeholder="Day"
+        placeholder={t("date.day")}
         min={1}
         max={maxDay()}
         inputmode="numeric"
         value={props.parts.day ?? ""}
         disabled={props.disabled || props.parts.month === null}
-        aria-label="Day"
+        aria-label={t("date.day")}
         data-testid={props.testId ? `${props.testId}-day` : undefined}
         onInput={event => props.onChange("day", event.currentTarget.value)}
       />
