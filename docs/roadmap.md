@@ -12,13 +12,13 @@ Scope:
 - Preview every import with a per-record report, and never merge silently.
 - On conflict, offer keep, replace, or merge per person, and reuse the duplicate detector as the review step.
 - Map GEDCOM date approximations back to fuzzy dates without losing qualifiers.
-- Map `FAM` records to partnerships and parent-child links without inventing sex. The model has no sex field, so `HUSB` and `WIFE` become partner order or a follow-up sex field.
+- Map `FAM` records to partnerships and parent-child links. Sex is recorded now, so use it for `HUSB` and `WIFE` where possible and flag same-sex or unknown couples for review.
 - Keep the operation resumable, because large files can exceed a single request.
 - Decide whether media is matched by file name, embedded, or skipped.
 
 Open questions:
 
-- Whether to add a sex field before import, since both GEDCOM and the pedigree chart want one.
+- How to represent same-sex couples, since GEDCOM 5.5.1 has only `HUSB` and `WIFE`.
 - How to map custom life events to the standard event tags and back.
 - Whether an import creates a new tree or merges into an existing one.
 
@@ -94,7 +94,6 @@ Scope:
 - Fact confidence: certain, probable, possible, disputed, plus a proof note.
 - Name variants: birth, married, religious, and also-known-as names with GEDCOM `NAME` type mapping.
 - Research tasks and notes per person or branch, so open questions are visible to collaborators.
-- A sex field on people. It unlocks father and mother labels in the pedigree, the conventional aunt/uncle wording, GEDCOM `SEX`, and the standard descendant numbering styles without guessing.
 - Place authority: canonical place plus hierarchy, with a merge step for variants.
 - Saved searches, a "changed since" digest, and comments on a person.
 

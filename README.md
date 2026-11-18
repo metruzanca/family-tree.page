@@ -66,6 +66,7 @@ The graph is the main view. People are nodes, parent and partner relationships a
 - Multi-file uploads become albums rendered as stacked nodes on the graph
 - Portraits stay on the person node and are not duplicated as file nodes
 - Person profiles with parents, partners, children, and life notes
+- Sex per person, used for father and mother labels and GEDCOM `SEX`
 - Partial and approximate dates for people, partnerships, and photos, including unknown-year birthdays
 - A life events timeline for each person: residence, occupation, education, military service, migration, marriage, divorce, burial, and custom events
 - Image, PDF, and document uploads attached to people
@@ -229,7 +230,7 @@ The views share one focus person, chosen from a picker or passed as `?person=`. 
 
 All views live in `src/lib/research/` as pure functions with tests, and the components in `src/components/research/` only render their output. `buildResearchIndex` groups parents, children, partners, events, and media once, and the views reuse that index. Dates sort with `fuzzySortValue`, so unknown dates go last instead of pretending to be year zero. A parent cycle is bounded rather than followed forever.
 
-The tree does not record sex. That is why the pedigree labels the two parent slots "parent A" and "parent B" instead of father and mother, and why relationship labels read "aunt or uncle" and "sibling". A sex field is the first data-model follow-up, because it also unlocks the conventional labels in GEDCOM and NGSQ work.
+People record sex as female, male, other, or unknown. The pedigree labels a known male parent as father and a known female parent as mother, and falls back to parent for other or unknown. Relationship labels stay neutral, so the desk never guesses at aunt or uncle. GEDCOM export uses the same field for `SEX` and, when a couple is one male and one female, for `HUSB` and `WIFE`.
 
 ## How dates work
 
@@ -641,7 +642,7 @@ Tree settings has **Download GEDCOM** on the Tree tab, and the API exposes the s
 
 The file is GEDCOM 5.5.1, the format Ancestry, MyHeritage, Gramps, RootsMagic, Family Tree Maker, and most other tools import:
 
-- A header with UTF-8, LINEAGE-LINKED, a submitter, and a note about unknown sex.
+- A header with UTF-8, LINEAGE-LINKED, a submitter, and a note about couple roles.
 - One `INDI` per person with the primary name, nickname, maiden name, birth, death, biography, life events, and media references.
 - One `FAM` per parent set or partnership, with `HUSB`, `WIFE`, and `CHIL`, plus marriage, divorce, separation, partnership, or widowed events.
 - `OBJE` records that reference the original file name, not the stored binary.
@@ -649,7 +650,7 @@ The file is GEDCOM 5.5.1, the format Ancestry, MyHeritage, Gramps, RootsMagic, F
 
 Dates use the standard approximations: `ABT`, `BEF`, `AFT`, and `BET ... AND ...`. Partial dates keep their precision, and a date with no year is omitted rather than invented. Long notes and biographies wrap with `CONT` and `CONC`.
 
-Two limits are deliberate. The model has no sex field, so every person exports as `SEX U` and a couple's `HUSB` and `WIFE` roles use stable partner order. Review those roles after importing. Media records point at file names and do not embed binaries, which matches how most tools handle media. GEDCOM import is not built yet.
+GEDCOM 5.5.1 has only `HUSB` and `WIFE` for a couple. When one partner is male and the other female, the roles follow sex. Same-sex couples and unknown partners keep stable partner order, and the file header says so, because the format has no neutral roles. Review those families after importing. Media records point at file names and do not embed binaries, which matches how most tools handle media. GEDCOM import is not built yet.
 
 ## Deleting a tree
 
@@ -692,7 +693,7 @@ This is a reading aid, not access control. The whole graph is still sent to ever
 - Dates are Gregorian and structured. Seasons and free-text dates such as "spring 1918" are not represented; use an event note for those.
 - Focus is a presentation aid, not access control. The whole tree is still loaded for every member, and anyone can reveal all branches with one click.
 - The API is read-only. There are no write scopes, webhooks, or GEDCOM import yet. See [docs/roadmap.md](docs/roadmap.md) for the deferred work.
-- GEDCOM export has no sex field to work with. Every person exports as `SEX U`, and a couple's husband and wife roles use stable partner order, so review them after importing.
+- GEDCOM 5.5.1 has no neutral couple roles. Same-sex and unknown-partner families export `HUSB` and `WIFE` by stable order, with a note in the file header. Review those roles after importing.
 - The API changes feed is derived from tree activity, not a strict per-row delta with tombstones. Use `export.json` when a client needs a guaranteed snapshot.
 - No printable chart export, OCR, or face recognition yet. Face detection and manual linking ship, but names are never suggested.
 
