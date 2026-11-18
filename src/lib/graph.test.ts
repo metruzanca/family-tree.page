@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  PARENT_BIRTH_GAP,
   buildGraphModel,
   computeGenerations,
   dedupeRelationships,
@@ -9,6 +10,7 @@ import {
   groupChildrenByParents,
   groupNodeId,
   junctionNodeId,
+  layoutBirthYears,
   mediaAspect,
   nodeIdOf,
   nodeRadius,
@@ -16,7 +18,12 @@ import {
 } from "./graph";
 import type { GraphPerson, GraphRelationship, TreeGraph } from "../api/people-server";
 
-function person(id: string, firstName = id, lastName = "Simpson"): GraphPerson {
+function person(
+  id: string,
+  firstName = id,
+  lastName = "Simpson",
+  birthYear: number | null = null,
+): GraphPerson {
   return {
     id,
     firstName,
@@ -25,7 +32,10 @@ function person(id: string, firstName = id, lastName = "Simpson"): GraphPerson {
     maidenName: null,
     nickname: null,
     sex: "unknown",
-    birthDate: null,
+    birthDate:
+      birthYear === null
+        ? null
+        : { start: { year: birthYear, month: null, day: null }, qualifier: "exact" },
     deathDate: null,
     birthPlace: null,
     deathPlace: null,
@@ -99,6 +109,77 @@ describe("computeGenerations", () => {
     const relationships = [parent("c1", "a", "b"), parent("c2", "b", "a")];
     const levels = computeGenerations(people, relationships);
     expect(levels.size).toBe(2);
+  });
+});
+
+describe("layoutBirthYears", () => {
+  it("places an undated parent a layout gap above their first child", () => {
+    const people = [person("parent"), person("child", "child", "Simpson", 1980)];
+    const years = layoutBirthYears(people, [parent("r1", "parent", "child")]);
+    expect(years.get("child")).toBe(1980);
+    expect(years.get("parent")).toBe(1980 - PARENT_BIRTH_GAP);
+  });
+
+  it("uses the earliest child when a parent has several", () => {
+    const people = [
+      person("parent"),
+      person("older", "older", "Simpson", 1975),
+      person("younger", "younger", "Simpson", 1988),
+    ];
+    const years = layoutBirthYears(people, [
+      parent("r1", "parent", "younger"),
+      parent("r2", "parent", "older"),
+    ]);
+    expect(years.get("parent")).toBe(1975 - PARENT_BIRTH_GAP);
+  });
+
+  it("never replaces a real birth year", () => {
+    const people = [
+      person("parent", "parent", "Simpson", 1952),
+      person("child", "child", "Simpson", 1980),
+    ];
+    const years = layoutBirthYears(people, [parent("r1", "parent", "child")]);
+    expect(years.get("parent")).toBe(1952);
+  });
+
+  it("chains the layout gap up through undated generations", () => {
+    const people = [
+      person("grandparent"),
+      person("parent"),
+      person("child", "child", "Simpson", 1980),
+    ];
+    const relationships = [
+      parent("r1", "grandparent", "parent"),
+      parent("r2", "parent", "child"),
+    ];
+    const years = layoutBirthYears(people, relationships);
+    expect(years.get("parent")).toBe(1960);
+    expect(years.get("grandparent")).toBe(1940);
+  });
+
+  it("leaves people with no dated descendant out of the map", () => {
+    const people = [person("lonely"), person("parent"), person("child")];
+    const years = layoutBirthYears(people, [parent("r1", "parent", "child")]);
+    expect(years.size).toBe(0);
+  });
+
+  it("terminates on a cyclic parent pair", () => {
+    const people = [person("a"), person("b")];
+    const years = layoutBirthYears(people, [
+      parent("r1", "a", "b"),
+      parent("r2", "b", "a"),
+    ]);
+    expect(years.size).toBe(0);
+  });
+
+  it("stamps the placement year on the person nodes", () => {
+    const data = treeWith(
+      [person("parent"), person("child", "child", "Simpson", 1980)],
+      [parent("r1", "parent", "child")],
+    );
+    const model = buildGraphModel(data, false);
+    expect(model.byId.get("parent")?.orderYear).toBe(1960);
+    expect(model.byId.get("child")?.orderYear).toBe(1980);
   });
 });
 

@@ -5,7 +5,7 @@ import type {
   GraphRelationship,
   TreeGraph,
 } from "~/api/people-server";
-import type { FuzzyDate } from "./fuzzy-date";
+import { fuzzyOrderYear, type FuzzyDate } from "./fuzzy-date";
 import { analyzeRelationships } from "./relationships";
 
 export type ParentType =
@@ -30,6 +30,11 @@ export type GraphNode = {
   ownerId?: string;
   degree: number;
   level: number;
+  /**
+   * Placement-only birth year, derived by `layoutBirthYears`. Never drawn or
+   * shown: labels keep the real date, or "?" when there is none.
+   */
+  orderYear?: number | null;
   /** Render coordinates, assigned by GraphView from the layout. */
   x?: number;
   y?: number;
@@ -193,6 +198,13 @@ export function buildGraphModel(
   visible?: ReadonlySet<string>,
 ): GraphModel {
   const generations = computeGenerations(data.people, data.relationships);
+  // Years come from the whole tree for the same reason generations do: hiding a
+  // branch must not move the people who stay on screen.
+  const orderYears = layoutBirthYears(
+    data.people,
+    data.relationships,
+    generations,
+  );
   const people = visible
     ? data.people.filter(person => visible.has(person.id))
     : data.people;
@@ -229,6 +241,7 @@ export function buildGraphModel(
       person,
       degree: degree.get(person.id) ?? 0,
       level: generations.get(person.id) ?? 0,
+      orderYear: orderYears.get(person.id) ?? null,
     });
   }
 
@@ -426,6 +439,60 @@ export function computeGenerations(
   relationships: GraphRelationship[],
 ): Map<string, number> {
   return analyzeRelationships(people, relationships).levels;
+}
+
+/**
+ * An undated parent is placed this many years above their first dated child.
+ * The number is a layout convention, not a claim about the person.
+ */
+export const PARENT_BIRTH_GAP = 20;
+
+/**
+ * Birth years the layout may rely on. A real date always wins. A person without
+ * one borrows 20 years above the earliest child that has a year, and the
+ * borrow chains upward, so an undated parent of an undated parent still finds
+ * a slot. People with no dates anywhere below them stay out of the map, which
+ * keeps the "drift to the middle" fallback for them.
+ */
+export function layoutBirthYears(
+  people: GraphPerson[],
+  relationships: GraphRelationship[],
+  generations?: ReadonlyMap<string, number>,
+): Map<string, number> {
+  const years = new Map<string, number>();
+  for (const person of people) {
+    const year = fuzzyOrderYear(person.birthDate);
+    if (year !== null) years.set(person.id, year);
+  }
+
+  const childrenByParent = new Map<string, string[]>();
+  for (const relationship of relationships) {
+    if (relationship.type !== "parent") continue;
+    const children = childrenByParent.get(relationship.source);
+    if (children) children.push(relationship.target);
+    else childrenByParent.set(relationship.source, [relationship.target]);
+  }
+
+  // Children come first, so a borrowed year is ready before its parent is
+  // visited. Sorting one generation at a time is enough: a cycle in bad data
+  // leaves equal levels, and the single pass still terminates.
+  const levels = generations ?? computeGenerations(people, relationships);
+  const oldestLast = [...people].sort(
+    (left, right) => (levels.get(right.id) ?? 0) - (levels.get(left.id) ?? 0),
+  );
+
+  for (const person of oldestLast) {
+    if (years.has(person.id)) continue;
+    let earliest: number | null = null;
+    for (const childId of childrenByParent.get(person.id) ?? []) {
+      const childYear = years.get(childId);
+      if (childYear === undefined) continue;
+      if (earliest === null || childYear < earliest) earliest = childYear;
+    }
+    if (earliest !== null) years.set(person.id, earliest - PARENT_BIRTH_GAP);
+  }
+
+  return years;
 }
 
 export function neighborsOf(links: GraphLink[], id: string): Set<string> {

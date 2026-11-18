@@ -31,7 +31,7 @@ Everything the app can do, grouped by area. For the engineering behind these fea
 - Links stop short of the avatars they connect and are cut wherever one would pass behind someone else, so a line through a stranger never reads as a relationship.
 - Partner links arc above the couple, child links end in an arrowhead, sibling arms fan out in birth order, and a clearance force keeps people off lines that do not belong to them.
 - A label-aware collision force keeps names readable, and disconnected branches find their own space.
-- Optional birth-year gravity drifts older people upward without pinning rows, toggled from the toolbar and remembered per browser.
+- Optional birth-year gravity drifts older people upward without pinning rows, toggled from the toolbar and remembered per browser. An undated parent borrows 20 years above their first dated child, chaining up through undated generations, so the timeline stays readable without inventing a date anyone can see.
 - Weak generation gravity settles each level in its own loose band, and partners always share a band.
 - Media clusters around its owner through a short hidden spring and is drawn behind the graph, so a photo never covers a person.
 - Parent arms follow the relationship type, and hovering a person lifts their own links above the dimmed ones.

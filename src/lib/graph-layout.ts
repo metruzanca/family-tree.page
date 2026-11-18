@@ -1,4 +1,3 @@
-import { fuzzyOrderYear } from "./fuzzy-date";
 import {
   nodeIdOf,
   nodeRadius,
@@ -312,8 +311,7 @@ function compareOrder(left: number, right: number) {
 
 function childOrder(model: Pick<GraphModel, "byId">, link: GraphLink) {
   const node = model.byId.get(nodeIdOf(link.target));
-  const year = node?.person ? fuzzyOrderYear(node.person.birthDate) : null;
-  return year ?? Number.POSITIVE_INFINITY;
+  return node?.orderYear ?? Number.POSITIVE_INFINITY;
 }
 
 /**
@@ -396,8 +394,8 @@ const SEED_MEDIA_STEP_X = 120;
 const SEED_MEDIA_STEP_Y = 110;
 
 function seedOrder(left: GraphNode, right: GraphNode) {
-  const leftYear = left.person ? fuzzyOrderYear(left.person.birthDate) : null;
-  const rightYear = right.person ? fuzzyOrderYear(right.person.birthDate) : null;
+  const leftYear = left.orderYear ?? null;
+  const rightYear = right.orderYear ?? null;
   if (leftYear !== rightYear) {
     if (leftYear === null) return 1;
     if (rightYear === null) return -1;

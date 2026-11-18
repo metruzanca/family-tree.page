@@ -514,6 +514,24 @@ describe("seedLayout", () => {
     }
   });
 
+  it("seeds an undated parent in birth order from its first child", () => {
+    const undatedParent = buildGraphModel(
+      treeWith(
+        [
+          person("x", "Undated"),
+          person("c", "Child", 1980),
+          person("y", "Younger", 1970),
+        ],
+        [parent("r1", "x", "c")],
+      ),
+      false,
+    );
+    const seeds = seedLayout(undatedParent);
+    // x borrows 1960 from its child, so it lands left of the 1970 person
+    // instead of trailing the row as an unknown.
+    expect(seeds.get("x")!.x).toBeLessThan(seeds.get("y")!.x);
+  });
+
   it("is stable across calls", () => {
     expect([...seedLayout(model)]).toEqual([...seedLayout(model)]);
   });

@@ -11,7 +11,7 @@ import type { TreeGraph } from "~/api/people-server";
 import type { TreeRole } from "~/server/guards";
 import type { PresencePeer } from "~/lib/presence-protocol";
 import { presenceColor } from "~/lib/presence-color";
-import { formatFuzzyYearRange, fuzzyOrderYear } from "~/lib/fuzzy-date";
+import { formatFuzzyYearRange } from "~/lib/fuzzy-date";
 import { useI18n } from "~/i18n/LocaleProvider";
 import { cx } from "~/lib/utils";
 import {
@@ -20,6 +20,7 @@ import {
   fileCardSize,
   graphModelKey,
   initialsOf,
+  layoutBirthYears,
   neighborsOf,
   nodeRadius,
   type GraphLink,
@@ -70,7 +71,7 @@ const AGE_ORDER_MIN_SPAN = 400;
 const AGE_ORDER_MAX_SPAN = 1200;
 /** Strong enough to read as a timeline, still weaker than a family link. */
 const AGE_ORDER_STRENGTH = 0.3;
-/** Undated people drift toward the middle band instead of one end. */
+/** Undated people with no dated descendant drift toward the middle instead. */
 const AGE_ORDER_FALLBACK_STRENGTH = 0.05;
 
 export type GraphHandle = {
@@ -777,13 +778,15 @@ export function GraphView(props: GraphViewProps) {
 
   function ageYear(node: GraphNode) {
     if (node.kind !== "person") return null;
-    return fuzzyOrderYear(node.person?.birthDate);
+    return node.orderYear ?? null;
   }
 
   /**
    * Birth-year gravity is a soft pull, not a pinned row. The band is computed
    * from the whole tree so focusing a branch never rescales the people who
-   * are left on screen, and anyone without a birth year keeps strength zero.
+   * are left on screen, and anyone with no year anywhere below them keeps a
+   * weak pull toward the middle. The band includes borrowed parent years, so a
+   * tree dated only through its youngest generation still spreads out.
    */
   function applyAgeOrder(tree: TreeGraph, enabled: boolean) {
     if (!graph) return;
@@ -791,9 +794,9 @@ export function GraphView(props: GraphViewProps) {
       graph.d3Force("y", null);
       return;
     }
-    const years = tree.people
-      .map(person => fuzzyOrderYear(person.birthDate))
-      .filter((year): year is number => year !== null);
+    const years = [
+      ...layoutBirthYears(tree.people, tree.relationships).values(),
+    ];
     if (!years.length) {
       graph.d3Force("y", null);
       return;
