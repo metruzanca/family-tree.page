@@ -149,7 +149,9 @@ export function MediaGallery(props: MediaGalleryProps) {
         setDropActive(true);
       }}
       onDragLeave={event => {
-        if (event.currentTarget === event.target) setDropActive(false);
+        if (event.currentTarget === event.target || !event.relatedTarget) {
+          setDropActive(false);
+        }
       }}
       onDrop={handleDrop}
       data-testid="media-gallery"
