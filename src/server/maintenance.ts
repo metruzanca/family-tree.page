@@ -10,12 +10,18 @@ import {
 import { cleanupFile } from "./file-service";
 import { pruneUsageEvents } from "./usage";
 import { sendAbuseDigest } from "./abuse-report";
+import {
+  pruneDeletionRequests,
+  purgeDueTrees,
+  sendDeletionReminders,
+} from "./tree-deletion";
 
 const STALE_UPLOAD_MS = 24 * 60 * 60_000;
 const TOKEN_GRACE_MS = 30 * 24 * 60 * 60_000;
 const INVITE_GRACE_MS = 90 * 24 * 60 * 60_000;
 const USAGE_RETENTION_DAYS = 90;
 const BIRTHDAY_LOG_RETENTION_MONTHS = 12;
+const DELETION_REQUEST_GRACE_MS = 30 * 24 * 60 * 60_000;
 
 export type MaintenanceSummary = {
   staleUploads: number;
@@ -23,6 +29,11 @@ export type MaintenanceSummary = {
   invites: number;
   birthdayLogs: number;
   usageEvents: number;
+  purgedTrees: number;
+  failedTreePurges: number;
+  deletionReminders: number;
+  deletionReminderEmails: number;
+  deletionRequests: number;
   abuseWarnings: number;
   abuseDigestSent: boolean;
 };
@@ -84,6 +95,25 @@ export async function runMaintenance(): Promise<MaintenanceSummary> {
 
   const usageEvents = await pruneUsageEvents(USAGE_RETENTION_DAYS);
 
+  let purgedTrees = 0;
+  let failedTreePurges = 0;
+  let deletionReminders = 0;
+  let deletionReminderEmails = 0;
+  let deletionRequests = 0;
+  try {
+    const purge = await purgeDueTrees();
+    purgedTrees = purge.purged;
+    failedTreePurges = purge.failed;
+    const reminders = await sendDeletionReminders();
+    deletionReminders = reminders.trees;
+    deletionReminderEmails = reminders.emailsSent;
+    deletionRequests = await pruneDeletionRequests(
+      new Date(now - DELETION_REQUEST_GRACE_MS),
+    );
+  } catch (error) {
+    log.error("maintenance.tree_deletion_failed", { error });
+  }
+
   let abuseWarnings = 0;
   let abuseDigestSent = false;
   try {
@@ -100,6 +130,11 @@ export async function runMaintenance(): Promise<MaintenanceSummary> {
     invites: inviteRows.length,
     birthdayLogs: birthdayRows.length,
     usageEvents,
+    purgedTrees,
+    failedTreePurges,
+    deletionReminders,
+    deletionReminderEmails,
+    deletionRequests,
     abuseWarnings,
     abuseDigestSent,
   };

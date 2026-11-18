@@ -357,3 +357,123 @@ export function inviteMessage(input: {
     ].join("\n"),
   };
 }
+
+function longDate(value: Date) {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(value);
+}
+
+export function treeDeletionRequestedMessage(input: {
+  treeName: string;
+  requesterName: string;
+  url: string;
+  expiresAt: Date;
+}): EmailMessage {
+  const treeName = escapeHtml(input.treeName);
+  const requesterName = escapeHtml(input.requesterName);
+  const expires = longDate(input.expiresAt);
+
+  return {
+    subject: subjectLine(
+      `${input.requesterName} asked to delete ${input.treeName} on family-tree`,
+    ),
+    html: layout({
+      preheader: `${input.requesterName} asked to delete ${input.treeName}. Every owner must approve.`,
+      heading: "A tree deletion needs your approval",
+      paragraphs: [
+        `${requesterName} asked to delete <strong style="color:${BRAND.ink};">${treeName}</strong>.`,
+        "Every owner of the tree must approve before anything is scheduled. If one owner does not approve, nothing happens.",
+        `The request expires on ${expires}. You can review it in the tree's Danger tab.`,
+      ],
+      ctaLabel: "Review the request",
+      ctaUrl: input.url,
+      footnote:
+        "This is a transactional safety email about a tree you own. If you did not expect it, open the tree and cancel the request.",
+    }),
+    text: [
+      `${input.requesterName} asked to delete "${input.treeName}".`,
+      "",
+      "Every owner of the tree must approve before anything is scheduled. If one owner does not approve, nothing happens.",
+      "",
+      `The request expires on ${expires}. Review it with this link:`,
+      "",
+      input.url,
+      "",
+      "If you did not expect this, open the tree and cancel the request.",
+    ].join("\n"),
+  };
+}
+
+export function treeDeletionScheduledMessage(input: {
+  treeName: string;
+  purgeAt: Date;
+  url: string;
+}): EmailMessage {
+  const treeName = escapeHtml(input.treeName);
+  const purge = longDate(input.purgeAt);
+
+  return {
+    subject: subjectLine(`"${input.treeName}" is scheduled for deletion on family-tree`),
+    html: layout({
+      preheader: `${input.treeName} will be permanently erased on ${purge}. Any owner can restore it before then.`,
+      heading: "A tree is scheduled for deletion",
+      paragraphs: [
+        `Every owner approved deleting <strong style="color:${BRAND.ink};">${treeName}</strong>.`,
+        `The tree and everything in it will be permanently erased on ${purge}. Until then it is locked, and any owner can restore it from Your trees.`,
+      ],
+      ctaLabel: "Open your trees",
+      ctaUrl: input.url,
+      footnote:
+        "This is a transactional safety email about a tree you belong to. No action is needed if you agree with the deletion.",
+    }),
+    text: [
+      `Every owner approved deleting "${input.treeName}".`,
+      "",
+      `The tree and everything in it will be permanently erased on ${purge}. Until then it is locked, and any owner can restore it.`,
+      "",
+      input.url,
+      "",
+      "No action is needed if you agree with the deletion.",
+    ].join("\n"),
+  };
+}
+
+export function treeDeletionReminderMessage(input: {
+  treeName: string;
+  purgeAt: Date;
+  url: string;
+}): EmailMessage {
+  const treeName = escapeHtml(input.treeName);
+  const purge = longDate(input.purgeAt);
+
+  return {
+    subject: subjectLine(
+      `Last chance to restore "${input.treeName}" on family-tree`,
+    ),
+    html: layout({
+      preheader: `${input.treeName} will be permanently erased on ${purge}.`,
+      heading: "One week before permanent deletion",
+      paragraphs: [
+        `<strong style="color:${BRAND.ink};">${treeName}</strong> is scheduled to be erased on ${purge}.`,
+        "This is the reminder before the purge. Any owner can restore the tree until then. After the purge, the people, photographs, documents, and history are gone for good.",
+      ],
+      ctaLabel: "Restore the tree",
+      ctaUrl: input.url,
+      footnote:
+        "This is a transactional safety email about a tree you belong to. You received it because you are a member of the tree.",
+    }),
+    text: [
+      `"${input.treeName}" is scheduled to be erased on ${purge}.`,
+      "",
+      "This is the reminder before the purge. Any owner can restore the tree until then. After the purge, the people, photographs, documents, and history are gone for good.",
+      "",
+      input.url,
+      "",
+      "You received this because you are a member of the tree.",
+    ].join("\n"),
+  };
+}

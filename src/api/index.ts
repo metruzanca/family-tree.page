@@ -13,6 +13,7 @@ import { requireUserPage as requireUserPageFn } from "./require-user-server";
 import {
   getInvitePreview as getInvitePreviewFn,
   getMyTrees as getMyTreesFn,
+  getPendingDeletionTrees as getPendingDeletionTreesFn,
   getTreeInvites as getTreeInvitesFn,
   getTreeMembers as getTreeMembersFn,
   getTreeOverview as getTreeOverviewFn,
@@ -33,6 +34,10 @@ import {
 export const getUser = query(getUserFn, "user");
 export const requireUserPage = query(requireUserPageFn, "require-user");
 export const getMyTrees = query(getMyTreesFn, "my-trees");
+export const getPendingDeletionTrees = query(
+  getPendingDeletionTreesFn,
+  "pending-deletion-trees",
+);
 export const getTreeOverview = query(getTreeOverviewFn, "tree-overview");
 export const getTreeMembers = query(getTreeMembersFn, "tree-members");
 export const getTreeInvites = query(getTreeInvitesFn, "tree-invites");

@@ -171,7 +171,7 @@ export async function getSharedTree(token: string): Promise<SharedTree | null> {
     })
     .from(treeShareLinks)
     .innerJoin(trees, eq(trees.id, treeShareLinks.treeId))
-    .where(eq(treeShareLinks.tokenHash, tokenHash))
+    .where(and(eq(treeShareLinks.tokenHash, tokenHash), isNull(trees.deletedAt)))
     .limit(1);
 
   const link = rows[0];
@@ -222,7 +222,8 @@ export async function getSharedImage(
       revokedAt: treeShareLinks.revokedAt,
     })
     .from(treeShareLinks)
-    .where(eq(treeShareLinks.tokenHash, tokenHash))
+    .innerJoin(trees, eq(trees.id, treeShareLinks.treeId))
+    .where(and(eq(treeShareLinks.tokenHash, tokenHash), isNull(trees.deletedAt)))
     .limit(1);
   if (!link || link.revokedAt || !link.includeMedia) return null;
   if (link.expiresAt && link.expiresAt.getTime() <= Date.now()) return null;

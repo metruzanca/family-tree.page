@@ -18,7 +18,12 @@ export type ActivityAction =
   | "invite.created"
   | "invite.revoked"
   | "invite.accepted"
-  | "tree.updated";
+  | "tree.updated"
+  | "tree.deletion_requested"
+  | "tree.deletion_approved"
+  | "tree.deletion_cancelled"
+  | "tree.deletion_scheduled"
+  | "tree.restored";
 
 export type ActivityEntityType =
   | "person"
@@ -70,7 +75,14 @@ export const ACTIVITY_GROUP_ACTIONS: Record<ActivityGroup, ActivityAction[]> = {
     "invite.revoked",
     "invite.accepted",
   ],
-  tree: ["tree.updated"],
+  tree: [
+    "tree.updated",
+    "tree.deletion_requested",
+    "tree.deletion_approved",
+    "tree.deletion_cancelled",
+    "tree.deletion_scheduled",
+    "tree.restored",
+  ],
 };
 
 export const ACTIVITY_GROUPS: { value: ActivityGroup | ""; label: string }[] = [
@@ -134,5 +146,15 @@ export function activityActionLabel(action: ActivityAction) {
       return "Invite accepted";
     case "tree.updated":
       return "Tree updated";
+    case "tree.deletion_requested":
+      return "Deletion requested";
+    case "tree.deletion_approved":
+      return "Deletion approved";
+    case "tree.deletion_cancelled":
+      return "Deletion request cancelled";
+    case "tree.deletion_scheduled":
+      return "Tree scheduled for deletion";
+    case "tree.restored":
+      return "Tree restored";
   }
 }

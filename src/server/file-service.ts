@@ -1,5 +1,5 @@
 import { log } from "./logger";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { fileTypeFromBuffer } from "file-type";
 import { db } from "./db";
 import {
@@ -93,7 +93,14 @@ export async function getFileWithAccess(fileId: string, userId: string) {
   const memberships = await db
     .select({ role: treeMembers.role })
     .from(treeMembers)
-    .where(and(eq(treeMembers.treeId, file.treeId), eq(treeMembers.userId, userId)))
+    .innerJoin(trees, eq(trees.id, treeMembers.treeId))
+    .where(
+      and(
+        eq(treeMembers.treeId, file.treeId),
+        eq(treeMembers.userId, userId),
+        isNull(trees.deletedAt),
+      ),
+    )
     .limit(1);
   if (!memberships.length) return null;
   return { file, role: memberships[0].role };
@@ -103,6 +110,12 @@ export async function finalizeFile(fileId: string, userId: string): Promise<Stor
   const file = await getFileById(fileId);
   if (!file) throw new AppError("That upload could not be found.");
   if (file.uploadedBy !== userId) throw new AppError("That upload does not belong to you.");
+  const [tree] = await db
+    .select({ deletedAt: trees.deletedAt })
+    .from(trees)
+    .where(eq(trees.id, file.treeId))
+    .limit(1);
+  if (!tree || tree.deletedAt) throw new AppError("That tree is no longer available.");
   if (file.status === "ready") return file;
   if (file.status === "failed") throw new AppError("That upload failed. Please try again.");
 
@@ -215,7 +228,14 @@ export async function deleteFileRecord(fileId: string, userId: string): Promise<
   const memberships = await db
     .select({ role: treeMembers.role })
     .from(treeMembers)
-    .where(and(eq(treeMembers.treeId, file.treeId), eq(treeMembers.userId, userId)))
+    .innerJoin(trees, eq(trees.id, treeMembers.treeId))
+    .where(
+      and(
+        eq(treeMembers.treeId, file.treeId),
+        eq(treeMembers.userId, userId),
+        isNull(trees.deletedAt),
+      ),
+    )
     .limit(1);
   if (!memberships.length || memberships[0].role === "viewer") {
     throw new AppError("You do not have permission to delete this file.");

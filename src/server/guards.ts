@@ -1,5 +1,5 @@
 import { redirect } from "@solidjs/router";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { db } from "./db";
 import { trees, treeMembers, type Tree } from "../../drizzle/schema";
 import { requireUser, type PublicUser } from "./auth-service";
@@ -30,6 +30,7 @@ export type TreeAccess = {
 export async function requireTreeMember(
   treeId: string,
   minRole: TreeRole = "viewer",
+  options: { includeDeleted?: boolean } = {},
 ): Promise<TreeAccess> {
   if (!isUuid(treeId)) throw redirect("/trees");
   const user = await requireUser();
@@ -50,7 +51,13 @@ export async function requireTreeMember(
     })
     .from(treeMembers)
     .innerJoin(trees, eq(trees.id, treeMembers.treeId))
-    .where(and(eq(treeMembers.treeId, treeId), eq(treeMembers.userId, user.id)))
+    .where(
+      and(
+        eq(treeMembers.treeId, treeId),
+        eq(treeMembers.userId, user.id),
+        options.includeDeleted ? undefined : isNull(trees.deletedAt),
+      ),
+    )
     .limit(1);
 
   const membership = rows[0];

@@ -46,7 +46,9 @@ export type AnalyticsEvent =
   | "relationship_removed"
   | "tree_created"
   | "tree_deleted"
-  | "tree_left";
+  | "tree_deletion_requested"
+  | "tree_left"
+  | "tree_restored";
 
 type AnalyticsPayloads = {
   album_deleted: undefined;
@@ -74,7 +76,9 @@ type AnalyticsPayloads = {
   relationship_removed: { relation: string };
   tree_created: undefined;
   tree_deleted: undefined;
+  tree_deletion_requested: undefined;
   tree_left: undefined;
+  tree_restored: undefined;
 };
 
 const PAYLOAD_KEYS: Record<AnalyticsEvent, readonly string[]> = {
@@ -103,7 +107,9 @@ const PAYLOAD_KEYS: Record<AnalyticsEvent, readonly string[]> = {
   relationship_removed: ["relation"],
   tree_created: [],
   tree_deleted: [],
+  tree_deletion_requested: [],
   tree_left: [],
+  tree_restored: [],
 };
 
 /**

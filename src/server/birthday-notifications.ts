@@ -92,6 +92,7 @@ export async function sendBirthdayNotifications(
         isNotNull(users.emailVerifiedAt),
         isNotNull(people.birthDate),
         isNull(people.deathDate),
+        isNull(trees.deletedAt),
         or(
           eq(users.notifyBirthdayWeekBefore, true),
           eq(users.notifyBirthdayDayBefore, true),

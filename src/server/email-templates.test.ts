@@ -4,6 +4,9 @@ import {
   escapeHtml,
   inviteMessage,
   passwordResetMessage,
+  treeDeletionReminderMessage,
+  treeDeletionRequestedMessage,
+  treeDeletionScheduledMessage,
   verifyEmailMessage,
 } from "./email-templates";
 
@@ -100,5 +103,46 @@ describe("email templates", () => {
     expect(message.html).toContain("&lt;b&gt;The");
     expect(message.text).toContain("editor");
     expect(message.text).toContain("https://family-tree.test/invite/abc");
+  });
+
+  it("names the tree and approver in a deletion request", () => {
+    const message = treeDeletionRequestedMessage({
+      treeName: '<b>The "Simpson" family</b>',
+      requesterName: "Sam <sam@example.com>",
+      url: "https://family-tree.test/trees/123/settings?tab=danger",
+      expiresAt: new Date("2030-01-01T00:00:00Z"),
+    });
+    expect(message.subject).toContain("asked to delete");
+    expect(message.subject).not.toContain("\n");
+    expect(message.html).not.toContain("<b>The");
+    expect(message.html).toContain("&lt;b&gt;The");
+    expect(message.html).toContain("Every owner");
+    expect(message.text).toContain("Every owner");
+    expect(message.text).toContain("January 1, 2030");
+    expect(message.text).toContain("https://family-tree.test/trees/123/settings?tab=danger");
+  });
+
+  it("gives the purge date and restore path in a scheduled deletion", () => {
+    const message = treeDeletionScheduledMessage({
+      treeName: "The Simpsons",
+      purgeAt: new Date("2030-01-31T00:00:00Z"),
+      url: "https://family-tree.test/trees",
+    });
+    expect(message.subject).toContain("scheduled for deletion");
+    expect(message.text).toContain("January 31, 2030");
+    expect(message.text).toContain("restore");
+    expect(message.text).toContain("https://family-tree.test/trees");
+  });
+
+  it("warns before the purge in the reminder", () => {
+    const message = treeDeletionReminderMessage({
+      treeName: "The Simpsons",
+      purgeAt: new Date("2030-01-31T00:00:00Z"),
+      url: "https://family-tree.test/trees",
+    });
+    expect(message.subject).toContain("Last chance");
+    expect(message.html).toContain("January 31, 2030");
+    expect(message.text).toContain("gone for good");
+    expect(message.text).toContain("https://family-tree.test/trees");
   });
 });

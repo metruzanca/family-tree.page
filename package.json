@@ -22,6 +22,7 @@
     "usage:report": "tsx scripts/usage-report.ts",
     "abuse:report": "tsx scripts/abuse-report.ts",
     "maintenance:run": "tsx scripts/maintenance.ts",
+    "tree:purge": "tsx scripts/purge-tree.ts",
     "storage:cors": "tsx scripts/storage-cors.ts",
     "backup": "tsx scripts/backup.ts",
     "backup:verify": "tsx scripts/backup-verify.ts",

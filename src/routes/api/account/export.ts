@@ -107,6 +107,9 @@ export async function GET(event: APIEvent) {
         description: tree.description,
         createdAt: tree.createdAt,
         updatedAt: tree.updatedAt,
+        pendingDeletion: tree.deletedAt
+          ? { deletedAt: tree.deletedAt, purgeAfter: tree.purgeAfter }
+          : null,
       },
       role: membership.role,
       members: memberRows,

@@ -1,10 +1,10 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import type { HTTPEvent, SessionConfig } from "nitro/h3";
 import { getCookie, unsealSession } from "nitro/h3";
 import { db } from "./db";
 import { isUuid } from "./ids";
 import { SESSION_COOKIE_NAME, sessionConfig } from "./session";
-import { treeMembers, users } from "../../drizzle/schema";
+import { treeMembers, trees, users } from "../../drizzle/schema";
 
 export type PresenceIdentity = {
   userId: string;
@@ -39,7 +39,14 @@ export async function authenticatePresence(
     .select({ displayName: users.displayName })
     .from(treeMembers)
     .innerJoin(users, eq(users.id, treeMembers.userId))
-    .where(and(eq(treeMembers.treeId, treeId), eq(treeMembers.userId, userId)))
+    .innerJoin(trees, eq(trees.id, treeMembers.treeId))
+    .where(
+      and(
+        eq(treeMembers.treeId, treeId),
+        eq(treeMembers.userId, userId),
+        isNull(trees.deletedAt),
+      ),
+    )
     .limit(1);
   const row = rows[0];
   return row ? { userId, displayName: row.displayName } : null;
