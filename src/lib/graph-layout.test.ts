@@ -5,6 +5,7 @@ import {
   LEVEL_SPACING,
   PARENT_CURVE,
   PARTNER_CURVE,
+  arrowHead,
   forceLinkClearance,
   generationTargetY,
   linkCurvatures,
@@ -280,6 +281,79 @@ describe("splitPathOutsideCircles", () => {
         [{ x: 5, y: 5, radius: 1 }],
       ),
     ).toEqual([]);
+  });
+});
+
+describe("arrowHead", () => {
+  it("puts the tip on the end of the path and the base behind it", () => {
+    const head = arrowHead(
+      [
+        { x: 0, y: 0 },
+        { x: 80, y: 0 },
+        { x: 100, y: 0 },
+      ],
+      10,
+      4,
+    );
+    expect(head).not.toBeNull();
+    expect(head![0]).toEqual({ x: 100, y: 0 });
+    expect(head![1].x).toBeCloseTo(90);
+    expect(head![2].x).toBeCloseTo(90);
+    expect(head![1].y).toBeCloseTo(4);
+    expect(head![2].y).toBeCloseTo(-4);
+  });
+
+  it("follows the direction of the last segment", () => {
+    const head = arrowHead(
+      [
+        { x: 0, y: 0 },
+        { x: 0, y: 100 },
+      ],
+      10,
+      3,
+    );
+    expect(head![0]).toEqual({ x: 0, y: 100 });
+    expect(head![1].y).toBeCloseTo(90);
+    expect(head![2].y).toBeCloseTo(90);
+    expect([head![1].x, head![2].x].sort((a, b) => a - b)).toEqual([-3, 3]);
+  });
+
+  it("shrinks the head on a short run", () => {
+    const head = arrowHead(
+      [
+        { x: 0, y: 0 },
+        { x: 4, y: 0 },
+      ],
+      20,
+      10,
+    );
+    expect(head![1].x).toBeGreaterThan(0);
+    expect(head![1].x).toBeLessThan(4);
+    expect(Math.abs(head![1].y)).toBeLessThanOrEqual(2.2);
+  });
+
+  it("returns nothing for a degenerate path", () => {
+    expect(arrowHead([{ x: 5, y: 5 }], 10, 4)).toBeNull();
+    expect(
+      arrowHead(
+        [
+          { x: 5, y: 5 },
+          { x: 5, y: 5 },
+        ],
+        10,
+        4,
+      ),
+    ).toBeNull();
+    expect(
+      arrowHead(
+        [
+          { x: 0, y: 0 },
+          { x: 10, y: 0 },
+        ],
+        0,
+        4,
+      ),
+    ).toBeNull();
   });
 });
 

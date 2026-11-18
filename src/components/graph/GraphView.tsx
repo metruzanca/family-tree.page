@@ -30,6 +30,7 @@ import {
   JUNCTION_PASS_PAD,
   LEVEL_STRENGTH,
   PASS_THROUGH_PAD,
+  arrowHead,
   forceLinkClearance,
   generationTargetY,
   linkCurvatures,
@@ -83,7 +84,10 @@ type LinkStyle = {
   dim: boolean;
 };
 
-type LinkBucket = LinkStyle & { runs: LayoutPoint[][] };
+type LinkBucket = LinkStyle & {
+  runs: LayoutPoint[][];
+  arrows: LayoutPoint[][];
+};
 
 type GraphViewProps = {
   data: TreeGraph;
@@ -1015,10 +1019,17 @@ export function GraphView(props: GraphViewProps) {
       }`;
       let bucket = buckets.get(key);
       if (!bucket) {
-        bucket = { ...style, runs: [] };
+        bucket = { ...style, runs: [], arrows: [] };
         buckets.set(key, bucket);
       }
       for (const run of runs) bucket.runs.push(run);
+
+      // The line points at the child, so a family chain reads downward even
+      // when the couple and the junction are close together.
+      if (link.kind === "child") {
+        const arrow = arrowHead(runs[runs.length - 1]);
+        if (arrow) bucket.arrows.push(arrow);
+      }
     }
 
     // Dimmed links first, so a hovered family always sits on top.
@@ -1042,6 +1053,18 @@ export function GraphView(props: GraphViewProps) {
         bucket.dash ? bucket.dash.map(value => value / globalScale) : [],
       );
       context.stroke();
+
+      if (bucket.arrows.length) {
+        context.beginPath();
+        for (const arrow of bucket.arrows) {
+          context.moveTo(arrow[0].x, arrow[0].y);
+          context.lineTo(arrow[1].x, arrow[1].y);
+          context.lineTo(arrow[2].x, arrow[2].y);
+          context.closePath();
+        }
+        context.fillStyle = bucket.color;
+        context.fill();
+      }
     }
     context.setLineDash([]);
     context.restore();

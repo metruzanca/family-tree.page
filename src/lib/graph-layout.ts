@@ -27,6 +27,14 @@ export const PASS_THROUGH_PAD = 8;
 export const JUNCTION_PASS_PAD = 4;
 
 /**
+ * Child links end in a small arrowhead so every line points at the person it
+ * leads to. Kept in graph units so the head scales with the avatars instead of
+ * turning into a blob when the view is zoomed out.
+ */
+export const CHILD_ARROW_LENGTH = 7;
+export const CHILD_ARROW_HALF_WIDTH = 3.2;
+
+/**
  * Partner arcs always bow the same way on screen, away from the generation
  * band that holds the children.
  */
@@ -147,6 +155,39 @@ export function pathSlice(
   const to = Math.max(from, Math.min(end, total));
   if (to <= from) return [];
   return pointsAlong(points, cumulative, from, to);
+}
+
+/**
+ * Triangle pointing along the end of a path: the tip sits on the last point
+ * and the base is one arrow length behind it. A short run gets a smaller
+ * triangle instead of one that swallows the whole segment.
+ */
+export function arrowHead(
+  points: readonly Point[],
+  length = CHILD_ARROW_LENGTH,
+  halfWidth = CHILD_ARROW_HALF_WIDTH,
+): Point[] | null {
+  if (points.length < 2 || length <= 0 || halfWidth <= 0) return null;
+  const tip = points[points.length - 1];
+  const previous = points[points.length - 2];
+  const dx = tip.x - previous.x;
+  const dy = tip.y - previous.y;
+  const distance = Math.hypot(dx, dy);
+  if (distance < 0.001) return null;
+
+  const size = Math.min(length, distance * 0.85);
+  const half = Math.min(halfWidth, size * 0.55);
+  if (size <= 0 || half <= 0) return null;
+
+  const ux = dx / distance;
+  const uy = dy / distance;
+  const baseX = tip.x - ux * size;
+  const baseY = tip.y - uy * size;
+  return [
+    { x: tip.x, y: tip.y },
+    { x: baseX - uy * half, y: baseY + ux * half },
+    { x: baseX + uy * half, y: baseY - ux * half },
+  ];
 }
 
 /**
