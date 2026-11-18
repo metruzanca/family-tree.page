@@ -5,6 +5,7 @@ import {
   dedupeRelationships,
   fileCardSize,
   fileNodeId,
+  graphModelKey,
   groupChildrenByParents,
   groupNodeId,
   junctionNodeId,
@@ -532,5 +533,100 @@ describe("focused graph model", () => {
 
     const full = buildGraphModel(data, true);
     expect(full.nodes.some(node => node.id === fileNodeId("doc"))).toBe(true);
+  });
+});
+
+describe("graphModelKey", () => {
+  function graph(people: GraphPerson[], relationships: GraphRelationship[]): TreeGraph {
+    const data = treeWith(people, relationships);
+    data.files = [
+      {
+        id: "doc",
+        personId: "a",
+        groupId: null,
+        name: "letter.pdf",
+        mimeType: "application/pdf",
+        kind: "document",
+        thumbUrl: null,
+        width: null,
+        height: null,
+        sizeBytes: 2000,
+        takenAt: null,
+        facesScannedAt: null,
+        faces: [],
+        taggedPersonIds: [],
+        createdAt: new Date(),
+        isAvatar: false,
+      },
+    ];
+    data.groups = [
+      {
+        id: "album",
+        personId: "a",
+        name: "Album",
+        count: 2,
+        coverFileId: "doc",
+        coverWidth: null,
+        coverHeight: null,
+        createdAt: new Date(),
+      },
+    ];
+    return data;
+  }
+
+  it("ignores a new object with the same rows", () => {
+    const first = graph(["a", "b"].map(id => person(id)), [parent("r1", "a", "b")]);
+    const second = JSON.parse(JSON.stringify(first)) as TreeGraph;
+    expect(graphModelKey(second, true, new Set(["a", "b"]))).toBe(
+      graphModelKey(first, true, new Set(["a", "b"])),
+    );
+  });
+
+  it("ignores row order and fields the canvas never draws", () => {
+    const first = graph(["a", "b", "c"].map(id => person(id)), []);
+    const second = graph(["c", "b", "a"].map(id => person(id)), []);
+    second.people[0].bio = "A long biography";
+    second.events = [
+      {
+        id: "e1",
+        personId: "a",
+        kind: "residence",
+        title: "Moved",
+        place: null,
+        date: null,
+        description: null,
+        createdAt: new Date(),
+      },
+    ];
+    expect(graphModelKey(second, true)).toBe(graphModelKey(first, true));
+  });
+
+  it("changes when a drawn field, a row, a media card, or the visible set changes", () => {
+    const base = graph(["a", "b"].map(id => person(id)), [parent("r1", "a", "b")]);
+    const key = graphModelKey(base, true);
+
+    const renamed = graph(["a", "b"].map(id => person(id)), [parent("r1", "a", "b")]);
+    renamed.people[0].displayName = "Homer J. Simpson";
+    expect(graphModelKey(renamed, true)).not.toBe(key);
+
+    const dated = graph(["a", "b"].map(id => person(id)), [parent("r1", "a", "b")]);
+    dated.people[0].birthDate = {
+      start: { year: 1956, month: 5, day: 12 },
+      qualifier: "exact",
+    };
+    expect(graphModelKey(dated, true)).not.toBe(key);
+
+    const related = graph(["a", "b"].map(id => person(id)), [
+      parent("r1", "a", "b"),
+      partner("r2", "a", "b"),
+    ]);
+    expect(graphModelKey(related, true)).not.toBe(key);
+
+    const albumRenamed = graph(["a", "b"].map(id => person(id)), [parent("r1", "a", "b")]);
+    albumRenamed.groups[0].name = "Summer";
+    expect(graphModelKey(albumRenamed, true)).not.toBe(key);
+
+    expect(graphModelKey(base, false)).not.toBe(key);
+    expect(graphModelKey(base, true, new Set(["a"]))).not.toBe(key);
   });
 });

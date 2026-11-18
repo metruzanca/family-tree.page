@@ -5,6 +5,7 @@ import type {
   GraphRelationship,
   TreeGraph,
 } from "~/api/people-server";
+import type { FuzzyDate } from "./fuzzy-date";
 import { analyzeRelationships } from "./relationships";
 
 export type ParentType =
@@ -316,6 +317,97 @@ export function buildGraphModel(
     junctions,
     mediaByOwner,
   };
+}
+
+function dateKey(date: FuzzyDate | null | undefined) {
+  if (!date) return "";
+  const start = date.start;
+  const end = date.end;
+  return `${date.qualifier}:${start.year ?? ""}-${start.month ?? ""}-${start.day ?? ""}:${
+    end ? `${end.year ?? ""}-${end.month ?? ""}-${end.day ?? ""}` : ""
+  }`;
+}
+
+/**
+ * A stable fingerprint of everything the canvas reads. Presence reconnects and
+ * focus/visibility refreshes refetch the graph even when no row changed, and
+ * rebuilds restart the force simulation (which can also re-fit the view). The
+ * fingerprint lets GraphView skip those no-op updates. Rows are sorted by id so
+ * a different query order does not count as a change, and fields the canvas
+ * never draws (bio, events, member claims) are deliberately left out.
+ */
+export function graphModelKey(
+  data: TreeGraph,
+  showMedia: boolean,
+  visible?: ReadonlySet<string>,
+): string {
+  const people = [...data.people]
+    .sort((a, b) => a.id.localeCompare(b.id))
+    .map(person =>
+      [
+        person.id,
+        person.displayName,
+        person.firstName,
+        person.lastName,
+        person.avatarFileId ?? "",
+        dateKey(person.birthDate),
+        dateKey(person.deathDate),
+      ].join("|"),
+    );
+  const relationships = [...data.relationships]
+    .sort((a, b) => a.id.localeCompare(b.id))
+    .map(relationship =>
+      [
+        relationship.id,
+        relationship.type,
+        relationship.source,
+        relationship.target,
+        relationship.type === "parent"
+          ? relationship.parentType ?? ""
+          : relationship.status ?? "",
+      ].join("|"),
+    );
+  const media: string[] = [];
+  if (showMedia) {
+    for (const group of [...data.groups].sort((a, b) => a.id.localeCompare(b.id))) {
+      media.push(
+        [
+          "g",
+          group.id,
+          group.personId,
+          group.name,
+          String(group.count),
+          group.coverFileId ?? "",
+          group.coverWidth ?? "",
+          group.coverHeight ?? "",
+        ].join("|"),
+      );
+    }
+    for (const file of [...data.files].sort((a, b) => a.id.localeCompare(b.id))) {
+      media.push(
+        [
+          "f",
+          file.id,
+          file.personId,
+          file.groupId ?? "",
+          file.name,
+          file.kind,
+          file.thumbUrl ?? "",
+          file.width ?? "",
+          file.height ?? "",
+          file.isAvatar ? "avatar" : "",
+        ].join("|"),
+      );
+    }
+  }
+  const visibleKey = visible ? [...visible].sort().join(",") : "*";
+  return [
+    showMedia ? "media" : "no-media",
+    visibleKey,
+    ...people,
+    ...relationships,
+    ...media,
+  ].join("\n");
 }
 
 function addMedia(

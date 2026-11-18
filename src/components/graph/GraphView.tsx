@@ -17,6 +17,7 @@ import {
   branchColor,
   buildGraphModel,
   fileCardSize,
+  graphModelKey,
   initialsOf,
   neighborsOf,
   nodeRadius,
@@ -106,6 +107,7 @@ export function GraphView(props: GraphViewProps) {
   const initialModel = buildGraphModel(props.data, props.showMedia, props.visible);
   const [model, setModel] = createSignal<GraphModel>(initialModel);
   let previousPersonIds = new Set(initialModel.people.map(node => node.id));
+  let previousModelKey = "";
   const [hovered, setHovered] = createSignal<string | null>(null);
   const [ready, setReady] = createSignal(false);
   const [paintVersion, setPaintVersion] = createSignal(0);
@@ -986,6 +988,11 @@ export function GraphView(props: GraphViewProps) {
   });
 
   createEffect(() => {
+    // A refetch with identical rows must not touch force-graph: rebuilding the
+    // data restarts the simulation, and a changed person set re-fits the view.
+    const nextKey = graphModelKey(props.data, props.showMedia, props.visible);
+    if (nextKey === previousModelKey) return;
+    previousModelKey = nextKey;
     const nextModel = buildGraphModel(props.data, props.showMedia, props.visible);
     const nextPersonIds = new Set(nextModel.people.map(node => node.id));
     const peopleChanged =
