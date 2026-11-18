@@ -13,11 +13,13 @@ import { Button } from "../ui/button";
 import { Field } from "../ui/Field";
 import { Modal } from "../ui/Modal";
 import { useToast } from "../ui/Toast";
+import { useI18n } from "~/i18n/LocaleProvider";
 
 export function ImportGedcomDialog(props: {
   open: boolean;
   onClose: () => void;
 }) {
+  const { t } = useI18n();
   const navigate = useNavigate();
   const toast = useToast();
   const [fileName, setFileName] = createSignal("");
@@ -51,7 +53,7 @@ export function ImportGedcomDialog(props: {
     setFileName(file.name);
 
     if (file.size > MAX_GEDCOM_CHARS) {
-      setError("That file is larger than 5 MB.");
+      setError(t("tree.import.errorTooLarge"));
       return;
     }
 
@@ -66,14 +68,12 @@ export function ImportGedcomDialog(props: {
         .replace(/[_-]+/g, " ")
         .replace(/\s+/g, " ")
         .trim();
-      setTreeName(base || "Imported family tree");
+      setTreeName(base || t("tree.import.defaultName"));
       if (!parsed.people.length) {
-        setError(
-          "No people were found. Check that this is a GEDCOM file with INDI records.",
-        );
+        setError(t("tree.import.errorNoPeople"));
       }
     } catch {
-      setError("That file could not be read as text.");
+      setError(t("tree.import.errorUnreadable"));
     } finally {
       setReading(false);
     }
@@ -99,9 +99,7 @@ export function ImportGedcomDialog(props: {
     await revalidate(getMyTrees.key);
     track("tree_imported");
     toast.show(
-      `Imported ${result.data.people} ${
-        result.data.people === 1 ? "person" : "people"
-      }.`,
+      t("tree.import.imported", { count: result.data.people }),
       "success",
     );
     props.onClose();
@@ -112,12 +110,17 @@ export function ImportGedcomDialog(props: {
     <Modal
       open={props.open}
       onClose={props.onClose}
-      title="Import a GEDCOM file"
-      description="Creates a new tree from a GEDCOM 5.5.1 file. Nothing in your existing trees changes. Media files and sources are not imported."
+      title={t("tree.import.title")}
+      description={t("tree.import.description")}
       footer={
         <>
-          <Button variant="ghost" type="button" onClick={props.onClose}>
-            Cancel
+          <Button
+            variant="ghost"
+            type="button"
+            onClick={props.onClose}
+            data-testid="gedcom-import-cancel"
+          >
+            {t("common.cancel")}
           </Button>
           <Button
             type="submit"
@@ -125,16 +128,16 @@ export function ImportGedcomDialog(props: {
             disabled={pending() || reading() || !preview() || !text()}
             data-testid="gedcom-import-submit"
           >
-            {pending() ? "Importing…" : "Create tree from file"}
+            {pending() ? t("tree.import.importing") : t("tree.import.submit")}
           </Button>
         </>
       }
     >
       <form id="gedcom-import-form" class="space-y-4" onSubmit={submit}>
         <Field
-          label="GEDCOM file"
+          label={t("tree.import.fileLabel")}
           for="gedcom-file"
-          hint="A .ged file, up to 5 MB. The app reads the text, then creates the tree on the server."
+          hint={t("tree.import.fileHint")}
         >
           <input
             id="gedcom-file"
@@ -149,15 +152,15 @@ export function ImportGedcomDialog(props: {
         <Show when={fileName()}>
           <p class="text-xs text-muted-foreground" data-testid="gedcom-import-file-name">
             {fileName()}
-            {reading() ? " · reading…" : ""}
+            {reading() ? ` · ${t("tree.import.reading")}` : ""}
           </p>
         </Show>
 
-        <Field label="Tree name" for="gedcom-tree-name">
+        <Field label={t("tree.create.name")} for="gedcom-tree-name">
           <input
             id="gedcom-tree-name"
             class="input"
-            placeholder="The Zanca family"
+            placeholder={t("tree.create.namePlaceholder")}
             value={treeName()}
             onInput={event => setTreeName(event.currentTarget.value)}
             maxlength={80}
@@ -173,16 +176,16 @@ export function ImportGedcomDialog(props: {
               data-testid="gedcom-import-preview"
             >
               <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                <Stat label="People" value={parsed().stats.people} />
-                <Stat label="Families" value={parsed().stats.families} />
-                <Stat label="Events" value={parsed().stats.events} />
-                <Stat label="Warnings" value={parsed().stats.warnings} />
+                <Stat label={t("tree.import.stats.people")} value={parsed().stats.people} />
+                <Stat label={t("tree.import.stats.families")} value={parsed().stats.families} />
+                <Stat label={t("tree.import.stats.events")} value={parsed().stats.events} />
+                <Stat label={t("tree.import.stats.warnings")} value={parsed().stats.warnings} />
               </div>
 
-              <Show when={skippedSummary(parsed().stats)}>
+              <Show when={skippedSummary(parsed().stats, t)}>
                 {summary => (
                   <p class="mt-2 text-xs text-muted-foreground">
-                    {summary()} will be skipped.
+                    {t("tree.import.skipped", { summary: summary() })}
                   </p>
                 )}
               </Show>
@@ -196,7 +199,11 @@ export function ImportGedcomDialog(props: {
                         data-testid={`gedcom-import-warning-${index()}`}
                       >
                         <Show when={warning.line}>
-                          <span class="font-mono">Line {warning.line}: </span>
+                          {line => (
+                            <span class="font-mono">
+                              {t("tree.import.warningLine", { line: line() })}{" "}
+                            </span>
+                          )}
                         </Show>
                         {warning.message}
                       </li>
@@ -205,10 +212,11 @@ export function ImportGedcomDialog(props: {
                 </ul>
                 <Show when={parsed().stats.warningsHidden > 0 || parsed().warnings.length > 6}>
                   <p class="mt-1 text-xs text-muted-foreground">
-                    and{" "}
-                    {parsed().stats.warningsHidden +
-                      Math.max(0, parsed().warnings.length - 6)}{" "}
-                    more.
+                    {t("common.moreCount", {
+                      count:
+                        parsed().stats.warningsHidden +
+                        Math.max(0, parsed().warnings.length - 6),
+                    })}.
                   </p>
                 </Show>
               </Show>
@@ -226,17 +234,18 @@ export function ImportGedcomDialog(props: {
   );
 }
 
-function skippedSummary(stats: GedcomImportResult["stats"]) {
+function skippedSummary(
+  stats: GedcomImportResult["stats"],
+  t: ReturnType<typeof useI18n>["t"],
+) {
   const parts: string[] = [];
   if (stats.media) {
-    parts.push(
-      `${stats.media} media ${stats.media === 1 ? "reference" : "references"}`,
-    );
+    parts.push(t("tree.import.mediaReference", { count: stats.media }));
   }
   if (stats.sources) {
-    parts.push(`${stats.sources} ${stats.sources === 1 ? "source" : "sources"}`);
+    parts.push(t("tree.import.source", { count: stats.sources }));
   }
-  return parts.join(" and ");
+  return parts.join(` ${t("common.and")} `);
 }
 
 function Stat(props: { label: string; value: number }) {

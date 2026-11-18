@@ -15,8 +15,9 @@ import { LoadingCards } from "~/components/ui/Loading";
 import { useToast } from "~/components/ui/Toast";
 import { attemptAction } from "~/lib/action-result";
 import { track } from "~/lib/analytics";
-import { formatDate, formatRelative, roleLabel } from "~/lib/format";
+import { formatDate, formatRelative, roleKey } from "~/lib/format";
 import { daysUntilPurge } from "~/lib/tree-deletion";
+import { useI18n } from "~/i18n/LocaleProvider";
 
 export const route = {
   preload: () => {
@@ -27,12 +28,13 @@ export const route = {
 };
 
 export default function TreesPage() {
+  const { t } = useI18n();
   return (
     <AppErrorBoundary
-      title="We could not load your trees"
-      message="Your groves are still safe. The connection to the server may have dropped."
+      title={t("trees.error.title")}
+      message={t("trees.error.message")}
       revalidateKeys={[requireUserPage.key, getMyTrees.key, getPendingDeletionTrees.key]}
-      back={{ href: "/", label: "Back home" }}
+      back={{ href: "/", label: t("error.goHome") }}
     >
       <TreesInner />
     </AppErrorBoundary>
@@ -40,6 +42,7 @@ export default function TreesPage() {
 }
 
 function TreesInner() {
+  const { t, locale } = useI18n();
   const user = createAsync(() => requireUserPage());
   const trees = createAsync(() => getMyTrees());
   const pending = createAsync(() => getPendingDeletionTrees());
@@ -65,7 +68,7 @@ function TreesInner() {
     }
     await revalidate([getMyTrees.key, getPendingDeletionTrees.key]);
     track("tree_restored");
-    toast.show(`Restored ${name}.`, "success");
+    toast.show(t("trees.restored", { name }), "success");
   }
 
   return (
@@ -84,7 +87,7 @@ function TreesInner() {
                     data-testid="trees-import-gedcom"
                   >
                     <Upload />
-                    Import
+                    {t("trees.import")}
                   </Button>
                   <Button
                     size="sm"
@@ -92,7 +95,7 @@ function TreesInner() {
                     data-testid="trees-new-tree"
                   >
                     <Plus />
-                    New tree
+                    {t("trees.newTree")}
                   </Button>
                 </div>
               }
@@ -103,13 +106,12 @@ function TreesInner() {
               </Show>
               <section class="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
                 <div>
-                  <p class="eyebrow mb-2">Your groves</p>
+                  <p class="eyebrow mb-2">{t("trees.eyebrow")}</p>
                   <h1 class="font-display text-4xl tracking-tight sm:text-5xl">
-                    The families you keep.
+                    {t("trees.title")}
                   </h1>
                   <p class="mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground">
-                    Each tree is a private graph. Invite relatives to add stories, photographs and
-                    the connections between them.
+                    {t("trees.subtitle")}
                   </p>
                 </div>
                 <div class="hidden items-center gap-3 rounded-2xl border border-border bg-card/70 px-4 py-3 text-sm shadow-xs sm:flex">
@@ -119,7 +121,7 @@ function TreesInner() {
                   <div>
                     <p class="font-semibold leading-tight">{currentUser().displayName}</p>
                     <p class="text-xs text-muted-foreground">
-                      {trees()?.length ?? 0} {trees()?.length === 1 ? "tree" : "trees"}
+                      {t("trees.count", { count: trees()?.length ?? 0 })}
                     </p>
                   </div>
                 </div>
@@ -129,10 +131,9 @@ function TreesInner() {
                 <section class="mt-10" data-testid="deleted-trees-section">
                   <div class="flex flex-wrap items-end justify-between gap-2">
                     <div>
-                      <h2 class="font-display text-2xl tracking-tight">Recently deleted</h2>
+                      <h2 class="font-display text-2xl tracking-tight">{t("trees.deleted.title")}</h2>
                       <p class="mt-1 text-sm leading-relaxed text-muted-foreground">
-                        These trees are kept for 30 days. Restore one any time before the date
-                        shown.
+                        {t("trees.deleted.subtitle")}
                       </p>
                     </div>
                   </div>
@@ -140,6 +141,13 @@ function TreesInner() {
                     <For each={pending()}>
                       {tree => {
                         const days = () => daysUntilPurge(tree.purgeAfter);
+                        const erasedText = () => {
+                          if (!tree.purgeAfter) return t("trees.deleted.erasedOverdue");
+                          const date = formatDate(tree.purgeAfter, locale());
+                          if (days() === 0) return t("trees.deleted.erasedNextRun", { date });
+                          if (days() === 1) return t("trees.deleted.erasedTomorrow", { date });
+                          return t("trees.deleted.erasedInDays", { date, days: days() });
+                        };
                         return (
                           <Card
                             class="flex h-full flex-col gap-0 border-destructive/30 bg-destructive/5 p-4"
@@ -154,32 +162,24 @@ function TreesInner() {
                                   {tree.name}
                                 </h3>
                                 <p class="mt-0.5 text-xs text-muted-foreground">
-                                  {tree.peopleCount}{" "}
-                                  {tree.peopleCount === 1 ? "person" : "people"} ·{" "}
-                                  {tree.memberCount}{" "}
-                                  {tree.memberCount === 1 ? "member" : "members"}
+                                  {t("common.person", { count: tree.peopleCount })} ·{" "}
+                                  {t("trees.member", { count: tree.memberCount })}
                                 </p>
                               </div>
                             </div>
                             <p class="mt-3 text-xs leading-relaxed text-muted-foreground">
-                              Requested by {tree.requestedByName}{" "}
-                              {formatRelative(tree.deletedAt)}.{" "}
-                              {tree.purgeAfter
-                                ? `Erased on ${formatDate(tree.purgeAfter)}${
-                                    days() === 0
-                                      ? " (the next maintenance run)"
-                                      : days() === 1
-                                        ? " (tomorrow)"
-                                        : ` (in ${days()} days)`
-                                  }.`
-                                : "Erasure is overdue and will run shortly."}
+                              {t("trees.deleted.requestedBy", {
+                                name: tree.requestedByName,
+                                when: formatRelative(tree.deletedAt, locale()),
+                              })}{" "}
+                              {erasedText()}
                             </p>
                             <div class="mt-4 flex flex-wrap items-center gap-2">
                               <Show
                                 when={tree.role === "owner"}
                                 fallback={
                                   <p class="text-xs leading-relaxed text-muted-foreground">
-                                    Restoring needs an owner. Ask one of the owners to restore it.
+                                    {t("trees.deleted.ownerOnly")}
                                   </p>
                                 }
                               >
@@ -191,7 +191,9 @@ function TreesInner() {
                                   data-testid={`deleted-tree-restore-${tree.id}`}
                                 >
                                   <RotateCcw />
-                                  {restoringId() === tree.id ? "Restoring…" : "Restore tree"}
+                                  {restoringId() === tree.id
+                                    ? t("trees.deleted.restoring")
+                                    : t("trees.deleted.restore")}
                                 </Button>
                               </Show>
                             </div>
@@ -211,7 +213,7 @@ function TreesInner() {
                       when={!(pending() && pending()!.length > 0)}
                       fallback={
                         <p class="mt-10 rounded-2xl border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
-                          You have no active trees right now.
+                          {t("trees.deleted.noneActive")}
                         </p>
                       }
                     >
@@ -227,7 +229,8 @@ function TreesInner() {
                         <A
                           href={`/trees/${tree.id}`}
                           class="absolute inset-0 z-0 rounded-xl focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/35"
-                          aria-label={`Open ${tree.name}`}
+                          aria-label={t("trees.open", { name: tree.name })}
+                          data-testid={`tree-open-${tree.id}`}
                         />
                         <div class="pointer-events-none relative z-10">
                           <div class="flex items-start justify-between gap-3">
@@ -235,7 +238,7 @@ function TreesInner() {
                               <Sprout size={20} />
                             </span>
                             <Badge variant="secondary" class="uppercase tracking-wide">
-                              {roleLabel(tree.role)}
+                              {t(roleKey(tree.role))}
                             </Badge>
                           </div>
                           <h2 class="mt-5 font-display text-2xl leading-tight tracking-tight">
@@ -250,20 +253,21 @@ function TreesInner() {
                         <div class="pointer-events-none relative z-10 mt-6 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-border pt-3 text-xs text-muted-foreground">
                           <span class="flex items-center gap-1.5">
                             <Users size={13} />
-                            {tree.memberCount} {tree.memberCount === 1 ? "member" : "members"}
+                            {t("trees.member", { count: tree.memberCount })}
                           </span>
                           <span>
-                            {tree.peopleCount} {tree.peopleCount === 1 ? "person" : "people"}
+                            {t("common.person", { count: tree.peopleCount })}
                           </span>
-                          <span>{formatRelative(tree.updatedAt)}</span>
+                          <span>{formatRelative(tree.updatedAt, locale())}</span>
                           <span class="ml-auto flex items-center gap-2">
                             <A
                               href={`/trees/${tree.id}/calendar`}
                               class="pointer-events-auto inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-1 text-[0.68rem] font-semibold text-foreground transition hover:border-primary/40 hover:bg-accent/60 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/35"
-                              aria-label={`Open ${tree.name} calendar`}
+                              aria-label={t("trees.openCalendar", { name: tree.name })}
+                              data-testid={`tree-calendar-${tree.id}`}
                             >
                               <CalendarDays size={13} />
-                              Calendar
+                              {t("trees.calendar")}
                             </A>
                             <ArrowUpRight
                               size={15}
@@ -278,13 +282,14 @@ function TreesInner() {
                     type="button"
                     onClick={() => setCreating(true)}
                     class="group flex min-h-56 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border text-muted-foreground transition hover:border-primary/45 hover:bg-accent/40 hover:text-foreground"
+                    data-testid="trees-start-another"
                   >
                     <span class="grid size-11 place-items-center rounded-full border border-border bg-card transition group-hover:border-primary/40">
                       <Plus size={20} />
                     </span>
-                    <span class="text-sm font-semibold">Start another tree</span>
+                    <span class="text-sm font-semibold">{t("trees.startAnother")}</span>
                     <span class="max-w-48 text-center text-xs leading-relaxed">
-                      A separate branch for another side of the family.
+                      {t("trees.startAnotherHint")}
                     </span>
                   </button>
                 </div>
@@ -300,19 +305,19 @@ function TreesInner() {
 }
 
 function EmptyTrees(props: { onCreate: () => void }) {
+  const { t } = useI18n();
   return (
     <Card class="mx-auto mt-14 max-w-2xl items-center gap-0 px-6 py-14 text-center">
       <div class="grid size-16 place-items-center rounded-3xl bg-accent text-accent-foreground">
         <Sprout size={30} />
       </div>
-      <h2 class="mt-6 font-display text-3xl tracking-tight">Plant your first tree</h2>
+      <h2 class="mt-6 font-display text-3xl tracking-tight">{t("trees.empty.title")}</h2>
       <p class="mx-auto mt-3 max-w-md text-sm leading-relaxed text-muted-foreground">
-        Add the people you remember, connect parents and partners, then invite a relative to help
-        fill in the branches.
+        {t("trees.empty.body")}
       </p>
-      <Button class="mt-7" onClick={props.onCreate}>
+      <Button class="mt-7" onClick={props.onCreate} data-testid="trees-empty-create">
         <Plus />
-        Create a family tree
+        {t("trees.empty.create")}
       </Button>
     </Card>
   );
