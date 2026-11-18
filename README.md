@@ -62,7 +62,7 @@ The graph is the main view. People are nodes, parent and partner relationships a
 - Portraits stay on the person node and are not duplicated as file nodes
 - Person profiles with parents, partners, children, and life notes
 - Partial and approximate dates for people, partnerships, and photos, including unknown-year birthdays
-- A life events timeline for each person: residence, occupation, education, military service, migration, burial, and custom events
+- A life events timeline for each person: residence, occupation, education, military service, migration, marriage, divorce, burial, and custom events
 - Image, PDF, and document uploads attached to people
 - Client-generated thumbnails, server-side content validation, and private file access
 - Mobile layout with a person sheet, touch gestures, and a list-free graph fallback through search
@@ -225,7 +225,9 @@ The same model is used for `people.birth_date`, `people.death_date`, `partnershi
 
 ## Life events
 
-Each person has a timeline of life events. An event has a kind (residence, occupation, education, military service, immigration, emigration, burial, or other), an optional title, a place, a fuzzy date, and notes. Editors can add, edit, and delete events from the person panel. Events are included in account exports and are removed with the person or tree.
+Each person has a timeline of life events. An event has a kind (residence, occupation, education, military service, immigration, emigration, marriage, divorce, burial, or other), an optional title, a place, a fuzzy date, and notes. Editors can add, edit, and delete events from the person panel. Events are included in account exports and are removed with the person or tree.
+
+A parent's timeline also lists the birth of each child who has a birth date on their own record. These entries are derived, not stored as events: they are read-only from the parent, and selecting one opens the child. `buildLifeTimeline` in `src/lib/person-events.ts` merges both sources and sorts them by fuzzy date.
 
 ## Tree activity
 

@@ -1,5 +1,6 @@
 import { For, Show, createMemo } from "solid-js";
 import {
+  Baby,
   CalendarDays,
   Clock3,
   FileText,
@@ -29,8 +30,12 @@ import { IconButton } from "../ui/icon-button";
 import { Progress, ProgressGroup, ProgressLabel, ProgressValueLabel } from "../ui/progress";
 import { FileUploadButton } from "../files/FileUploadButton";
 import { formatYears } from "~/lib/format";
-import { compareFuzzyDates, formatFuzzyDate } from "~/lib/fuzzy-date";
-import { personEventKindLabel } from "~/lib/person-events";
+import { formatFuzzyDate } from "~/lib/fuzzy-date";
+import {
+  buildLifeTimeline,
+  personEventKindLabel,
+  type TimelineChildBirth,
+} from "~/lib/person-events";
 
 type PersonPanelProps = {
   person: GraphPerson;
@@ -102,13 +107,7 @@ export function PersonPanel(props: PersonPanelProps) {
     />
   );
   const events = createMemo(() =>
-    props.data.events
-      .filter(event => event.personId === props.person.id)
-      .sort(
-        (a, b) =>
-          compareFuzzyDates(a.date, b.date) ||
-          a.createdAt.getTime() - b.createdAt.getTime(),
-      ),
+    props.data.events.filter(event => event.personId === props.person.id),
   );
   const parents = createMemo(() =>
     props.data.relationships
@@ -134,6 +133,13 @@ export function PersonPanel(props: PersonPanelProps) {
       }))
       .filter(entry => entry.person),
   );
+  const childPeople = createMemo(() =>
+    children()
+      .map(entry => entry.person)
+      .filter((person): person is GraphPerson => Boolean(person)),
+  );
+  /** Own events plus the births of this person's children, in date order. */
+  const timeline = createMemo(() => buildLifeTimeline(events(), childPeople()));
   const partners = createMemo(() =>
     props.data.relationships
       .filter(
@@ -310,28 +316,32 @@ export function PersonPanel(props: PersonPanelProps) {
             </Show>
           </div>
           <Show
-            when={events().length}
+            when={timeline().length}
             fallback={
               <p
                 class="mt-1.5 rounded-xl border border-dashed border-border px-3 py-4 text-center text-xs leading-relaxed text-muted-foreground"
                 data-testid="person-panel-events-empty"
               >
                 {editable()
-                  ? "Add a residence, job, migration, or burial to build a timeline."
+                  ? "Add a residence, job, migration, marriage, or burial to build a timeline."
                   : "No life events yet."}
               </p>
             }
           >
             <ol class="mt-2 space-y-2">
-              <For each={events()}>
-                {event => (
-                  <LifeEventEntry
-                    event={event}
-                    editable={editable()}
-                    onEdit={() => props.onEditEvent(event)}
-                    onDelete={() => props.onDeleteEvent(event)}
-                  />
-                )}
+              <For each={timeline()}>
+                {entry =>
+                  entry.type === "event" ? (
+                    <LifeEventEntry
+                      event={entry.event}
+                      editable={editable()}
+                      onEdit={() => props.onEditEvent(entry.event)}
+                      onDelete={() => props.onDeleteEvent(entry.event)}
+                    />
+                  ) : (
+                    <ChildBirthEntry entry={entry} onSelect={props.onSelectPerson} />
+                  )
+                }
               </For>
             </ol>
           </Show>
@@ -709,6 +719,44 @@ function LifeEventEntry(props: {
             </button>
           </div>
         </Show>
+      </div>
+    </li>
+  );
+}
+
+function ChildBirthEntry(props: {
+  entry: TimelineChildBirth;
+  onSelect: (id: string) => void;
+}) {
+  return (
+    <li
+      class="rounded-xl border border-dashed border-border bg-background/40 px-3 py-2.5"
+      data-testid={`person-panel-child-birth-${props.entry.personId}`}
+    >
+      <div class="flex items-start gap-2">
+        <Baby size={13} class="mt-0.5 shrink-0 text-muted-foreground" />
+        <div class="min-w-0 flex-1">
+          <p class="text-[0.66rem] font-semibold uppercase tracking-wide text-muted-foreground">
+            {formatFuzzyDate(props.entry.date) || "Undated"}
+          </p>
+          <button
+            type="button"
+            class="mt-0.5 block max-w-full truncate text-left text-sm font-medium leading-snug transition hover:text-primary"
+            data-testid={`person-panel-child-birth-open-${props.entry.personId}`}
+            onClick={() => props.onSelect(props.entry.personId)}
+          >
+            Birth of {props.entry.name}
+          </button>
+          <Show when={props.entry.place}>
+            <p class="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+              <MapPin size={11} />
+              {props.entry.place}
+            </p>
+          </Show>
+          <p class="mt-1 text-[0.66rem] text-muted-foreground">
+            From this child&apos;s record
+          </p>
+        </div>
       </div>
     </li>
   );

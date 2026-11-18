@@ -1,3 +1,5 @@
+import { compareFuzzyDates, type FuzzyDate } from "./fuzzy-date";
+
 export const PERSON_EVENT_KINDS = [
   "residence",
   "occupation",
@@ -28,4 +30,74 @@ export const PERSON_EVENT_OPTIONS: { value: PersonEventKind; label: string }[] =
 
 export function personEventKindLabel(kind: PersonEventKind) {
   return PERSON_EVENT_OPTIONS.find(option => option.value === kind)?.label ?? "Event";
+}
+
+/** The child fields a derived birth entry needs, kept free of API types. */
+export type ChildBirthSource = {
+  id: string;
+  displayName: string;
+  birthDate: FuzzyDate | null;
+  birthPlace?: string | null;
+};
+
+type TimelineEventInput = {
+  date: FuzzyDate | null;
+  createdAt: Date;
+};
+
+export type LifeTimelineEntry<E> =
+  | { type: "event"; event: E }
+  | {
+      type: "child-birth";
+      personId: string;
+      name: string;
+      date: FuzzyDate;
+      place: string | null;
+    };
+
+export type TimelineChildBirth = Extract<LifeTimelineEntry<never>, { type: "child-birth" }>;
+
+function entryDate(entry: LifeTimelineEntry<TimelineEventInput>): FuzzyDate | null {
+  return entry.type === "event" ? entry.event.date : entry.date;
+}
+
+/**
+ * A person's timeline: their own events interleaved with the births of their
+ * children. Only children with a known birth date contribute, so a parent's
+ * timeline never fills with undated noise. Birth entries are derived from the
+ * child's record and are not editable from the parent.
+ */
+export function buildLifeTimeline<E extends TimelineEventInput>(
+  events: E[],
+  children: ChildBirthSource[],
+): LifeTimelineEntry<E>[] {
+  const entries: LifeTimelineEntry<E>[] = [
+    ...events.map(event => ({ type: "event" as const, event })),
+    ...children
+      .filter(
+        (
+          child,
+        ): child is ChildBirthSource & { birthDate: FuzzyDate } =>
+          child.birthDate !== null && child.birthDate !== undefined,
+      )
+      .map(child => ({
+        type: "child-birth" as const,
+        personId: child.id,
+        name: child.displayName,
+        date: child.birthDate,
+        place: child.birthPlace ?? null,
+      })),
+  ];
+
+  return entries.sort((a, b) => {
+    const byDate = compareFuzzyDates(entryDate(a), entryDate(b));
+    if (byDate) return byDate;
+    if (a.type === "event" && b.type === "event") {
+      return a.event.createdAt.getTime() - b.event.createdAt.getTime();
+    }
+    if (a.type === "child-birth" && b.type === "child-birth") {
+      return a.name.localeCompare(b.name);
+    }
+    return a.type === "event" ? -1 : 1;
+  });
 }
