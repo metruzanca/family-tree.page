@@ -31,6 +31,7 @@ import { Button, buttonVariants } from "../ui/button";
 import { IconButton } from "../ui/icon-button";
 import { Progress, ProgressGroup, ProgressLabel, ProgressValueLabel } from "../ui/progress";
 import { FileUploadButton } from "../files/FileUploadButton";
+import { PersonContactSection, PersonLinksSection } from "./PersonLinks";
 import { formatYears } from "~/lib/format";
 import { formatFuzzyDate } from "~/lib/fuzzy-date";
 import {
@@ -309,6 +310,17 @@ export function PersonPanel(props: PersonPanelProps) {
               </Badge>
             </Show>
           </section>
+        </Show>
+
+        <Show when={props.person.links.length}>
+          <PersonLinksSection links={props.person.links} />
+        </Show>
+
+        <Show when={props.person.contactEmail || props.person.contactPhone}>
+          <PersonContactSection
+            email={props.person.contactEmail}
+            phone={props.person.contactPhone}
+          />
         </Show>
 
         <section class="mb-5" data-testid="person-panel-events">

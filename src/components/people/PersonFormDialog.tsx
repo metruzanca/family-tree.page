@@ -1,6 +1,7 @@
 import { For, Show, createEffect, createSignal } from "solid-js";
 import { createStore } from "solid-js/store";
 import { revalidate } from "@solidjs/router";
+import { House, Plus, Trash2 } from "lucide-solid";
 import type { GraphPerson } from "~/api/people-server";
 import {
   createPerson,
@@ -22,6 +23,12 @@ import {
   PERSON_SEX_OPTIONS,
   type PersonSex,
 } from "~/lib/person-sex";
+import {
+  canBeHomeLink,
+  MAX_PERSON_LINKS,
+  type PersonLink,
+} from "~/lib/person-links";
+import { PersonLinkGlyph } from "./PersonLinks";
 
 export type PersonFormState = {
   firstName: string;
@@ -34,6 +41,9 @@ export type PersonFormState = {
   birthPlace: string;
   deathPlace: string;
   bio: string;
+  links: PersonLink[];
+  contactEmail: string;
+  contactPhone: string;
 };
 
 const emptyForm: PersonFormState = {
@@ -47,6 +57,9 @@ const emptyForm: PersonFormState = {
   birthPlace: "",
   deathPlace: "",
   bio: "",
+  links: [],
+  contactEmail: "",
+  contactPhone: "",
 };
 
 export function PersonFormDialog(props: {
@@ -79,13 +92,46 @@ export function PersonFormDialog(props: {
             birthPlace: person.birthPlace ?? "",
             deathPlace: person.deathPlace ?? "",
             bio: person.bio ?? "",
+            links: (person.links ?? []).map(link => ({ ...link })),
+            contactEmail: person.contactEmail ?? "",
+            contactPhone: person.contactPhone ?? "",
           }
-        : { ...emptyForm },
+        : { ...emptyForm, links: [] },
     );
     setError("");
     setDuplicates([]);
     setAllowDuplicate(false);
   });
+
+  function addLink() {
+    if (form.links.length >= MAX_PERSON_LINKS) return;
+    setForm("links", [...form.links, { url: "", isHome: false }]);
+  }
+
+  function removeLink(index: number) {
+    setForm(
+      "links",
+      form.links.filter((_, current) => current !== index),
+    );
+  }
+
+  function updateLinkUrl(index: number, url: string) {
+    setForm("links", index, "url", url);
+    if (form.links[index]?.isHome && !canBeHomeLink(url)) {
+      setForm("links", index, "isHome", false);
+    }
+  }
+
+  function toggleHome(index: number) {
+    const next = !form.links[index]?.isHome;
+    setForm(
+      "links",
+      form.links.map((link, current) => ({
+        ...link,
+        isHome: current === index ? next : false,
+      })),
+    );
+  }
 
   async function submit(event: SubmitEvent) {
     event.preventDefault();
@@ -105,6 +151,11 @@ export function PersonFormDialog(props: {
       birthPlace: form.birthPlace,
       deathPlace: form.deathPlace,
       bio: form.bio,
+      links: form.links
+        .map(link => ({ url: link.url.trim(), isHome: link.isHome }))
+        .filter(link => link.url.length > 0),
+      contactEmail: form.contactEmail,
+      contactPhone: form.contactPhone,
     };
 
     if (!props.person && !allowDuplicate()) {
@@ -291,6 +342,146 @@ export function PersonFormDialog(props: {
             data-testid="person-form-bio"
           />
         </Field>
+
+        <section
+          class="space-y-3 rounded-xl border border-border bg-secondary/20 p-3"
+          data-testid="person-form-links"
+        >
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <h3 class="field-label">Links</h3>
+              <p class="mt-0.5 text-[0.7rem] leading-relaxed text-muted-foreground">
+                Social profiles show as icons on the profile. Mark one personal
+                website with the house.
+              </p>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              onClick={addLink}
+              disabled={form.links.length >= MAX_PERSON_LINKS}
+              data-testid="person-form-add-link"
+            >
+              <Plus size={13} />
+              Add link
+            </Button>
+          </div>
+
+          <Show
+            when={form.links.length}
+            fallback={
+              <p
+                class="rounded-lg border border-dashed border-border px-3 py-3 text-center text-xs text-muted-foreground"
+                data-testid="person-form-links-empty"
+              >
+                No links yet.
+              </p>
+            }
+          >
+            <div class="space-y-2">
+              <For each={form.links}>
+                {(link, index) => (
+                  <div
+                    class="flex items-center gap-2"
+                    data-testid={`person-form-link-${index()}`}
+                  >
+                    <span
+                      class="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-border bg-card text-muted-foreground"
+                      data-testid={`person-form-link-preview-${index()}`}
+                    >
+                      <PersonLinkGlyph link={link} size={16} />
+                    </span>
+                    <input
+                      class="input min-w-0 flex-1"
+                      placeholder="https://instagram.com/name"
+                      value={link.url}
+                      onInput={event =>
+                        updateLinkUrl(index(), event.currentTarget.value)
+                      }
+                      maxlength={2048}
+                      aria-label="Link address"
+                      data-testid={`person-form-link-url-${index()}`}
+                    />
+                    <Show
+                      when={
+                        link.url.trim() &&
+                        (canBeHomeLink(link.url) || link.isHome)
+                      }
+                    >
+                      <button
+                        type="button"
+                        class={`grid h-9 w-9 shrink-0 place-items-center rounded-xl border transition hover:bg-primary/5 ${
+                          link.isHome
+                            ? "border-primary bg-primary/10 text-primary"
+                            : "border-border text-muted-foreground hover:text-foreground"
+                        }`}
+                        aria-pressed={link.isHome}
+                        aria-label={
+                          link.isHome
+                            ? "Remove personal website"
+                            : "Use as personal website"
+                        }
+                        onClick={() => toggleHome(index())}
+                        data-testid={`person-form-link-home-${index()}`}
+                      >
+                        <House size={15} />
+                      </button>
+                    </Show>
+                    <button
+                      type="button"
+                      class="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-border text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"
+                      aria-label="Remove link"
+                      onClick={() => removeLink(index())}
+                      data-testid={`person-form-link-remove-${index()}`}
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
+                )}
+              </For>
+            </div>
+          </Show>
+
+          <div class="grid gap-3 sm:grid-cols-2">
+            <Field
+              label="Contact email"
+              for="person-contact-email"
+              hint="Only tree members can see this."
+            >
+              <input
+                id="person-contact-email"
+                class="input"
+                type="email"
+                placeholder="Optional"
+                value={form.contactEmail}
+                onInput={event =>
+                  setForm("contactEmail", event.currentTarget.value)
+                }
+                maxlength={254}
+                data-testid="person-form-contact-email"
+              />
+            </Field>
+            <Field
+              label="Contact phone"
+              for="person-contact-phone"
+              hint="Only tree members can see this."
+            >
+              <input
+                id="person-contact-phone"
+                class="input"
+                type="tel"
+                placeholder="Optional"
+                value={form.contactPhone}
+                onInput={event =>
+                  setForm("contactPhone", event.currentTarget.value)
+                }
+                maxlength={50}
+                data-testid="person-form-contact-phone"
+              />
+            </Field>
+          </div>
+        </section>
         <Show when={duplicates().length}>
           <DuplicateWarning
             candidates={duplicates()}
