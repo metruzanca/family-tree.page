@@ -9,6 +9,8 @@ import { Card } from "~/components/ui/card";
 import { Field } from "~/components/ui/Field";
 import { Skeleton } from "~/components/ui/skeleton";
 import { getPasswordResetPreview, resetPassword } from "~/api";
+import { useI18n } from "~/i18n/LocaleProvider";
+import { Trans } from "~/i18n/Trans";
 
 export const route = {
   preload: ({ params }: { params: { token: string } }) =>
@@ -16,12 +18,13 @@ export const route = {
 };
 
 export default function ResetPasswordPage() {
+  const { t } = useI18n();
   return (
     <AppErrorBoundary
-      title="We could not check this link"
-      message="The link may still be good. Try again, or request a new one."
+      title={t("auth.error.linkCheck")}
+      message={t("auth.error.linkCheck.reset")}
       revalidateKeys={[getPasswordResetPreview.key]}
-      back={{ href: "/forgot-password", label: "Request a new link" }}
+      back={{ href: "/forgot-password", label: t("auth.reset.requestNew") }}
     >
       <ResetPasswordInner />
     </AppErrorBoundary>
@@ -29,6 +32,7 @@ export default function ResetPasswordPage() {
 }
 
 function ResetPasswordInner() {
+  const { t } = useI18n();
   const params = useParams<{ token: string }>();
   const preview = createAsync(() => getPasswordResetPreview(params.token));
   const submission = useSubmission(resetPassword);
@@ -36,17 +40,24 @@ function ResetPasswordInner() {
 
   return (
     <AuthLayout
-      title="Choose a new password"
-      subtitle="Your reset link works once. After this, every other device is signed out."
+      title={t("auth.reset.title")}
+      subtitle={t("auth.reset.subtitle")}
       footer={
         <span>
-          Need a new link?{" "}
-          <A
-            href="/forgot-password"
-            class="font-semibold text-primary underline decoration-primary/30 underline-offset-4"
-          >
-            Request another
-          </A>
+          <Trans
+            key="auth.reset.footer"
+            components={{
+              requestAnother: (
+                <A
+                  href="/forgot-password"
+                  class="font-semibold text-primary underline decoration-primary/30 underline-offset-4"
+                  data-testid="reset-password-request-another"
+                >
+                  {t("auth.reset.requestAnother")}
+                </A>
+              ),
+            }}
+          />
         </span>
       }
     >
@@ -69,20 +80,21 @@ function ResetPasswordInner() {
                   <Clock size={26} />
                 </div>
                 <h2 class="mt-5 font-display text-2xl tracking-tight">
-                  This link cannot be used
+                  {t("auth.linkInvalid")}
                 </h2>
                 <p class="mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">
                   {state().status === "expired"
-                    ? "This reset link has expired."
+                    ? t("auth.reset.expired")
                     : state().status === "used"
-                      ? "This reset link has already been used."
-                      : "This reset link is not valid."}
+                      ? t("auth.reset.used")
+                      : t("auth.reset.invalid")}
                 </p>
                 <A
                   href="/forgot-password"
                   class={buttonVariants({ class: "mt-6" })}
+                  data-testid="reset-password-request-new"
                 >
-                  Request a new link
+                  {t("auth.reset.requestNew")}
                 </A>
               </Card>
             }
@@ -90,29 +102,35 @@ function ResetPasswordInner() {
             <Card class="gap-0 p-5 sm:p-6">
               <form action={resetPassword} method="post" class="space-y-4">
                 <input type="hidden" name="token" value={params.token} />
-                <Field label="New password" for="password" hint="At least 10 characters.">
+                <Field
+                  label={t("auth.newPassword")}
+                  for="password"
+                  hint={t("auth.passwordHint")}
+                >
                   <input
                     id="password"
                     name="password"
                     type="password"
                     class="input"
-                    placeholder="Choose a password"
+                    placeholder={t("auth.choosePassword")}
                     autocomplete="new-password"
                     minlength={10}
                     required
                     autofocus
+                    data-testid="reset-password-new"
                   />
                 </Field>
-                <Field label="Confirm password" for="confirmPassword">
+                <Field label={t("auth.confirmPassword")} for="confirmPassword">
                   <input
                     id="confirmPassword"
                     name="confirmPassword"
                     type="password"
                     class="input"
-                    placeholder="Type it again"
+                    placeholder={t("auth.repeatPassword")}
                     autocomplete="new-password"
                     minlength={10}
                     required
+                    data-testid="reset-password-confirm"
                   />
                 </Field>
                 <Show when={error()}>
@@ -121,12 +139,17 @@ function ResetPasswordInner() {
                     <AlertDescription>{error()}</AlertDescription>
                   </Alert>
                 </Show>
-                <Button type="submit" class="w-full" disabled={submission.pending}>
-                  {submission.pending ? "Saving…" : "Save new password"}
+                <Button
+                  type="submit"
+                  class="w-full"
+                  disabled={submission.pending}
+                  data-testid="reset-password-submit"
+                >
+                  {submission.pending ? t("auth.saving") : t("auth.reset.submit")}
                 </Button>
                 <p class="flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground">
                   <LockKeyhole size={12} />
-                  Resetting your password signs you out everywhere else.
+                  {t("auth.reset.signOutNote")}
                 </p>
               </form>
             </Card>

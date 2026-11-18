@@ -7,8 +7,11 @@ import { Button } from "~/components/ui/button";
 import { Card } from "~/components/ui/card";
 import { Field } from "~/components/ui/Field";
 import { login } from "~/api";
+import { useI18n } from "~/i18n/LocaleProvider";
+import { Trans } from "~/i18n/Trans";
 
 export default function LoginPage() {
+  const { t } = useI18n();
   const submission = useSubmission(login);
   const [searchParams] = useSearchParams();
   const redirectTo = () => {
@@ -20,29 +23,34 @@ export default function LoginPage() {
 
   return (
     <AuthLayout
-      title="Welcome back"
-      subtitle="Sign in to add people, attach photos, and keep your family's stories connected."
-      notice={
-        invited()
-          ? "You have been invited to join a family tree. Sign in or create an account to accept."
-          : undefined
-      }
+      title={t("auth.login.title")}
+      subtitle={t("auth.login.subtitle")}
+      notice={invited() ? t("auth.login.invited") : undefined}
       footer={
         <span>
-          New here?{" "}
-          <A
-            href={redirectTo() ? `/register?redirectTo=${encodeURIComponent(redirectTo())}` : "/register"}
-            class="font-semibold text-primary underline decoration-primary/30 underline-offset-4"
-          >
-            Create an account
-          </A>
+          <Trans
+            key="auth.login.newHere"
+            components={{
+              createAccount: (
+                <A
+                  href={
+                    redirectTo() ? `/register?redirectTo=${encodeURIComponent(redirectTo())}` : "/register"
+                  }
+                  class="font-semibold text-primary underline decoration-primary/30 underline-offset-4"
+                  data-testid="login-create-account"
+                >
+                  {t("auth.createAccount")}
+                </A>
+              ),
+            }}
+          />
         </span>
       }
     >
       <Card class="gap-0 p-5 sm:p-6">
         <form action={login} method="post" class="space-y-4">
           <input type="hidden" name="redirectTo" value={redirectTo()} />
-          <Field label="Email" for="email">
+          <Field label={t("auth.email")} for="email">
             <input
               id="email"
               name="email"
@@ -52,25 +60,28 @@ export default function LoginPage() {
               autocomplete="email"
               required
               autofocus
+              data-testid="login-email"
             />
           </Field>
-          <Field label="Password" for="password">
+          <Field label={t("auth.password")} for="password">
             <input
               id="password"
               name="password"
               type="password"
               class="input"
-              placeholder="Your password"
+              placeholder={t("auth.login.passwordPlaceholder")}
               autocomplete="current-password"
               required
+              data-testid="login-password"
             />
           </Field>
           <div class="-mt-2 text-right">
             <A
               href="/forgot-password"
               class="text-xs font-semibold text-primary underline decoration-primary/30 underline-offset-4"
+              data-testid="login-forgot-password"
             >
-              Forgot your password?
+              {t("auth.forgot.title")}
             </A>
           </div>
           <Show when={error()}>
@@ -79,8 +90,13 @@ export default function LoginPage() {
               <AlertDescription>{error()}</AlertDescription>
             </Alert>
           </Show>
-          <Button type="submit" class="w-full" disabled={submission.pending}>
-            {submission.pending ? "Signing in…" : "Sign in"}
+          <Button
+            type="submit"
+            class="w-full"
+            disabled={submission.pending}
+            data-testid="login-submit"
+          >
+            {submission.pending ? t("auth.login.submitting") : t("auth.signIn")}
           </Button>
         </form>
       </Card>

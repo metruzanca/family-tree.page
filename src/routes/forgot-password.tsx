@@ -7,29 +7,35 @@ import { Button } from "~/components/ui/button";
 import { Card } from "~/components/ui/card";
 import { Field } from "~/components/ui/Field";
 import { requestPasswordReset } from "~/api";
+import { useI18n } from "~/i18n/LocaleProvider";
+import { Trans } from "~/i18n/Trans";
 
 export default function ForgotPasswordPage() {
+  const { t } = useI18n();
   const submission = useSubmission(requestPasswordReset);
   const error = () => (submission.result instanceof Error ? submission.result.message : "");
   const sent = () => Boolean(submission.result) && !(submission.result instanceof Error);
 
   return (
     <AuthLayout
-      title={sent() ? "Check your inbox" : "Forgot your password?"}
-      subtitle={
-        sent()
-          ? "If that address belongs to an account, a reset link is on its way."
-          : "Enter the email address on your account and we will send a link to choose a new password."
-      }
+      title={sent() ? t("auth.forgot.sentTitle") : t("auth.forgot.title")}
+      subtitle={sent() ? t("auth.forgot.sentSubtitle") : t("auth.forgot.subtitle")}
       footer={
         <span>
-          Remembered it?{" "}
-          <A
-            href="/login"
-            class="font-semibold text-primary underline decoration-primary/30 underline-offset-4"
-          >
-            Back to sign in
-          </A>
+          <Trans
+            key="auth.forgot.footer"
+            components={{
+              backToSignIn: (
+                <A
+                  href="/login"
+                  class="font-semibold text-primary underline decoration-primary/30 underline-offset-4"
+                  data-testid="forgot-password-back-to-sign-in"
+                >
+                  {t("auth.backToSignIn")}
+                </A>
+              ),
+            }}
+          />
         </span>
       }
     >
@@ -41,15 +47,14 @@ export default function ForgotPasswordPage() {
               <MailCheck size={26} />
             </div>
             <p class="mt-5 text-sm leading-relaxed text-muted-foreground">
-              The link expires in one hour and works once. If it does not arrive, check your spam
-              folder, then try again in a few minutes.
+              {t("auth.forgot.sentBody")}
             </p>
           </Card>
         }
       >
         <Card class="gap-0 p-5 sm:p-6">
           <form action={requestPasswordReset} method="post" class="space-y-4">
-            <Field label="Email" for="email">
+            <Field label={t("auth.email")} for="email">
               <input
                 id="email"
                 name="email"
@@ -59,6 +64,7 @@ export default function ForgotPasswordPage() {
                 autocomplete="email"
                 required
                 autofocus
+                data-testid="forgot-password-email"
               />
             </Field>
             <Show when={error()}>
@@ -67,11 +73,16 @@ export default function ForgotPasswordPage() {
                 <AlertDescription>{error()}</AlertDescription>
               </Alert>
             </Show>
-            <Button type="submit" class="w-full" disabled={submission.pending}>
-              {submission.pending ? "Sending…" : "Send reset link"}
+            <Button
+              type="submit"
+              class="w-full"
+              disabled={submission.pending}
+              data-testid="forgot-password-submit"
+            >
+              {submission.pending ? t("auth.sending") : t("auth.forgot.submit")}
             </Button>
             <p class="text-center text-xs leading-relaxed text-muted-foreground">
-              For your privacy, we show the same message whether or not that address has an account.
+              {t("auth.forgot.privacyNote")}
             </p>
           </form>
         </Card>

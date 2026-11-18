@@ -7,18 +7,20 @@ import { BrandMark } from "~/components/app/AppHeader";
 import { buttonVariants } from "~/components/ui/button";
 import { Card } from "~/components/ui/card";
 import { Skeleton } from "~/components/ui/skeleton";
+import { useI18n } from "~/i18n/LocaleProvider";
 
 export const route = {
   preload: ({ params }: { params: { token: string } }) => verifyEmail(params.token),
 };
 
 export default function VerifyEmailPage() {
+  const { t } = useI18n();
   return (
     <AppErrorBoundary
-      title="We could not check this link"
-      message="The link may still be good. Try again, or request a new one from account settings."
+      title={t("auth.error.linkCheck")}
+      message={t("auth.error.linkCheck.verify")}
       revalidateKeys={[verifyEmail.key, getUser.key]}
-      back={{ href: "/login", label: "Back to sign in" }}
+      back={{ href: "/login", label: t("auth.backToSignIn") }}
     >
       <VerifyEmailInner />
     </AppErrorBoundary>
@@ -26,6 +28,7 @@ export default function VerifyEmailPage() {
 }
 
 function VerifyEmailInner() {
+  const { t } = useI18n();
   const params = useParams<{ token: string }>();
   const result = createAsync(() => verifyEmail(params.token));
   const user = createAsync(() => getUser());
@@ -35,8 +38,12 @@ function VerifyEmailInner() {
       <div class="flex items-center justify-between px-5 py-5 sm:px-8">
         <BrandMark />
         <Show when={user()}>
-          <A href="/trees" class={buttonVariants({ variant: "ghost", size: "sm" })}>
-            Your trees
+          <A
+            href="/trees"
+            class={buttonVariants({ variant: "ghost", size: "sm" })}
+            data-testid="verify-email-your-trees"
+          >
+            {t("auth.yourTrees")}
           </A>
         </Show>
       </div>
@@ -59,24 +66,27 @@ function VerifyEmailInner() {
                     <CircleCheck size={30} />
                   </div>
                   <p class="mt-6 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
-                    Email confirmed
+                    {t("auth.verify.emailConfirmed")}
                   </p>
                   <h1 class="mt-2 font-display text-4xl tracking-tight">
-                    {state().status === "already" ? "Already confirmed" : "You're all set"}
+                    {state().status === "already"
+                      ? t("auth.verify.alreadyTitle")
+                      : t("auth.allSet")}
                   </h1>
                   <p class="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-muted-foreground">
                     <Show
                       when={user()}
-                      fallback="Your email address is verified. Sign in to start building your family trees."
+                      fallback={t("auth.verify.signedOutBody")}
                     >
-                      Your email address is verified. You can now send invitations to relatives.
+                      {t("auth.verify.signedInBody")}
                     </Show>
                   </p>
                   <A
                     href={user() ? "/trees" : "/login"}
                     class={buttonVariants({ class: "mt-7" })}
+                    data-testid="verify-email-continue"
                   >
-                    {user() ? "Go to your trees" : "Sign in"}
+                    {user() ? t("auth.verify.goToTrees") : t("auth.signIn")}
                   </A>
                 </Match>
                 <Match when={true}>
@@ -84,18 +94,19 @@ function VerifyEmailInner() {
                     <Clock size={28} />
                   </div>
                   <h1 class="mt-6 font-display text-3xl tracking-tight">
-                    This link cannot be used
+                    {t("auth.linkInvalid")}
                   </h1>
                   <p class="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-muted-foreground">
                     {state().status === "expired"
-                      ? "This verification link has expired. Sign in and ask for a new one."
-                      : "This verification link is not valid. It may have been used already."}
+                      ? t("auth.verify.expired")
+                      : t("auth.verify.invalid")}
                   </p>
                   <A
                     href={user() ? "/settings" : "/login"}
                     class={buttonVariants({ variant: "secondary", class: "mt-7" })}
+                    data-testid="verify-email-resend"
                   >
-                    {user() ? "Resend from your account" : "Sign in"}
+                    {user() ? t("auth.verify.resend") : t("auth.signIn")}
                   </A>
                 </Match>
               </Switch>

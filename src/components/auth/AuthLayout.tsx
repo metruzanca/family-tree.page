@@ -3,6 +3,9 @@ import { Show, type JSX } from "solid-js";
 import { Moon, Sun } from "lucide-solid";
 import { useTheme } from "../ui/Theme";
 import { IconButton } from "../ui/icon-button";
+import { useI18n } from "../../i18n/LocaleProvider";
+import { LocaleSwitcher } from "../../i18n/LocaleSwitcher";
+import { Trans } from "../../i18n/Trans";
 
 export function AuthLayout(props: {
   title: string;
@@ -12,6 +15,7 @@ export function AuthLayout(props: {
   notice?: string;
 }) {
   const { theme, toggle } = useTheme();
+  const { t } = useI18n();
   return (
     <main class="page-shell grid min-h-[100dvh] lg:grid-cols-[1.05fr_0.95fr]">
       <section class="relative hidden overflow-hidden bg-[#1a2418] p-10 text-[#f5efe2] lg:flex lg:flex-col lg:justify-between">
@@ -35,16 +39,15 @@ export function AuthLayout(props: {
         </div>
         <div class="relative max-w-lg">
           <p class="font-display text-4xl leading-[1.12] tracking-tight xl:text-5xl">
-            Every family has a shape. Map yours together.
+            {t("auth.layout.tagline")}
           </p>
           <p class="mt-6 max-w-md text-sm leading-relaxed text-[#cfd6c6]">
-            A private, living graph of the people you come from. Invite the people who remember the
-            stories, add photographs, and keep the branches growing.
+            {t("auth.layout.taglineBody")}
           </p>
         </div>
         <div class="relative flex items-center gap-3 text-xs text-[#aeb8a4]">
           <span class="h-px w-10 bg-[#aeb8a4]/50" />
-          <span>Private by default. Shared only by invitation.</span>
+          <span>{t("auth.layout.privateByDefault")}</span>
         </div>
       </section>
 
@@ -60,14 +63,19 @@ export function AuthLayout(props: {
             </span>
             <span class="font-display text-xl">family-tree</span>
           </A>
-          <IconButton
-            label={theme() === "dark" ? "Switch to light theme" : "Switch to dark theme"}
-            onClick={toggle}
-          >
-            <Show when={theme() === "dark"} fallback={<Moon size={18} />}>
-              <Sun size={18} />
-            </Show>
-          </IconButton>
+          <div class="flex items-center gap-1">
+            <div data-testid="auth-locale-switcher">
+              <LocaleSwitcher variant="text" />
+            </div>
+            <IconButton
+              label={theme() === "dark" ? t("header.lightTheme") : t("header.darkTheme")}
+              onClick={toggle}
+            >
+              <Show when={theme() === "dark"} fallback={<Moon size={18} />}>
+                <Sun size={18} />
+              </Show>
+            </IconButton>
+          </div>
         </div>
 
         <div class="mx-auto flex w-full max-w-md flex-1 flex-col justify-center py-10">
@@ -83,15 +91,29 @@ export function AuthLayout(props: {
         </div>
 
         <div class="mt-5 space-y-1 text-center text-[0.7rem] leading-relaxed text-muted-foreground">
-          <p>Your family data stays private to the people you invite.</p>
+          <p>{t("auth.layout.dataPrivacy")}</p>
           <p>
-            <A href="/privacy" class="underline decoration-border underline-offset-2 transition hover:text-foreground">
-              Privacy Policy
-            </A>
-            <span class="px-1.5">and</span>
-            <A href="/terms" class="underline decoration-border underline-offset-2 transition hover:text-foreground">
-              Terms of Service
-            </A>
+            <Trans
+              key="auth.layout.legal"
+              components={{
+                privacy: (
+                  <A
+                    href="/privacy"
+                    class="underline decoration-border underline-offset-2 transition hover:text-foreground"
+                  >
+                    {t("auth.layout.privacyPolicy")}
+                  </A>
+                ),
+                terms: (
+                  <A
+                    href="/terms"
+                    class="underline decoration-border underline-offset-2 transition hover:text-foreground"
+                  >
+                    {t("auth.layout.terms")}
+                  </A>
+                ),
+              }}
+            />
           </p>
         </div>
       </section>

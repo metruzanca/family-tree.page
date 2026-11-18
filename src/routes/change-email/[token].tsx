@@ -10,6 +10,8 @@ import { Button, buttonVariants } from "~/components/ui/button";
 import { Card } from "~/components/ui/card";
 import { Skeleton } from "~/components/ui/skeleton";
 import { attemptAction } from "~/lib/action-result";
+import { useI18n } from "~/i18n/LocaleProvider";
+import { Trans } from "~/i18n/Trans";
 
 export const route = {
   preload: ({ params }: { params: { token: string } }) =>
@@ -17,12 +19,13 @@ export const route = {
 };
 
 export default function ChangeEmailPage() {
+  const { t } = useI18n();
   return (
     <AppErrorBoundary
-      title="We could not check this link"
-      message="The link may still be good. Try again, or request a new change from account settings."
+      title={t("auth.error.linkCheck")}
+      message={t("auth.error.linkCheck.email")}
       revalidateKeys={[getEmailChangePreview.key, getUser.key]}
-      back={{ href: "/settings", label: "Account settings" }}
+      back={{ href: "/settings", label: t("header.accountSettings") }}
     >
       <ChangeEmailInner />
     </AppErrorBoundary>
@@ -30,6 +33,7 @@ export default function ChangeEmailPage() {
 }
 
 function ChangeEmailInner() {
+  const { t } = useI18n();
   const params = useParams<{ token: string }>();
   const preview = createAsync(() => getEmailChangePreview(params.token));
   const user = createAsync(() => getUser());
@@ -64,8 +68,12 @@ function ChangeEmailInner() {
       <div class="flex items-center justify-between px-5 py-5 sm:px-8">
         <BrandMark />
         <Show when={user()}>
-          <A href="/settings" class={buttonVariants({ variant: "ghost", size: "sm" })}>
-            Account settings
+          <A
+            href="/settings"
+            class={buttonVariants({ variant: "ghost", size: "sm" })}
+            data-testid="change-email-account-settings"
+          >
+            {t("header.accountSettings")}
           </A>
         </Show>
       </div>
@@ -88,16 +96,25 @@ function ChangeEmailInner() {
                     <MailCheck size={30} />
                   </div>
                   <p class="mt-6 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
-                    Email changed
+                    {t("auth.changeEmail.changed")}
                   </p>
-                  <h1 class="mt-2 font-display text-4xl tracking-tight">You're all set</h1>
+                  <h1 class="mt-2 font-display text-4xl tracking-tight">{t("auth.allSet")}</h1>
                   <p class="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-muted-foreground">
-                    Your account now uses{" "}
-                    <span class="font-medium text-foreground">{changedTo()}</span> for sign-in,
-                    invitations, and reminders.
+                    <Trans
+                      key="auth.changeEmail.changedBody"
+                      components={{
+                        email: (
+                          <span class="font-medium text-foreground">{changedTo()}</span>
+                        ),
+                      }}
+                    />
                   </p>
-                  <A href="/settings" class={buttonVariants({ class: "mt-7" })}>
-                    Back to account settings
+                  <A
+                    href="/settings"
+                    class={buttonVariants({ class: "mt-7" })}
+                    data-testid="change-email-back-to-settings"
+                  >
+                    {t("auth.changeEmail.backToSettings")}
                   </A>
                 </Match>
 
@@ -113,17 +130,17 @@ function ChangeEmailInner() {
                               <ShieldCheck size={30} />
                             </div>
                             <h1 class="mt-6 font-display text-3xl tracking-tight">
-                              Sign in to confirm
+                              {t("auth.changeEmail.signInTitle")}
                             </h1>
                             <p class="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-muted-foreground">
-                              This link changes the email address on your account. Sign in as the
-                              account owner to finish the change.
+                              {t("auth.changeEmail.signInBody")}
                             </p>
                             <A
                               href={`/login?redirectTo=${encodeURIComponent(`/change-email/${params.token}`)}`}
                               class={buttonVariants({ class: "mt-7" })}
+                              data-testid="change-email-sign-in"
                             >
-                              Sign in
+                              {t("auth.signIn")}
                             </A>
                           </>
                         }
@@ -133,15 +150,18 @@ function ChangeEmailInner() {
                             <CircleAlert size={30} />
                           </div>
                           <h1 class="mt-6 font-display text-3xl tracking-tight">
-                            Wrong account
+                            {t("auth.changeEmail.wrongAccount")}
                           </h1>
                           <p class="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-muted-foreground">
-                            This link belongs to a different family-tree account. Sign out and sign
-                            back in as the account that requested the change.
+                            {t("auth.changeEmail.wrongAccountBody")}
                           </p>
                           <form action={logout} method="post" class="mt-7">
-                            <Button type="submit" variant="secondary">
-                              Sign out
+                            <Button
+                              type="submit"
+                              variant="secondary"
+                              data-testid="change-email-sign-out"
+                            >
+                              {t("auth.signOut")}
                             </Button>
                           </form>
                         </>
@@ -153,15 +173,20 @@ function ChangeEmailInner() {
                         <MailCheck size={30} />
                       </div>
                       <p class="mt-6 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
-                        Confirm the change
+                        {t("auth.changeEmail.confirmEyebrow")}
                       </p>
                       <h1 class="mt-2 font-display text-4xl tracking-tight">
-                        Use a new email?
+                        {t("auth.changeEmail.confirmTitle")}
                       </h1>
                       <p class="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-muted-foreground">
-                        Your account will switch to{" "}
-                        <span class="font-medium text-foreground">{valid()?.newEmail}</span>.
-                        Your current address stops working for sign-in as soon as you confirm.
+                        <Trans
+                          key="auth.changeEmail.confirmBody"
+                          components={{
+                            email: (
+                              <span class="font-medium text-foreground">{valid()?.newEmail}</span>
+                            ),
+                          }}
+                        />
                       </p>
                       <Show when={error()}>
                         <Alert variant="destructive" class="mt-5 w-full rounded-xl py-2.5 text-left">
@@ -174,11 +199,16 @@ function ChangeEmailInner() {
                           type="button"
                           disabled={pending()}
                           onClick={confirm}
+                          data-testid="change-email-confirm"
                         >
-                          {pending() ? "Changing…" : "Confirm new email"}
+                          {pending() ? t("auth.changeEmail.confirming") : t("auth.changeEmail.confirm")}
                         </Button>
-                        <A href="/settings" class={buttonVariants({ variant: "ghost" })}>
-                          Cancel
+                        <A
+                          href="/settings"
+                          class={buttonVariants({ variant: "ghost" })}
+                          data-testid="change-email-cancel"
+                        >
+                          {t("common.cancel")}
                         </A>
                       </div>
                     </>
@@ -190,20 +220,21 @@ function ChangeEmailInner() {
                     <Clock size={28} />
                   </div>
                   <h1 class="mt-6 font-display text-3xl tracking-tight">
-                    This link cannot be used
+                    {t("auth.linkInvalid")}
                   </h1>
                   <p class="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-muted-foreground">
                     {state().status === "expired"
-                      ? "This email change link has expired. Request a new one from account settings."
+                      ? t("auth.changeEmail.expired")
                       : state().status === "used"
-                        ? "This email change link has already been used."
-                        : "This email change link is not valid."}
+                        ? t("auth.changeEmail.used")
+                        : t("auth.changeEmail.invalid")}
                   </p>
                   <A
                     href={user() ? "/settings" : "/login"}
                     class={buttonVariants({ variant: "secondary", class: "mt-7" })}
+                    data-testid="change-email-open-settings"
                   >
-                    {user() ? "Open account settings" : "Sign in"}
+                    {user() ? t("auth.changeEmail.openSettings") : t("auth.signIn")}
                   </A>
                 </Match>
               </Switch>

@@ -7,8 +7,11 @@ import { Button } from "~/components/ui/button";
 import { Card } from "~/components/ui/card";
 import { Field } from "~/components/ui/Field";
 import { register } from "~/api";
+import { useI18n } from "~/i18n/LocaleProvider";
+import { Trans } from "~/i18n/Trans";
 
 export default function RegisterPage() {
+  const { t } = useI18n();
   const submission = useSubmission(register);
   const [searchParams] = useSearchParams();
   const redirectTo = () => {
@@ -20,25 +23,32 @@ export default function RegisterPage() {
 
   return (
     <AuthLayout
-      title="Start your family tree"
-      subtitle="Create an account to start a family tree or accept an invitation to one."
-      notice={invited() ? "Create an account, then you can accept the invitation." : undefined}
+      title={t("auth.register.title")}
+      subtitle={t("auth.register.subtitle")}
+      notice={invited() ? t("auth.register.invited") : undefined}
       footer={
         <span>
-          Already have an account?{" "}
-          <A
-            href={redirectTo() ? `/login?redirectTo=${encodeURIComponent(redirectTo())}` : "/login"}
-            class="font-semibold text-primary underline decoration-primary/30 underline-offset-4"
-          >
-            Sign in
-          </A>
+          <Trans
+            key="auth.register.haveAccount"
+            components={{
+              signIn: (
+                <A
+                  href={redirectTo() ? `/login?redirectTo=${encodeURIComponent(redirectTo())}` : "/login"}
+                  class="font-semibold text-primary underline decoration-primary/30 underline-offset-4"
+                  data-testid="register-sign-in"
+                >
+                  {t("auth.signIn")}
+                </A>
+              ),
+            }}
+          />
         </span>
       }
     >
       <Card class="gap-0 p-5 sm:p-6">
         <form action={register} method="post" class="space-y-4">
           <input type="hidden" name="redirectTo" value={redirectTo()} />
-          <Field label="Your name" for="displayName">
+          <Field label={t("auth.name")} for="displayName">
             <input
               id="displayName"
               name="displayName"
@@ -47,9 +57,10 @@ export default function RegisterPage() {
               autocomplete="name"
               required
               autofocus
+              data-testid="register-name"
             />
           </Field>
-          <Field label="Email" for="email">
+          <Field label={t("auth.email")} for="email">
             <input
               id="email"
               name="email"
@@ -58,18 +69,20 @@ export default function RegisterPage() {
               placeholder="you@example.com"
               autocomplete="email"
               required
+              data-testid="register-email"
             />
           </Field>
-          <Field label="Password" for="password" hint="At least 10 characters.">
+          <Field label={t("auth.password")} for="password" hint={t("auth.passwordHint")}>
             <input
               id="password"
               name="password"
               type="password"
               class="input"
-              placeholder="Choose a password"
+              placeholder={t("auth.choosePassword")}
               autocomplete="new-password"
               minlength={10}
               required
+              data-testid="register-password"
             />
           </Field>
           <Show when={error()}>
@@ -78,23 +91,33 @@ export default function RegisterPage() {
               <AlertDescription>{error()}</AlertDescription>
             </Alert>
           </Show>
-          <Button type="submit" class="w-full" disabled={submission.pending}>
-            {submission.pending ? "Creating account…" : "Create account"}
+          <Button
+            type="submit"
+            class="w-full"
+            disabled={submission.pending}
+            data-testid="register-submit"
+          >
+            {submission.pending ? t("auth.register.submitting") : t("auth.register.submit")}
           </Button>
           <p class="text-center text-xs leading-relaxed text-muted-foreground">
-            We will send a link to confirm your email address. Your family data stays private in the
-            meantime.
+            {t("auth.register.confirmation")}
           </p>
           <p class="text-center text-[0.7rem] leading-relaxed text-muted-foreground">
-            By creating an account you agree to the{" "}
-            <A href="/terms" class="underline decoration-border underline-offset-2 hover:text-foreground">
-              Terms of Service
-            </A>{" "}
-            and the{" "}
-            <A href="/privacy" class="underline decoration-border underline-offset-2 hover:text-foreground">
-              Privacy Policy
-            </A>
-            .
+            <Trans
+              key="auth.register.legal"
+              components={{
+                terms: (
+                  <A href="/terms" class="underline decoration-border underline-offset-2 hover:text-foreground">
+                    {t("auth.layout.terms")}
+                  </A>
+                ),
+                privacy: (
+                  <A href="/privacy" class="underline decoration-border underline-offset-2 hover:text-foreground">
+                    {t("auth.layout.privacyPolicy")}
+                  </A>
+                ),
+              }}
+            />
           </p>
         </form>
       </Card>
