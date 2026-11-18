@@ -1,5 +1,5 @@
 import { createReconnectingWS } from "@solid-primitives/websocket";
-import { createEffect, createSignal } from "solid-js";
+import { createEffect, createSignal, onCleanup } from "solid-js";
 import type {
   PresenceClientMessage,
   PresencePeer,
@@ -8,6 +8,9 @@ import type {
 } from "./presence-protocol";
 
 export type TreeChange = { at: string; seq: number };
+
+/** Well under proxy idle timeouts (Cloudflare closes after ~100s of silence). */
+const PRESENCE_PING_INTERVAL_MS = 25_000;
 
 export type TreePresence = {
   peers: () => PresencePeer[];
@@ -54,6 +57,13 @@ export function createTreePresence(options: {
   const socket = createReconnectingWS(endpoint.toString(), undefined, { delay: 2500 });
 
   let sentNodeId: string | null | undefined;
+  let keepalive: ReturnType<typeof setInterval> | undefined;
+
+  function stopKeepalive() {
+    if (!keepalive) return;
+    clearInterval(keepalive);
+    keepalive = undefined;
+  }
 
   function sendFocus(nodeId: string | null) {
     sentNodeId = nodeId;
@@ -63,14 +73,24 @@ export function createTreePresence(options: {
   socket.addEventListener("open", () => {
     setStatus("online");
     sendFocus(options.nodeId());
+    // Proxies close idle sockets, and each reconnect makes every open tab
+    // refetch the tree. A small ping keeps the connection (and the roster)
+    // alive; the server answers with pong.
+    stopKeepalive();
+    keepalive = setInterval(() => {
+      socket.send(JSON.stringify({ type: "ping" } satisfies PresenceClientMessage));
+    }, PRESENCE_PING_INTERVAL_MS);
   });
 
   socket.addEventListener("close", () => {
+    stopKeepalive();
     setStatus("offline");
     setPeers([]);
     setSelfPeerId(null);
     sentNodeId = undefined;
   });
+
+  onCleanup(stopKeepalive);
 
   socket.addEventListener("message", event => {
     if (typeof event.data !== "string") return;

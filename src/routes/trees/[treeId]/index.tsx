@@ -331,6 +331,14 @@ function TreePageInner() {
 
   const [pendingRefresh, setPendingRefresh] = createSignal(false);
   let refreshTimer: ReturnType<typeof setTimeout> | undefined;
+  let offlineAt = 0;
+
+  /**
+   * A quick socket reconnect (proxy idle close, laptop sleep) usually missed
+   * nothing, so it should not refetch. A real outage or redeploy might have
+   * dropped tree-changed messages, so a longer gap still refreshes.
+   */
+  const RECONNECT_REFRESH_AFTER_MS = 5000;
 
   const dialogOpen = () =>
     addPersonOpen() ||
@@ -356,7 +364,7 @@ function TreePageInner() {
     }
     if (refreshTimer) clearTimeout(refreshTimer);
     refreshTimer = setTimeout(() => {
-      void revalidate([getTreeGraph.key, getTreeOverview.key]);
+      void revalidate(getTreeGraph.key);
     }, 300);
   }
 
@@ -367,7 +375,17 @@ function TreePageInner() {
     on(
       presence.status,
       (status, previous) => {
-        if (status === "online" && previous === "offline") refreshFromRemote();
+        if (status === "offline") {
+          offlineAt = Date.now();
+          return;
+        }
+        if (
+          status === "online" &&
+          previous === "offline" &&
+          Date.now() - offlineAt >= RECONNECT_REFRESH_AFTER_MS
+        ) {
+          refreshFromRemote();
+        }
       },
       { defer: true },
     ),

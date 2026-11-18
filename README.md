@@ -232,7 +232,9 @@ The actor name is snapshotted. Deleting an account replaces the actor with "Form
 
 ## Live refresh
 
-The presence WebSocket also carries a `tree-changed` message. Mutations call `notifyTreeChanged`, the WebSocket route forwards it to sockets in that tree, and open tabs revalidate the graph after a short debounce. Tabs also refresh on focus, visibility change, and reconnect. If a dialog is open, the refresh waits until it closes and a toast explains why.
+The presence WebSocket also carries a `tree-changed` message. Mutations call `notifyTreeChanged`, the WebSocket route forwards it to sockets in that tree, and open tabs revalidate the graph after a short debounce. Tabs also refresh on focus and visibility change, and after a reconnect that lasted more than five seconds; a quick reconnect (proxy idle close, sleep) is ignored because nothing was likely missed. If a dialog is open, the refresh waits until it closes and a toast explains why.
+
+A refetch does not redraw by itself. The graph builds a fingerprint of the rows the canvas actually draws, and an identical payload leaves force-graph untouched, so the zoom, pan, and node positions survive presence housekeeping. Only a real change rebuilds the simulation, and only a change to the visible people re-fits the view.
 
 ## Duplicate people
 
@@ -248,7 +250,7 @@ Living people are anyone without a recorded death date. The default share settin
 
 ## How presence works
 
-1. The browser opens `wss://<host>/presence?treeId=...` with `@solid-primitives/websocket`, which buffers the first focus message and reconnects with a fixed delay after deploys, sleeps, and network drops.
+1. The browser opens `wss://<host>/presence?treeId=...` with `@solid-primitives/websocket`, which buffers the first focus message and reconnects with a fixed delay after deploys, sleeps, and network drops. A ping every 25 seconds keeps proxies from closing an idle socket, which also keeps the roster and the graph view stable.
 2. Nitro's WebSocket route in `server/routes/presence.ts` unseals the same `family_tree_session` cookie SolidStart uses and checks tree membership before the upgrade completes. Because the session is a sealed cookie with no server-side state, reconnects survive deploys.
 3. Each socket joins a namespace per tree and a presence topic. The client sends `{ type: "focus", nodeId }` when the open person, file, or album changes; the server broadcasts a full snapshot of who is present and what each peer has open.
 4. The avatar stack dedupes by user, and each avatar is outlined in that person's presence color. The graph draws one ring per connected tab plus a name tag in the same color. Colors come from a matte palette keyed by user id, so renaming a person does not change their color.
