@@ -320,3 +320,24 @@ textarea.input {
     scroll-behavior: auto !important;
   }
 }
+
+/* Printable research sheets and charts. */
+@media print {
+  @page {
+    margin: 12mm;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+  }
+
+  .page-shell {
+    background: #fff !important;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+}

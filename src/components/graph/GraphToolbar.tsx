@@ -2,6 +2,7 @@ import { A } from "@solidjs/router";
 import { For, Show, type JSX } from "solid-js";
 import {
   ArrowLeft,
+  BookOpen,
   CalendarArrowUp,
   CalendarDays,
   History,
@@ -193,6 +194,13 @@ export function GraphToolbar(props: ToolbarProps) {
             </ToolButton>
             <Show when={props.showTreeLinks !== false}>
               <ToolButton
+                testId="tree-toolbar-research"
+                label="Research desk"
+                href={`/trees/${props.treeId}/research`}
+              >
+                <BookOpen size={17} />
+              </ToolButton>
+              <ToolButton
                 testId="tree-toolbar-activity"
                 label="Activity"
                 href={`/trees/${props.treeId}/activity`}
@@ -287,6 +295,15 @@ export function GraphToolbar(props: ToolbarProps) {
               </GlassItem>
               <Show when={props.showTreeLinks !== false}>
                 <DropdownMenuSeparator class="my-1 bg-white/10" />
+                <DropdownMenuItem
+                  as={A}
+                  href={`/trees/${props.treeId}/research`}
+                  data-testid="tree-toolbar-more-research"
+                  class="gap-2 rounded-xl px-3 py-2 text-white/80 data-[highlighted]:bg-white/10 data-[highlighted]:text-white"
+                >
+                  <BookOpen />
+                  Research desk
+                </DropdownMenuItem>
                 <DropdownMenuItem
                   as={A}
                   href={`/trees/${props.treeId}/activity`}
