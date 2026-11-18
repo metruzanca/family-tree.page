@@ -22,6 +22,7 @@ import {
   type StoredFile,
 } from "../../drizzle/schema";
 import type { FuzzyDate } from "../lib/fuzzy-date";
+import type { PersonLink } from "../lib/person-links";
 import type { PersonSex } from "../lib/person-sex";
 import { requireTreeMember, type TreeRole } from "../server/guards";
 import { AppError, runAction, type ActionResult } from "../server/errors";
@@ -111,6 +112,9 @@ export type GraphPerson = {
   birthPlace: string | null;
   deathPlace: string | null;
   bio: string | null;
+  links: PersonLink[];
+  contactEmail: string | null;
+  contactPhone: string | null;
   avatarFileId: string | null;
 };
 
@@ -291,6 +295,9 @@ export async function loadTreeGraph(tree: {
       birthPlace: person.birthPlace,
       deathPlace: person.deathPlace,
       bio: person.bio,
+      links: person.links ?? [],
+      contactEmail: person.contactEmail,
+      contactPhone: person.contactPhone,
       avatarFileId: avatarByPerson.get(person.id) ?? null,
     })),
     relationships: [
@@ -480,6 +487,9 @@ export async function createPerson(
           birthPlace: parsed.birthPlace,
           deathPlace: parsed.deathPlace,
           bio: parsed.bio,
+          links: parsed.links,
+          contactEmail: parsed.contactEmail,
+          contactPhone: parsed.contactPhone,
           createdBy: access.user.id,
         })
         .returning();
@@ -532,6 +542,9 @@ export async function updatePerson(
           birthPlace: parsed.birthPlace,
           deathPlace: parsed.deathPlace,
           bio: parsed.bio,
+          links: parsed.links,
+          contactEmail: parsed.contactEmail,
+          contactPhone: parsed.contactPhone,
           updatedAt: new Date(),
         })
         .where(and(eq(people.id, input.personId), eq(people.treeId, access.tree.id)))
@@ -938,6 +951,9 @@ export async function addRelative(input: {
             birthPlace: parsed.person.birthPlace,
             deathPlace: parsed.person.deathPlace,
             bio: parsed.person.bio,
+            links: parsed.person.links,
+            contactEmail: parsed.person.contactEmail,
+            contactPhone: parsed.person.contactPhone,
             createdBy: access.user.id,
           })
           .returning();

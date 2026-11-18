@@ -7,6 +7,12 @@ import {
   isValidPartialDate,
   type FuzzyDate,
 } from "../lib/fuzzy-date";
+import {
+  canBeHomeLink,
+  MAX_PERSON_LINK_URL_LENGTH,
+  MAX_PERSON_LINKS,
+  normalizePersonLinkUrl,
+} from "../lib/person-links";
 
 const optionalText = (max: number) =>
   z
@@ -235,6 +241,86 @@ export const resetPasswordSchema = z
     path: ["confirmPassword"],
   });
 
+const optionalContactEmail = z
+  .string()
+  .trim()
+  .max(254, "That email address is too long.")
+  .optional()
+  .nullable()
+  .transform(value => (value ? value.toLowerCase() : null))
+  .refine(value => value === null || emailSchema.safeParse(value).success, {
+    message: "Enter a valid email address.",
+  });
+
+const optionalContactPhone = z
+  .string()
+  .trim()
+  .max(50, "That phone number is too long.")
+  .optional()
+  .nullable()
+  .transform(value => (value ? value : null));
+
+const personLinkSchema = z
+  .object({
+    url: z
+      .string()
+      .trim()
+      .min(1, "Enter a link.")
+      .max(MAX_PERSON_LINK_URL_LENGTH, "That link is too long.")
+      .transform(value => normalizePersonLinkUrl(value) ?? value),
+    isHome: z.boolean().optional().default(false),
+  })
+  .superRefine((link, context) => {
+    if (!normalizePersonLinkUrl(link.url)) {
+      context.addIssue({
+        code: "custom",
+        path: ["url"],
+        message: "Enter a valid web address.",
+      });
+      return;
+    }
+    if (link.isHome && !canBeHomeLink(link.url)) {
+      context.addIssue({
+        code: "custom",
+        path: ["isHome"],
+        message: "Only a personal website can use the home icon.",
+      });
+    }
+  });
+
+const personLinksSchema = z
+  .array(personLinkSchema)
+  .max(MAX_PERSON_LINKS, `Add at most ${MAX_PERSON_LINKS} links.`)
+  .superRefine((links, context) => {
+    const seen = new Set<string>();
+    let homeIndex = -1;
+    links.forEach((link, index) => {
+      const key = link.url.toLowerCase();
+      if (seen.has(key)) {
+        context.addIssue({
+          code: "custom",
+          path: [index, "url"],
+          message: "That link has already been added.",
+        });
+      } else {
+        seen.add(key);
+      }
+      if (link.isHome) {
+        if (homeIndex >= 0) {
+          context.addIssue({
+            code: "custom",
+            path: [index, "isHome"],
+            message: "Only one link can be the personal website.",
+          });
+        } else {
+          homeIndex = index;
+        }
+      }
+    });
+  })
+  .optional()
+  .default([]);
+
 export const personSchema = z.object({
   treeId: z.string().uuid(),
   firstName: z.string().trim().min(1, "Enter a first name.").max(80),
@@ -247,6 +333,9 @@ export const personSchema = z.object({
   birthPlace: optionalText(160),
   deathPlace: optionalText(160),
   bio: optionalText(4000),
+  links: personLinksSchema,
+  contactEmail: optionalContactEmail,
+  contactPhone: optionalContactPhone,
 });
 
 export const personUpdateSchema = personSchema.omit({ treeId: true });

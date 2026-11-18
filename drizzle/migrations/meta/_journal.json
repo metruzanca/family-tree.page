@@ -134,6 +134,13 @@
       "when": 1794978491305,
       "tag": "0018_optimal_wraith",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1794987637039,
+      "tag": "0019_hot_bloodaxe",
+      "breakpoints": true
     }
   ]
 }

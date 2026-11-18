@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import type { FuzzyDate } from "../src/lib/fuzzy-date";
+import type { PersonLink } from "../src/lib/person-links";
 import type { ActivityChange } from "../src/lib/activity";
 import type { ApiScope } from "../src/lib/api";
 import {
@@ -292,6 +293,10 @@ export const people = pgTable(
     birthPlace: text("birth_place"),
     deathPlace: text("death_place"),
     bio: text("bio"),
+    /** Social profiles and one personal website, shown as icons. */
+    links: jsonb("links").$type<PersonLink[]>().notNull().default(sql`'[]'::jsonb`),
+    contactEmail: text("contact_email"),
+    contactPhone: text("contact_phone"),
     createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

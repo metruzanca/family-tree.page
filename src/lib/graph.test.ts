@@ -30,6 +30,9 @@ function person(id: string, firstName = id, lastName = "Simpson"): GraphPerson {
     birthPlace: null,
     deathPlace: null,
     bio: null,
+    links: [],
+    contactEmail: null,
+    contactPhone: null,
     avatarFileId: null,
   };
 }

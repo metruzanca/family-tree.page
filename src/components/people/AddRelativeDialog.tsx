@@ -215,6 +215,9 @@ export function AddRelativeDialog(props: {
                 birthPlace: "",
                 deathPlace: "",
                 bio: "",
+                links: [],
+                contactEmail: "",
+                contactPhone: "",
               }
             : undefined,
         parentType: parentType() as "biological" | "adoptive" | "foster" | "step" | "unknown",

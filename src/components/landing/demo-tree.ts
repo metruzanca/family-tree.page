@@ -157,6 +157,9 @@ export const demoPeople: GraphPerson[] = personSeeds.map(person => ({
   birthPlace: person.birthPlace,
   deathPlace: null,
   bio: person.bio,
+  links: [],
+  contactEmail: null,
+  contactPhone: null,
   avatarFileId: `avatar:${person.avatar}`,
 }));
 

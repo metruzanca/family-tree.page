@@ -26,6 +26,9 @@ function person(overrides: Partial<GraphPerson> & { id: string }): GraphPerson {
     birthPlace: null,
     deathPlace: null,
     bio: null,
+    links: [],
+    contactEmail: null,
+    contactPhone: null,
     avatarFileId: null,
   };
 }

@@ -11,6 +11,7 @@ import {
   inviteEmailSchema,
   parentChildSchema,
   personSchema,
+  personUpdateSchema,
   recordFacesSchema,
   registerSchema,
   resetPasswordSchema,
@@ -260,6 +261,81 @@ describe("validation", () => {
     expect(addManualFaceSchema.safeParse(base).success).toBe(true);
     expect(
       addManualFaceSchema.safeParse({ ...base, personId: "grandma" }).success,
+    ).toBe(false);
+  });
+});
+
+describe("person links and contact", () => {
+  it("normalizes links and accepts one personal website", () => {
+    const parsed = personUpdateSchema.parse({
+      firstName: "Sam",
+      links: [
+        { url: "instagram.com/sam" },
+        { url: "sam.example.com", isHome: true },
+      ],
+      contactEmail: "  Sam@Example.COM ",
+      contactPhone: "  +1 201 555 0123 ",
+    });
+
+    expect(parsed.links).toEqual([
+      { url: "https://instagram.com/sam", isHome: false },
+      { url: "https://sam.example.com/", isHome: true },
+    ]);
+    expect(parsed.contactEmail).toBe("sam@example.com");
+    expect(parsed.contactPhone).toBe("+1 201 555 0123");
+  });
+
+  it("turns empty contact fields into null and defaults to no links", () => {
+    const parsed = personUpdateSchema.parse({
+      firstName: "Sam",
+      contactEmail: "",
+      contactPhone: "  ",
+    });
+    expect(parsed.links).toEqual([]);
+    expect(parsed.contactEmail).toBeNull();
+    expect(parsed.contactPhone).toBeNull();
+  });
+
+  it("rejects a second personal website", () => {
+    const result = personUpdateSchema.safeParse({
+      firstName: "Sam",
+      links: [
+        { url: "one.example.com", isHome: true },
+        { url: "two.example.com", isHome: true },
+      ],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a home icon on a recognized platform", () => {
+    const result = personUpdateSchema.safeParse({
+      firstName: "Sam",
+      links: [{ url: "instagram.com/sam", isHome: true }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects duplicate and unsafe links", () => {
+    expect(
+      personUpdateSchema.safeParse({
+        firstName: "Sam",
+        links: [{ url: "instagram.com/sam" }, { url: "https://instagram.com/sam" }],
+      }).success,
+    ).toBe(false);
+    expect(
+      personUpdateSchema.safeParse({
+        firstName: "Sam",
+        links: [{ url: "javascript:alert(1)" }],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("rejects an invalid contact email", () => {
+    expect(
+      personUpdateSchema.safeParse({
+        firstName: "Sam",
+        contactEmail: "not-an-email",
+      }).success,
     ).toBe(false);
   });
 });

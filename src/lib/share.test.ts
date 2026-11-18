@@ -21,6 +21,9 @@ function person(id: string, overrides: Partial<GraphPerson> = {}): GraphPerson {
     birthPlace: "Springfield",
     deathPlace: null,
     bio: "A life well lived.",
+    links: [],
+    contactEmail: null,
+    contactPhone: null,
     avatarFileId: `avatar-${id}`,
     ...overrides,
   };
@@ -179,6 +182,43 @@ describe("sanitizeSharedGraph", () => {
     });
 
     expect(shared.groups).toEqual([]);
+  });
+
+  it("shares links only with full details and never shares contact info", () => {
+    const links = [{ url: "https://instagram.com/name", isHome: false }];
+    const data = graph({
+      people: [
+        person("living", { links, contactEmail: "living@example.com", contactPhone: "+1 201 555 0123" }),
+        person("dead", {
+          deathDate: { start: { year: 1990, month: null, day: null }, qualifier: "exact" },
+          links,
+          contactEmail: "dead@example.com",
+          contactPhone: "+1 201 555 0100",
+        }),
+      ],
+    });
+
+    const named = sanitizeSharedGraph(data, {
+      livingVisibility: "name",
+      includeMedia: false,
+      thumbUrl: thumb,
+    });
+    for (const shared of named.people) {
+      expect(shared.links).toEqual([]);
+      expect(shared.contactEmail).toBeNull();
+      expect(shared.contactPhone).toBeNull();
+    }
+
+    const full = sanitizeSharedGraph(data, {
+      livingVisibility: "full",
+      includeMedia: false,
+      thumbUrl: thumb,
+    });
+    for (const shared of full.people) {
+      expect(shared.links).toEqual(links);
+      expect(shared.contactEmail).toBeNull();
+      expect(shared.contactPhone).toBeNull();
+    }
   });
 
   it("never shares face boxes or the scan marker", () => {

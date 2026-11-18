@@ -32,14 +32,23 @@ export function sanitizeSharedGraph(
   );
   const hiddenIds =
     options.livingVisibility === "hidden" ? new Set(livingIds) : new Set<string>();
+  const includeLinks = options.livingVisibility === "full";
 
   const people = graph.people
     .filter(person => !hiddenIds.has(person.id))
     .map(person => {
       const isLiving = livingIds.has(person.id);
+      // Contact details are for signed-in tree members only. Social links are
+      // part of full details, never a name-only share.
+      const shared = {
+        ...person,
+        links: includeLinks ? person.links : [],
+        contactEmail: null,
+        contactPhone: null,
+      };
       if (options.livingVisibility === "name" && isLiving) {
         return {
-          ...person,
+          ...shared,
           birthDate: null,
           deathDate: null,
           birthPlace: null,
@@ -49,9 +58,9 @@ export function sanitizeSharedGraph(
         };
       }
       if (!options.includeMedia) {
-        return { ...person, avatarFileId: null };
+        return { ...shared, avatarFileId: null };
       }
-      return person;
+      return shared;
     });
 
   const visiblePersonIds = new Set(people.map(person => person.id));

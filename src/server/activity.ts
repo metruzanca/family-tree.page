@@ -99,6 +99,9 @@ const PERSON_FIELDS: { key: keyof PersonInput; label: string }[] = [
   { key: "birthPlace", label: "Birthplace" },
   { key: "deathPlace", label: "Resting place" },
   { key: "bio", label: "Life notes" },
+  { key: "links", label: "Links" },
+  { key: "contactEmail", label: "Contact email" },
+  { key: "contactPhone", label: "Contact phone" },
 ];
 
 export function personChanges(before: Person, after: PersonInput): ActivityChange[] {
@@ -168,6 +171,14 @@ function displayValue(key: keyof PersonInput, value: unknown): string | null {
   }
   if (key === "sex") {
     return personSexLabel(value as PersonSex);
+  }
+  if (key === "links") {
+    const links = Array.isArray(value)
+      ? (value as { url?: string }[]).map(link => link.url).filter(Boolean)
+      : [];
+    if (!links.length) return null;
+    const text = links.join(", ");
+    return text.length > 500 ? `${text.slice(0, 500)}…` : text;
   }
   const text = String(value);
   return text.length > 500 ? `${text.slice(0, 500)}…` : text;

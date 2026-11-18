@@ -50,6 +50,9 @@ function person(
     birthPlace: null,
     deathPlace: null,
     bio: null,
+    links: [],
+    contactEmail: null,
+    contactPhone: null,
     avatarFileId: null,
   };
 }
