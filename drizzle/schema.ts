@@ -159,14 +159,65 @@ export const authTokens = pgTable(
   t => [index("auth_tokens_user_kind_idx").on(t.userId, t.kind)],
 );
 
-export const trees = pgTable("trees", {
+export const trees = pgTable(
+  "trees",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: text("name").notNull(),
+    description: text("description"),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    /**
+     * Set when every owner approved the deletion. The tree is locked and the
+     * daily purge permanently erases it once `purgeAfter` has passed.
+     */
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    purgeAfter: timestamp("purge_after", { withTimezone: true }),
+    deletedBy: uuid("deleted_by").references(() => users.id, { onDelete: "set null" }),
+    /** When the reminder before permanent deletion was emailed. */
+    deletionReminderSentAt: timestamp("deletion_reminder_sent_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  t => [
+    index("trees_purge_after_idx")
+      .on(t.purgeAfter)
+      .where(sql`${t.deletedAt} is not null`),
+  ],
+);
+
+/**
+ * A pending request to delete a tree. Every current owner must approve before
+ * the tree is locked and scheduled for permanent deletion.
+ */
+export const treeDeletionRequests = pgTable("tree_deletion_requests", {
   id: uuid("id").primaryKey().defaultRandom(),
-  name: text("name").notNull(),
-  description: text("description"),
-  createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+  treeId: uuid("tree_id")
+    .notNull()
+    .unique()
+    .references(() => trees.id, { onDelete: "cascade" }),
+  requestedBy: uuid("requested_by").references(() => users.id, { onDelete: "set null" }),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+export const treeDeletionApprovals = pgTable(
+  "tree_deletion_approvals",
+  {
+    requestId: uuid("request_id")
+      .notNull()
+      .references(() => treeDeletionRequests.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    approvedAt: timestamp("approved_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  t => [
+    primaryKey({
+      columns: [t.requestId, t.userId],
+      name: "tree_deletion_approvals_pk",
+    }),
+  ],
+);
 
 export const treeMembers = pgTable(
   "tree_members",
@@ -581,6 +632,8 @@ export type User = typeof users.$inferSelect;
 export type CalendarFeed = typeof calendarFeeds.$inferSelect;
 export type AuthToken = typeof authTokens.$inferSelect;
 export type Tree = typeof trees.$inferSelect;
+export type TreeDeletionRequest = typeof treeDeletionRequests.$inferSelect;
+export type TreeDeletionApproval = typeof treeDeletionApprovals.$inferSelect;
 export type TreeMember = typeof treeMembers.$inferSelect;
 export type TreeInvite = typeof treeInvites.$inferSelect;
 export type Person = typeof people.$inferSelect;
