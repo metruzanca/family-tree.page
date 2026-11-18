@@ -308,7 +308,9 @@ The hosted instance targets family members in the EU, so the app is built around
 - The controller for the hosted instance is Samuele Zanca, contact `samuele+family-tree@zanca.dev`. Self-hosters are the controller for their own instance, and the policy says so.
 - Tree content often describes living relatives who never created an account. The policy has a dedicated section for that, and account holders are responsible for having a lawful basis to add it.
 - Rights are operable in the product: change email, download a zip with a JSON manifest and every original, and delete the account with password plus typed confirmation. Deletion blocks when the user is the last owner of a shared tree and removes trees where they are the only member.
-- Retention is enforced in code. The daily maintenance plugin prunes expired auth tokens, old invites, birthday email logs older than 12 months, and `usage_events` older than 90 days. Backup retention is 30 daily dumps plus one per month for 12 months.
+- Tree deletion is guarded separately. Owners request it with the exact tree name. A tree with several owners needs every owner to approve. Once approved, the tree is locked for 30 days and any owner can restore it from `/trees`. The daily maintenance job then erases the storage prefix and the database rows. Account deletion still removes trees where the user is the only member immediately, because no account remains to restore them.
+- An erasure request from a data subject is handled by the controller and is not blocked by the owner approval flow. `pnpm tree:purge -- <treeId> --yes [--force]` erases a tree immediately when that is required.
+- Retention is enforced in code. The daily maintenance plugin prunes expired auth tokens, old invites, birthday email logs older than 12 months, `usage_events` older than 90 days, and trees whose 30 day deletion window has ended. Backup retention is 30 daily dumps plus one per month for 12 months.
 - Data is hosted in the US. The policy discloses the location, the providers, and the safeguards used for EU data.
 
 If you add a new data category, a new processor, or a new retention period, update `/privacy` in the same change.
@@ -588,6 +590,21 @@ Account settings has three exits for your own data:
 - **Delete account.** This requires your password and a typed email confirmation. Trees where you are the only member are deleted with their storage objects. If you are the last owner of a shared tree, promote another owner or delete that tree first. Deleting your account clears the session and cascades memberships, calendar feeds, birthday logs, auth tokens, and pending email changes.
 
 Account settings also shows storage and people usage against your limits, with a link to ask for more. The published policy is at `/privacy` and the terms are at `/terms`. See [Privacy and GDPR](#privacy-and-gdpr) for the engineering side.
+
+## Deleting a tree
+
+Deleting a tree is deliberately slower than leaving one. The controls live in the **Danger** tab of tree settings.
+
+1. An owner types the exact tree name. The request dialog shows the tree's people and member counts so the wrong tree is hard to pick by mistake.
+2. If the tree has one owner, that confirmation schedules the deletion. If it has several, the request waits for every current owner to approve. Each approval is its own confirmation, co-owners get an email, and the request lapses after 14 days if not everyone agrees. Any owner can cancel it.
+3. When every owner approves, the tree is locked. Its URLs redirect to `/trees`, invites and share links are revoked, and it drops out of birthday emails, calendar feeds, and presence.
+4. The tree and its files stay in place for 30 days. `/trees` shows it under **Recently deleted** with the purge date and a Restore button. Any owner can restore it instantly, even if they were not the person who requested the deletion.
+5. Seven days before the purge, every member with a confirmed address gets a reminder email.
+6. The daily maintenance job deletes the tree's storage prefix, then the database row, which cascades people, relationships, files, tags, faces, events, activity, invites, and share links. Storage goes first: if it fails, the row stays so the next run retries instead of leaving orphaned objects.
+
+`pnpm tree:purge -- <treeId> --yes [--force]` is the operator-only escape hatch for a legal erasure request. It skips the grace period and is deliberately not reachable from the app.
+
+Account deletion is separate and still immediate for trees where the user is the only member, since no account remains to restore them. An owner of a shared tree must transfer ownership or delete the tree first.
 
 ## Focused browsing
 

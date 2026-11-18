@@ -258,6 +258,12 @@ export default function PrivacyPage() {
                 <td class="py-2">Until you delete it or your account</td>
               </tr>
               <tr>
+                <td class="py-2 pr-4">Trees marked for deletion</td>
+                <td class="py-2">
+                  30 days, then permanently erased with their photos, documents, and history
+                </td>
+              </tr>
+              <tr>
                 <td class="py-2 pr-4">Session cookie</td>
                 <td class="py-2">30 days, or until you sign out</td>
               </tr>
@@ -324,6 +330,18 @@ export default function PrivacyPage() {
           the only member are deleted. If you are the last owner of a shared tree, transfer ownership
           or delete that tree first. Files you uploaded into someone else's tree stay in that tree,
           because they belong to its members, and your account reference is removed.
+        </p>
+        <p>
+          Deleting a tree takes more than one click. You type its exact name, every owner must
+          approve, and the tree is then locked for 30 days. During those 30 days any owner can
+          restore it from Your trees. At the end of the period the tree and everything in it,
+          including photos, documents, and history, are permanently erased from live systems. Copies
+          can remain in backups until the backup retention period ends, as described above.
+        </p>
+        <p>
+          If you need personal data erased sooner, email us. We action erasure requests within one
+          month, regardless of the tree's owner approval flow, and can erase a tree immediately when
+          the law requires it.
         </p>
         <p>
           For anything else, email us. We may ask you to verify your identity before acting on a

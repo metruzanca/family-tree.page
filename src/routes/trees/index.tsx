@@ -1,7 +1,8 @@
-import { A, createAsync } from "@solidjs/router";
-import { For, Show, createSignal } from "solid-js";
-import { ArrowUpRight, CalendarDays, Plus, Sprout, Users } from "lucide-solid";
-import { getMyTrees, requireUserPage } from "~/api";
+import { A, createAsync, revalidate } from "@solidjs/router";
+import { For, Show, createSignal, onMount } from "solid-js";
+import { ArrowUpRight, CalendarDays, Plus, RotateCcw, Sprout, Trash2, Users } from "lucide-solid";
+import { getMyTrees, getPendingDeletionTrees, requireUserPage } from "~/api";
+import { restoreTree } from "~/api/trees-server";
 import { AppErrorBoundary } from "~/components/app/AppErrorBoundary";
 import { AppHeader } from "~/components/app/AppHeader";
 import { VerifyEmailNotice } from "~/components/auth/VerifyEmailNotice";
@@ -10,12 +11,17 @@ import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card } from "~/components/ui/card";
 import { LoadingCards } from "~/components/ui/Loading";
-import { formatRelative, roleLabel } from "~/lib/format";
+import { useToast } from "~/components/ui/Toast";
+import { attemptAction } from "~/lib/action-result";
+import { track } from "~/lib/analytics";
+import { formatDate, formatRelative, roleLabel } from "~/lib/format";
+import { daysUntilPurge } from "~/lib/tree-deletion";
 
 export const route = {
   preload: () => {
     requireUserPage();
     getMyTrees();
+    getPendingDeletionTrees();
   },
 };
 
@@ -24,7 +30,7 @@ export default function TreesPage() {
     <AppErrorBoundary
       title="We could not load your trees"
       message="Your groves are still safe. The connection to the server may have dropped."
-      revalidateKeys={[requireUserPage.key, getMyTrees.key]}
+      revalidateKeys={[requireUserPage.key, getMyTrees.key, getPendingDeletionTrees.key]}
       back={{ href: "/", label: "Back home" }}
     >
       <TreesInner />
@@ -35,7 +41,30 @@ export default function TreesPage() {
 function TreesInner() {
   const user = createAsync(() => requireUserPage());
   const trees = createAsync(() => getMyTrees());
+  const pending = createAsync(() => getPendingDeletionTrees());
+  const toast = useToast();
   const [creating, setCreating] = createSignal(false);
+  const [restoringId, setRestoringId] = createSignal<string | null>(null);
+
+  // Tree lists change from other sessions and from the deletion flow, so a
+  // visit always asks for the current state instead of trusting a cached list.
+  onMount(() => {
+    void revalidate([getMyTrees.key, getPendingDeletionTrees.key]);
+  });
+
+  async function restore(treeId: string, name: string) {
+    if (restoringId()) return;
+    setRestoringId(treeId);
+    const result = await attemptAction(() => restoreTree(treeId));
+    setRestoringId(null);
+    if (!result.ok) {
+      toast.show(result.error, "error");
+      return;
+    }
+    await revalidate([getMyTrees.key, getPendingDeletionTrees.key]);
+    track("tree_restored");
+    toast.show(`Restored ${name}.`, "success");
+  }
 
   return (
     <div class="page-shell min-h-[100dvh]">
@@ -79,11 +108,98 @@ function TreesInner() {
                 </div>
               </section>
 
+              <Show when={pending() && pending()!.length > 0}>
+                <section class="mt-10" data-testid="deleted-trees-section">
+                  <div class="flex flex-wrap items-end justify-between gap-2">
+                    <div>
+                      <h2 class="font-display text-2xl tracking-tight">Recently deleted</h2>
+                      <p class="mt-1 text-sm leading-relaxed text-muted-foreground">
+                        These trees are kept for 30 days. Restore one any time before the date
+                        shown.
+                      </p>
+                    </div>
+                  </div>
+                  <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    <For each={pending()}>
+                      {tree => {
+                        const days = () => daysUntilPurge(tree.purgeAfter);
+                        return (
+                          <Card
+                            class="flex h-full flex-col gap-0 border-destructive/30 bg-destructive/5 p-4"
+                            data-testid={`deleted-tree-card-${tree.id}`}
+                          >
+                            <div class="flex items-start gap-3">
+                              <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-destructive/10 text-destructive">
+                                <Trash2 size={18} />
+                              </span>
+                              <div class="min-w-0">
+                                <h3 class="truncate font-display text-lg leading-tight tracking-tight">
+                                  {tree.name}
+                                </h3>
+                                <p class="mt-0.5 text-xs text-muted-foreground">
+                                  {tree.peopleCount}{" "}
+                                  {tree.peopleCount === 1 ? "person" : "people"} ·{" "}
+                                  {tree.memberCount}{" "}
+                                  {tree.memberCount === 1 ? "member" : "members"}
+                                </p>
+                              </div>
+                            </div>
+                            <p class="mt-3 text-xs leading-relaxed text-muted-foreground">
+                              Requested by {tree.requestedByName}{" "}
+                              {formatRelative(tree.deletedAt)}.{" "}
+                              {tree.purgeAfter
+                                ? `Erased on ${formatDate(tree.purgeAfter)}${
+                                    days() === 0
+                                      ? " (the next maintenance run)"
+                                      : days() === 1
+                                        ? " (tomorrow)"
+                                        : ` (in ${days()} days)`
+                                  }.`
+                                : "Erasure is overdue and will run shortly."}
+                            </p>
+                            <div class="mt-4 flex flex-wrap items-center gap-2">
+                              <Show
+                                when={tree.role === "owner"}
+                                fallback={
+                                  <p class="text-xs leading-relaxed text-muted-foreground">
+                                    Restoring needs an owner. Ask one of the owners to restore it.
+                                  </p>
+                                }
+                              >
+                                <Button
+                                  size="sm"
+                                  type="button"
+                                  disabled={restoringId() === tree.id}
+                                  onClick={() => void restore(tree.id, tree.name)}
+                                  data-testid={`deleted-tree-restore-${tree.id}`}
+                                >
+                                  <RotateCcw />
+                                  {restoringId() === tree.id ? "Restoring…" : "Restore tree"}
+                                </Button>
+                              </Show>
+                            </div>
+                          </Card>
+                        );
+                      }}
+                    </For>
+                  </div>
+                </section>
+              </Show>
+
               <Show
                 when={trees() && trees()!.length > 0}
                 fallback={
                   <Show when={trees()} fallback={<div class="mt-10"><LoadingCards count={3} /></div>}>
-                    <EmptyTrees onCreate={() => setCreating(true)} />
+                    <Show
+                      when={!(pending() && pending()!.length > 0)}
+                      fallback={
+                        <p class="mt-10 rounded-2xl border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
+                          You have no active trees right now.
+                        </p>
+                      }
+                    >
+                      <EmptyTrees onCreate={() => setCreating(true)} />
+                    </Show>
                   </Show>
                 }
               >

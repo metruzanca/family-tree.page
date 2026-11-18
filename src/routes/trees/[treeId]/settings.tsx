@@ -1,15 +1,14 @@
 import { For, Show, createEffect, createSignal } from "solid-js";
-import { A, createAsync, useNavigate, useParams, revalidate } from "@solidjs/router";
-import { Copy, Link2, LogOut, Mail, Plus, RotateCw, Settings, Share2, Shield, Trash2, Unlink, Users } from "lucide-solid";
+import { A, createAsync, useNavigate, useParams, useSearchParams, revalidate } from "@solidjs/router";
+import { Copy, Download, Link2, LogOut, Mail, Plus, RotateCw, Settings, Share2, Shield, ShieldAlert, Trash2, Unlink, Users } from "lucide-solid";
 import {
+  approveTreeDeletion,
+  cancelTreeDeletionRequest,
   clearMemberPerson,
   createInvite,
-  deleteTree,
-  getTreeInvites,
-  getTreeMembers,
-  getTreeOverview,
   leaveTree,
   removeMember,
+  requestTreeDeletion,
   resendInvite,
   revokeInvite,
   updateMemberRole,
@@ -19,6 +18,7 @@ import {
 } from "~/api/trees-server";
 import {
   getMyTrees,
+  getPendingDeletionTrees,
   getTreeGraph,
   getTreeMembers as membersQuery,
   getTreeOverview as overviewQuery,
@@ -38,11 +38,12 @@ import { AppErrorBoundary } from "~/components/app/AppErrorBoundary";
 import { AppHeader } from "~/components/app/AppHeader";
 import { Avatar } from "~/components/ui/Avatar";
 import { Badge } from "~/components/ui/badge";
-import { Button } from "~/components/ui/button";
+import { Button, buttonVariants } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { ConfirmDialog } from "~/components/ui/ConfirmDialog";
 import { Field } from "~/components/ui/Field";
 import { IconButton } from "~/components/ui/icon-button";
+import { Modal } from "~/components/ui/Modal";
 import {
   Select,
   SelectContent,
@@ -78,8 +79,8 @@ const expiryOptions = [
 export const route = {
   preload: ({ params }: { params: { treeId: string } }) => {
     requireUserPage();
-    getTreeOverview(params.treeId);
-    getTreeMembers(params.treeId);
+    overviewQuery(params.treeId);
+    membersQuery(params.treeId);
   },
 };
 
@@ -105,11 +106,13 @@ function TreeSettingsInner() {
   const params = useParams<{ treeId: string }>();
   const navigate = useNavigate();
   const toast = useToast();
+  const [searchParams] = useSearchParams();
+  const defaultTab = searchParams.tab === "danger" ? "danger" : "tree";
   const user = createAsync(() => requireUserPage());
-  const overview = createAsync(() => getTreeOverview(params.treeId));
-  const members = createAsync(() => getTreeMembers(params.treeId));
+  const overview = createAsync(() => overviewQuery(params.treeId));
+  const members = createAsync(() => membersQuery(params.treeId));
   const invites = createAsync(() =>
-    overview()?.role === "owner" ? getTreeInvites(params.treeId) : Promise.resolve([]),
+    overview()?.role === "owner" ? invitesQuery(params.treeId) : Promise.resolve([]),
   );
   const shareLinks = createAsync(() =>
     overview()?.role === "owner"
@@ -176,12 +179,17 @@ function TreeSettingsInner() {
   const [confirm, setConfirm] = createSignal<
     | { kind: "remove"; userId: string; name: string }
     | { kind: "leave" }
-    | { kind: "delete" }
     | { kind: "revoke"; inviteId: string }
     | { kind: "revoke-share"; linkId: string }
     | null
   >(null);
   const [pending, setPending] = createSignal(false);
+  const [deleteOpen, setDeleteOpen] = createSignal(false);
+  const [deleteName, setDeleteName] = createSignal("");
+  const [deletePending, setDeletePending] = createSignal(false);
+  const [approveOpen, setApproveOpen] = createSignal(false);
+  const [approvalPending, setApprovalPending] = createSignal(false);
+  const [cancelPending, setCancelPending] = createSignal(false);
 
   let hydrated = false;
   createEffect(() => {
@@ -371,17 +379,9 @@ function TreeSettingsInner() {
       } else if (action.kind === "leave") {
         const result = await attemptAction(() => leaveTree(params.treeId));
         if (!result.ok) return toast.show(result.error, "error");
-        await revalidate(getMyTrees.key);
+        await revalidate([getMyTrees.key, getPendingDeletionTrees.key]);
         track("tree_left");
         toast.show("You left the tree.", "success");
-        navigate("/trees");
-        return;
-      } else if (action.kind === "delete") {
-        const result = await attemptAction(() => deleteTree(params.treeId));
-        if (!result.ok) return toast.show(result.error, "error");
-        await revalidate(getMyTrees.key);
-        track("tree_deleted");
-        toast.show("Tree deleted.", "success");
         navigate("/trees");
         return;
       } else if (action.kind === "revoke") {
@@ -416,6 +416,102 @@ function TreeSettingsInner() {
     }
   }
 
+  const owners = () => (members() ?? []).filter(member => member.role === "owner");
+  const approvedIds = () =>
+    new Set(overview()?.deletionRequest?.approvals.map(approval => approval.userId) ?? []);
+  const ownersAwaiting = () => owners().filter(owner => !approvedIds().has(owner.userId));
+  const isOnlyOwner = () => Boolean(members()) && owners().length === 1;
+  const deleteNameMatches = () => deleteName().trim() === (overview()?.tree.name ?? "");
+
+  function ownerCountLabel(count: number) {
+    return count === 1 ? "1 owner" : `${count} owners`;
+  }
+
+  async function submitDeleteRequest(event: SubmitEvent) {
+    event.preventDefault();
+    if (deletePending() || !deleteNameMatches()) return;
+    setDeletePending(true);
+    const result = await attemptAction(() =>
+      requestTreeDeletion({
+        treeId: params.treeId,
+        confirmationName: deleteName(),
+      }),
+    );
+    setDeletePending(false);
+    if (!result.ok) {
+      toast.show(result.error, "error");
+      return;
+    }
+    setDeleteOpen(false);
+    setDeleteName("");
+    await revalidate([
+      overviewQuery.key,
+      membersQuery.key,
+      getMyTrees.key,
+      getPendingDeletionTrees.key,
+    ]);
+    if (result.data.scheduled) {
+      track("tree_deleted");
+      toast.show(
+        "Tree scheduled for deletion. You can restore it from Your trees for 30 days.",
+        "success",
+      );
+      navigate("/trees");
+      return;
+    }
+    track("tree_deletion_requested");
+    const waiting = ownerCountLabel(result.data.ownersAwaiting);
+    toast.show(
+      result.data.emailsSent > 0
+        ? `Deletion requested. We emailed the other owners. Waiting on ${waiting}.`
+        : `Deletion requested. Waiting on ${waiting} to approve.`,
+      "success",
+    );
+  }
+
+  async function approveDeletion() {
+    if (approvalPending()) return;
+    setApprovalPending(true);
+    const result = await attemptAction(() => approveTreeDeletion(params.treeId));
+    setApprovalPending(false);
+    if (!result.ok) {
+      toast.show(result.error, "error");
+      return;
+    }
+    setApproveOpen(false);
+    await revalidate([
+      overviewQuery.key,
+      getMyTrees.key,
+      getPendingDeletionTrees.key,
+    ]);
+    if (result.data.scheduled) {
+      track("tree_deleted");
+      toast.show(
+        "Every owner approved. The tree can be restored from Your trees for 30 days.",
+        "success",
+      );
+      navigate("/trees");
+      return;
+    }
+    toast.show(
+      `Approval recorded. Waiting on ${ownerCountLabel(result.data.ownersAwaiting)}.`,
+      "success",
+    );
+  }
+
+  async function cancelDeletionRequest() {
+    if (cancelPending()) return;
+    setCancelPending(true);
+    const result = await attemptAction(() => cancelTreeDeletionRequest(params.treeId));
+    setCancelPending(false);
+    if (!result.ok) {
+      toast.show(result.error, "error");
+      return;
+    }
+    await revalidate([overviewQuery.key]);
+    toast.show("Deletion request cancelled. The tree is unchanged.", "success");
+  }
+
   return (
     <Show when={user()}>
       {currentUser => (
@@ -441,7 +537,7 @@ function TreeSettingsInner() {
               </div>
             </div>
 
-            <Tabs defaultValue="tree" class="gap-5">
+            <Tabs defaultValue={defaultTab} class="gap-5">
               <TabsList class="max-w-full overflow-x-auto">
                 <TabsIndicator />
                 <TabsTrigger value="tree">
@@ -462,6 +558,10 @@ function TreeSettingsInner() {
                     Sharing
                   </TabsTrigger>
                 </Show>
+                <TabsTrigger value="danger" data-testid="tree-settings-tab-danger">
+                  <ShieldAlert />
+                  Danger
+                </TabsTrigger>
               </TabsList>
 
               <TabsContent value="tree">
@@ -985,31 +1085,279 @@ function TreeSettingsInner() {
                     </div>
                   </SectionCard>
                 </TabsContent>
+
+                <TabsContent value="danger">
+                  <div class="space-y-5" data-testid="tree-danger-tab">
+                    <div class="rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3.5">
+                      <div class="flex items-start gap-3">
+                        <span class="mt-0.5 shrink-0 text-destructive">
+                          <ShieldAlert size={18} />
+                        </span>
+                        <div>
+                          <p class="text-sm font-semibold text-destructive">
+                            Actions here affect everyone in the tree.
+                          </p>
+                          <p class="mt-1 text-xs leading-relaxed text-muted-foreground">
+                            Leaving removes only your access. Deleting locks the tree for every
+                            member, emails them, and erases it after 30 days.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <SectionCard
+                      title="Leave this tree"
+                      description="Your access ends, but the tree and everything in it stays for the other members."
+                    >
+                      <Button
+                        variant="secondary"
+                        type="button"
+                        onClick={() => setConfirm({ kind: "leave" })}
+                        data-testid="tree-danger-leave-button"
+                      >
+                        <LogOut />
+                        Leave this tree
+                      </Button>
+                      <p class="mt-3 text-xs leading-relaxed text-muted-foreground">
+                        {isOnlyOwner()
+                          ? "You are the only owner. Promote another member to owner before leaving."
+                          : "You can only rejoin later with a new invite."}
+                      </p>
+                    </SectionCard>
+
+                    <Show when={isOwner()}>
+                      <SectionCard
+                        title="Delete this tree"
+                        description="Deleting is deliberately slow. It takes the exact tree name, every owner, and a 30 day wait."
+                      >
+                        <Show
+                          when={overview()?.deletionRequest}
+                          fallback={
+                            <div data-testid="tree-deletion-idle">
+                              <ul class="space-y-2 text-xs leading-relaxed text-muted-foreground">
+                                <li class="flex gap-2">
+                                  <span class="font-semibold text-foreground">1.</span>
+                                  You type the exact tree name.
+                                </li>
+                                <li class="flex gap-2">
+                                  <span class="font-semibold text-foreground">2.</span>
+                                  {isOnlyOwner()
+                                    ? "As the only owner, your confirmation schedules the deletion."
+                                    : "Every current owner must approve. One refusal stops it."}
+                                </li>
+                                <li class="flex gap-2">
+                                  <span class="font-semibold text-foreground">3.</span>
+                                  The tree is locked and kept for 30 days. Any owner can restore it
+                                  from Your trees until then.
+                                </li>
+                              </ul>
+                              <div class="mt-4 flex flex-wrap gap-2">
+                                <a
+                                  href="/api/account/export?media=1"
+                                  download="family-tree-export-with-files.zip"
+                                  class={buttonVariants({ variant: "secondary", size: "sm" })}
+                                  data-testid="tree-deletion-export"
+                                >
+                                  <Download />
+                                  Download a copy first
+                                </a>
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  type="button"
+                                  onClick={() => {
+                                    setDeleteName("");
+                                    setDeleteOpen(true);
+                                  }}
+                                  data-testid="tree-danger-delete-button"
+                                >
+                                  <Trash2 />
+                                  Request deletion
+                                </Button>
+                              </div>
+                              <Show when={isOnlyOwner()}>
+                                <p class="mt-3 rounded-xl border border-gold/40 bg-gold/10 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
+                                  You are the only owner of this tree. Requesting deletion schedules
+                                  it straight away, but it stays restorable for 30 days.
+                                </p>
+                              </Show>
+                            </div>
+                          }
+                        >
+                          {request => (
+                            <div
+                              class="rounded-xl border border-destructive/30 bg-destructive/5 p-3.5"
+                              data-testid="tree-deletion-request-card"
+                            >
+                              <p class="text-sm font-semibold text-destructive">
+                                Deletion requested {formatRelative(request().createdAt)}
+                              </p>
+                              <p class="mt-1 text-xs leading-relaxed text-muted-foreground">
+                                {request().requestedByName} asked to delete this tree. Every
+                                current owner must approve. The request expires{" "}
+                                {formatRelative(request().expiresAt)} and nothing happens if it
+                                lapses.
+                              </p>
+
+                              <ul class="mt-3 divide-y divide-border border-y border-border">
+                                <For each={owners()}>
+                                  {owner => (
+                                    <li
+                                      class="flex items-center gap-3 py-2.5"
+                                      data-testid={`tree-deletion-owner-row-${owner.userId}`}
+                                    >
+                                      <Avatar name={owner.displayName} size={30} />
+                                      <div class="min-w-0 flex-1">
+                                        <p class="truncate text-sm font-medium">
+                                          {owner.displayName}
+                                          <Show when={owner.userId === currentUser().id}>
+                                            <span class="ml-1.5 text-xs font-normal text-muted-foreground">
+                                              you
+                                            </span>
+                                          </Show>
+                                        </p>
+                                        <p class="truncate text-xs text-muted-foreground">
+                                          {owner.email}
+                                        </p>
+                                      </div>
+                                      <Show
+                                        when={approvedIds().has(owner.userId)}
+                                        fallback={
+                                          <Badge variant="secondary" class="uppercase tracking-wide">
+                                            Waiting
+                                          </Badge>
+                                        }
+                                      >
+                                        <Badge class="bg-primary/10 uppercase tracking-wide text-primary">
+                                          Approved
+                                        </Badge>
+                                      </Show>
+                                    </li>
+                                  )}
+                                </For>
+                              </ul>
+
+                              <div class="mt-3 flex flex-wrap gap-2">
+                                <Show when={!approvedIds().has(currentUser().id)}>
+                                  <Button
+                                    variant="destructive"
+                                    size="sm"
+                                    type="button"
+                                    onClick={() => setApproveOpen(true)}
+                                    data-testid="tree-deletion-approve-button"
+                                  >
+                                    Approve deletion
+                                  </Button>
+                                </Show>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  type="button"
+                                  disabled={cancelPending()}
+                                  onClick={() => void cancelDeletionRequest()}
+                                  data-testid="tree-deletion-cancel-request-button"
+                                >
+                                  {cancelPending() ? "Cancelling…" : "Cancel request"}
+                                </Button>
+                              </div>
+                              <Show when={ownersAwaiting().length > 0}>
+                                <p class="mt-2 text-xs text-muted-foreground">
+                                  Waiting on {ownerCountLabel(ownersAwaiting().length)}.
+                                </p>
+                              </Show>
+                            </div>
+                          )}
+                        </Show>
+                      </SectionCard>
+                    </Show>
+                  </div>
+                </TabsContent>
               </Show>
             </Tabs>
 
-            <SectionCard
-              class="mt-5"
-              title="Leave or delete"
-              description="Leaving removes your access. Deleting removes the whole tree for everyone."
-            >
-              <div class="flex flex-wrap gap-2">
-                <Button variant="secondary" type="button" onClick={() => setConfirm({ kind: "leave" })}>
-                  <LogOut />
-                  Leave this tree
-                </Button>
-                <Show when={isOwner()}>
-                  <Button variant="destructive" type="button" onClick={() => setConfirm({ kind: "delete" })}>
-                    <Trash2 />
-                    Delete tree
-                  </Button>
-                </Show>
-              </div>
-              <p class="mt-3 text-xs leading-relaxed text-muted-foreground">
-                If you are the only owner, promote another member to owner before leaving.
-              </p>
-            </SectionCard>
           </main>
+
+          <Modal
+            open={deleteOpen()}
+            onClose={() => {
+              setDeleteOpen(false);
+              setDeleteName("");
+            }}
+            title={`Delete ${overview()?.tree.name ?? "this tree"}?`}
+            description="This starts the deletion process. Nothing is erased yet."
+            testId="tree-delete-dialog"
+          >
+            <form class="space-y-4" onSubmit={submitDeleteRequest}>
+              <div class="rounded-xl border border-destructive/30 bg-destructive/5 px-3.5 py-3 text-xs leading-relaxed text-muted-foreground">
+                <p class="font-semibold text-destructive">
+                  {overview()?.tree.name ?? "This tree"} has{" "}
+                  {overview()?.peopleCount ?? 0} people and{" "}
+                  {overview()?.memberCount ?? 0} members.
+                </p>
+                <p class="mt-1.5">
+                  {isOnlyOwner()
+                    ? "You are the only owner, so confirming schedules the deletion. It stays restorable for 30 days."
+                    : "Every owner must approve before anything is scheduled. If one owner does not approve, the tree is untouched."}
+                </p>
+                <p class="mt-1.5">
+                  Once scheduled, the tree is locked, and any owner can restore it from Your trees
+                  during the 30 day grace period.
+                </p>
+              </div>
+              <Field
+                label="Tree name"
+                for="tree-delete-name"
+                hint={`Type ${overview()?.tree.name ?? "the tree name"} exactly to continue.`}
+              >
+                <input
+                  id="tree-delete-name"
+                  class="input"
+                  autocomplete="off"
+                  value={deleteName()}
+                  onInput={event => setDeleteName(event.currentTarget.value)}
+                  data-testid="tree-delete-name-input"
+                  required
+                />
+              </Field>
+              <div class="flex flex-wrap justify-end gap-2 pt-1">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    setDeleteOpen(false);
+                    setDeleteName("");
+                  }}
+                  data-testid="tree-delete-cancel"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  variant="destructive"
+                  disabled={deletePending() || !deleteNameMatches()}
+                  data-testid="tree-delete-submit"
+                >
+                  {deletePending()
+                    ? "Working…"
+                    : isOnlyOwner()
+                      ? "Schedule deletion"
+                      : "Request deletion"}
+                </Button>
+              </div>
+            </form>
+          </Modal>
+
+          <ConfirmDialog
+            open={approveOpen()}
+            onClose={() => setApproveOpen(false)}
+            title="Approve deleting this tree?"
+            message="This is your approval. When every owner approves, the tree is locked and permanently erased in 30 days. Any owner can restore it before then."
+            confirmLabel="Approve deletion"
+            danger
+            pending={approvalPending()}
+            testId="tree-deletion-approve-dialog"
+            onConfirm={() => void approveDeletion()}
+          />
 
           <ConfirmDialog
             open={Boolean(confirm())}
@@ -1017,7 +1365,7 @@ function TreeSettingsInner() {
             title={confirmTitle(confirm())}
             message={confirmMessage(confirm(), overview()?.tree.name ?? "this tree")}
             confirmLabel={confirmLabel(confirm())}
-            danger={confirm()?.kind === "delete" || confirm()?.kind === "remove" || confirm()?.kind === "revoke-share"}
+            danger={confirm()?.kind === "remove" || confirm()?.kind === "revoke-share"}
             pending={pending()}
             onConfirm={runConfirm}
           />
@@ -1082,7 +1430,6 @@ function confirmTitle(action: { kind: string } | null) {
   if (!action) return "";
   if (action.kind === "remove") return "Remove this member?";
   if (action.kind === "leave") return "Leave this tree?";
-  if (action.kind === "delete") return "Delete this tree?";
   if (action.kind === "revoke-share") return "Revoke this share link?";
   return "Revoke this invite?";
 }
@@ -1091,7 +1438,6 @@ function confirmLabel(action: { kind: string } | null) {
   if (!action) return "Confirm";
   if (action.kind === "remove") return "Remove member";
   if (action.kind === "leave") return "Leave tree";
-  if (action.kind === "delete") return "Delete tree";
   if (action.kind === "revoke-share") return "Revoke link";
   return "Revoke invite";
 }
@@ -1103,9 +1449,6 @@ function confirmMessage(action: { kind: string; name?: string } | null, treeName
   }
   if (action.kind === "leave") {
     return `You will lose access to ${treeName}. You can only rejoin with a new invite.`;
-  }
-  if (action.kind === "delete") {
-    return `${treeName}, everyone's connections, and all uploaded files will be permanently deleted. This cannot be undone.`;
   }
   if (action.kind === "revoke-share") {
     return "Anyone with this link will lose access immediately. You can create a new link at any time.";
