@@ -52,7 +52,7 @@ export function SharedTreeView(props: SharedTreeViewProps) {
       : [],
   );
   const activeMediaPerson = createMemo<GraphPerson | undefined>(() => {
-    const personId = effectiveGroup()?.personId ?? selectedFile()?.personId;
+    const personId = effectiveGroup()?.personId ?? selectedFile()?.personId ?? null;
     return props.graph.people.find(person => person.id === personId);
   });
   const selectedNodeId = createMemo(() => {

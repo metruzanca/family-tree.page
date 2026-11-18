@@ -8,7 +8,9 @@ import { requireTreeMember } from "../server/guards";
 import { requireUser } from "../server/auth-service";
 import { AppError, runAction, type ActionResult } from "../server/errors";
 import {
+  assignFilesSchema,
   fileGroupSchema,
+  fileIdsSchema,
   fileTagsSchema,
   fileTakenAtSchema,
   prepareUploadSchema,
@@ -48,7 +50,7 @@ export type PreparedUpload = {
 
 export async function prepareUpload(input: {
   treeId: string;
-  personId: string;
+  personId?: string | null;
   groupId?: string | null;
   fileName: string;
   mimeType: string;
@@ -81,14 +83,18 @@ export async function prepareUpload(input: {
       throw error;
     }
 
-    const personRows = await db
-      .select({ id: people.id })
-      .from(people)
-      .where(and(eq(people.id, parsed.personId), eq(people.treeId, access.tree.id)))
-      .limit(1);
-    if (!personRows.length) throw new AppError("That person could not be found.");
+    const personId = parsed.personId ?? null;
+    if (personId) {
+      const personRows = await db
+        .select({ id: people.id })
+        .from(people)
+        .where(and(eq(people.id, personId), eq(people.treeId, access.tree.id)))
+        .limit(1);
+      if (!personRows.length) throw new AppError("That person could not be found.");
+    }
 
     if (parsed.groupId) {
+      if (!personId) throw new AppError("Choose a person before adding an album.");
       const groupRows = await db
         .select({ id: fileGroups.id })
         .from(fileGroups)
@@ -96,7 +102,7 @@ export async function prepareUpload(input: {
           and(
             eq(fileGroups.id, parsed.groupId),
             eq(fileGroups.treeId, access.tree.id),
-            eq(fileGroups.personId, parsed.personId),
+            eq(fileGroups.personId, personId),
           ),
         )
         .limit(1);
@@ -104,7 +110,7 @@ export async function prepareUpload(input: {
     }
 
     const fileId = randomUUID();
-    const keys = storageKeys(access.tree.id, parsed.personId, fileId);
+    const keys = storageKeys(access.tree.id, personId, fileId);
     const thumbReservation = thumbMime
       ? Math.min(parsed.thumbSizeBytes ?? MAX_THUMB_BYTES, MAX_THUMB_BYTES)
       : 0;
@@ -118,7 +124,7 @@ export async function prepareUpload(input: {
         await tx.insert(files).values({
           id: fileId,
           treeId: access.tree.id,
-          personId: parsed.personId,
+          personId,
           groupId: parsed.groupId ?? null,
           storageKey: keys.original,
           thumbKey: thumbMime ? keys.thumb : null,
@@ -175,17 +181,18 @@ export async function finalizeUpload(fileId: string): Promise<ActionResult<{ id:
     await requireTreeMember(file.treeId, "editor");
     const updated = await finalizeFile(fileId, user.id);
     if (file.status !== "ready") {
-      const names = await peopleNames(db, updated.treeId, [updated.personId]);
+      const personId = updated.personId;
+      const names = await peopleNames(db, updated.treeId, personId ? [personId] : []);
       await logActivityBestEffort({
         treeId: updated.treeId,
         actor: user,
         action: "file.uploaded",
         entityType: "file",
         entityId: updated.id,
-        personId: updated.personId,
-        summary: `Uploaded ${updated.originalName} to ${
-          names.get(updated.personId) ?? "someone"
-        }`,
+        personId,
+        summary: personId
+          ? `Uploaded ${updated.originalName} to ${names.get(personId) ?? "someone"}`
+          : `Uploaded ${updated.originalName} to the tree inbox`,
       });
       await recordUsage({
         userId: user.id,
@@ -220,7 +227,7 @@ export async function deleteFile(input: {
     const access = await requireTreeMember(input.treeId, "editor");
     const file = await getFileById(input.fileId);
     if (!file || file.treeId !== access.tree.id) throw new AppError("That file could not be found.");
-    const names = await peopleNames(db, access.tree.id, [file.personId]);
+    const names = await peopleNames(db, access.tree.id, file.personId ? [file.personId] : []);
     const usage = await deleteFileRecord(input.fileId, access.user.id);
     await logActivityBestEffort({
       treeId: access.tree.id,
@@ -229,9 +236,9 @@ export async function deleteFile(input: {
       entityType: "file",
       entityId: file.id,
       personId: file.personId,
-      summary: `Deleted ${file.originalName} from ${
-        names.get(file.personId) ?? "someone"
-      }`,
+      summary: file.personId
+        ? `Deleted ${file.originalName} from ${names.get(file.personId) ?? "someone"}`
+        : `Deleted ${file.originalName} from the tree inbox`,
     });
     await recordUsage({
       userId: access.user.id,
@@ -241,6 +248,166 @@ export async function deleteFile(input: {
       treeId: access.tree.id,
     });
     return undefined;
+  });
+}
+
+export async function deleteFiles(input: {
+  treeId: string;
+  fileIds: string[];
+}): Promise<ActionResult<{ deleted: number }>> {
+  return runAction("files.deleteFiles", async () => {
+    const access = await requireTreeMember(input.treeId, "editor");
+    const parsed = fileIdsSchema.parse(input);
+    const rows = await db
+      .select({
+        id: files.id,
+        originalName: files.originalName,
+        personId: files.personId,
+      })
+      .from(files)
+      .where(
+        and(eq(files.treeId, access.tree.id), inArray(files.id, parsed.fileIds)),
+      );
+    if (rows.length !== parsed.fileIds.length) {
+      throw new AppError("One of those files could not be found.");
+    }
+
+    let bytes = 0;
+    let count = 0;
+    for (const row of rows) {
+      const usage = await deleteFileRecord(row.id, access.user.id);
+      bytes += usage.bytes;
+      count += usage.count;
+    }
+    await recordUsage({
+      userId: access.user.id,
+      kind: "file_deleted",
+      bytes,
+      itemCount: count,
+      treeId: access.tree.id,
+    });
+    await logActivityBestEffort({
+      treeId: access.tree.id,
+      actor: access.user,
+      action: "file.deleted",
+      entityType: "file",
+      entityId: rows.length === 1 ? rows[0].id : null,
+      personId: rows.length === 1 ? rows[0].personId : null,
+      summary:
+        rows.length === 1
+          ? `Deleted ${rows[0].originalName}`
+          : `Deleted ${rows.length} files`,
+    });
+    return { deleted: count };
+  });
+}
+
+export async function assignFilesToPerson(input: {
+  treeId: string;
+  fileIds: string[];
+  personId: string | null;
+}): Promise<ActionResult<{ moved: number }>> {
+  return runAction("files.assignFilesToPerson", async () => {
+    const access = await requireTreeMember(input.treeId, "editor");
+    const parsed = assignFilesSchema.parse(input);
+
+    if (parsed.personId) {
+      const personRows = await db
+        .select({ id: people.id })
+        .from(people)
+        .where(and(eq(people.id, parsed.personId), eq(people.treeId, access.tree.id)))
+        .limit(1);
+      if (!personRows.length) throw new AppError("That person could not be found.");
+    }
+
+    const rows = await db
+      .select({
+        id: files.id,
+        personId: files.personId,
+        groupId: files.groupId,
+        originalName: files.originalName,
+      })
+      .from(files)
+      .where(
+        and(eq(files.treeId, access.tree.id), inArray(files.id, parsed.fileIds)),
+      );
+    if (rows.length !== parsed.fileIds.length) {
+      throw new AppError("One of those files could not be found.");
+    }
+
+    const changed = rows.filter(row => row.personId !== parsed.personId);
+    if (!changed.length) return { moved: 0 };
+
+    const names = await peopleNames(
+      db,
+      access.tree.id,
+      parsed.personId ? [parsed.personId] : [],
+    );
+    const groupIds = [
+      ...new Set(
+        changed
+          .map(row => row.groupId)
+          .filter((groupId): groupId is string => Boolean(groupId)),
+      ),
+    ];
+
+    await db.transaction(async tx => {
+      await tx
+        .update(files)
+        .set({
+          personId: parsed.personId,
+          // An album belongs to the person it was created for, so a file that
+          // changes hands leaves its album behind. A portrait stops being one.
+          groupId: null,
+          isAvatar: false,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(files.treeId, access.tree.id),
+            inArray(
+              files.id,
+              changed.map(row => row.id),
+            ),
+          ),
+        );
+
+      for (const groupId of groupIds) {
+        const remaining = await tx
+          .select({ id: files.id })
+          .from(files)
+          .where(and(eq(files.groupId, groupId), eq(files.treeId, access.tree.id)))
+          .limit(1);
+        if (!remaining.length) {
+          await tx
+            .delete(fileGroups)
+            .where(and(eq(fileGroups.id, groupId), eq(fileGroups.treeId, access.tree.id)));
+        }
+      }
+
+      await tx
+        .update(trees)
+        .set({ updatedAt: new Date() })
+        .where(eq(trees.id, access.tree.id));
+    });
+
+    const destination = parsed.personId
+      ? names.get(parsed.personId) ?? "someone"
+      : "the tree inbox";
+    await logActivityBestEffort({
+      treeId: access.tree.id,
+      actor: access.user,
+      action: "file.updated",
+      entityType: "file",
+      entityId: changed.length === 1 ? changed[0].id : null,
+      personId: parsed.personId,
+      summary:
+        changed.length === 1
+          ? `Filed ${changed[0].originalName} under ${destination}`
+          : `Filed ${changed.length} files under ${destination}`,
+    });
+    notifyTreeChanged(access.tree.id);
+    return { moved: changed.length };
   });
 }
 
@@ -408,7 +575,17 @@ export async function updateFileTags(input: {
       }
     }
 
+    // Tagging a photo from the inbox files it under the first person picked,
+    // so an editor can assign media by naming who is in it.
+    const autoFilePersonId = file.personId === null && desired.length ? desired[0] : null;
+
     await db.transaction(async tx => {
+      if (autoFilePersonId) {
+        await tx
+          .update(files)
+          .set({ personId: autoFilePersonId, updatedAt: new Date() })
+          .where(and(eq(files.id, file.id), eq(files.treeId, access.tree.id)));
+      }
       const existing = await tx
         .select({ personId: fileTags.personId })
         .from(fileTags)
@@ -457,8 +634,10 @@ export async function updateFileTags(input: {
       action: "file.updated",
       entityType: "file",
       entityId: file.id,
-      personId: file.personId,
-      summary: `Updated the people tagged in ${file.originalName}`,
+      personId: autoFilePersonId ?? file.personId,
+      summary: autoFilePersonId
+        ? `Filed ${file.originalName} and tagged the people in it`
+        : `Updated the people tagged in ${file.originalName}`,
     });
 
     return desired;

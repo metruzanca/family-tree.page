@@ -62,7 +62,7 @@ import { ConfirmDialog } from "~/components/ui/ConfirmDialog";
 import { Alert, AlertDescription, AlertTitle } from "~/components/ui/alert";
 import { Button } from "~/components/ui/button";
 import { useToast } from "~/components/ui/Toast";
-import { uploadPersonFile } from "~/lib/upload";
+import { uploadFile } from "~/lib/upload";
 import { scanFileForFaces } from "~/lib/face-scan";
 import type { FaceBox } from "~/lib/face-box";
 import { attemptAction, friendlyMessage } from "~/lib/action-result";
@@ -164,7 +164,7 @@ function TreePageInner() {
     return data()?.files.filter(file => file.groupId === group.id) ?? [];
   });
   const activeMediaPerson = createMemo(() => {
-    const personId = effectiveGroup()?.personId ?? selectedFile()?.personId;
+    const personId = effectiveGroup()?.personId ?? selectedFile()?.personId ?? null;
     return data()?.people.find(person => person.id === personId) ?? undefined;
   });
   const selectedNodeId = createMemo(() => {
@@ -494,7 +494,7 @@ function TreePageInner() {
 
   function focusFile(id: string) {
     const file = data()?.files.find(candidate => candidate.id === id);
-    if (file) revealPerson(file.personId);
+    if (file?.personId) revealPerson(file.personId);
     if (file?.groupId) {
       focusGroup(file.groupId, file.id);
       return;
@@ -562,7 +562,7 @@ function TreePageInner() {
     try {
       for (let index = 0; index < files.length; index += 1) {
         const file = files[index];
-        const result = await uploadPersonFile({
+        const result = await uploadFile({
           treeId: params.treeId,
           personId: person.id,
           groupId,
@@ -1054,7 +1054,10 @@ function TreePageInner() {
                 onClose={() => selectPerson(null)}
                 onPreview={() => undefined}
                 onSelectPerson={focusPerson}
-                onSetAvatar={fileId => handleSetAvatar(file().personId, fileId)}
+                onSetAvatar={fileId => {
+                  const personId = file().personId;
+                  if (personId) handleSetAvatar(personId, fileId);
+                }}
                 onSaveTags={personIds => handleSaveTags(file().id, personIds)}
                 onSetTakenAt={value => handleSetTakenAt(file().id, value)}
                 onDelete={() => setDeleteFileTarget(file())}
@@ -1226,8 +1229,8 @@ function TreePageInner() {
             title={`Delete ${selectedPerson()?.displayName ?? "this person"}?`}
             message={
               <>
-                This removes the person, their connections, and every file attached to them. This
-                cannot be undone.
+                This removes the person and their connections. Their photos move to the tree
+                inbox so you can file them under someone else. This cannot be undone.
               </>
             }
             confirmLabel="Delete person"

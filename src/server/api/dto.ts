@@ -237,7 +237,7 @@ export function toApiEvent(row: PersonEvent): ApiEvent {
 }
 
 export function toApiMedia(
-  file: StoredFile,
+  file: StoredFile & { personId: string },
   options: {
     origin: string;
     treeId: string;
@@ -283,7 +283,7 @@ export function buildTreeSnapshot(input: SnapshotInput): ApiTreeSnapshot {
   const readyFiles = input.files.filter(file => file.status === "ready");
   const avatarByPerson = new Map<string, StoredFile>();
   for (const file of readyFiles) {
-    if (file.isAvatar) avatarByPerson.set(file.personId, file);
+    if (file.isAvatar && file.personId) avatarByPerson.set(file.personId, file);
   }
 
   const tagsByFile = new Map<string, string[]>();
@@ -322,6 +322,7 @@ export function buildTreeSnapshot(input: SnapshotInput): ApiTreeSnapshot {
     )
     .map(toApiEvent);
   const media = [...readyFiles]
+    .filter((file): file is StoredFile & { personId: string } => file.personId !== null)
     .sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime())
     .map(file =>
       toApiMedia(file, {

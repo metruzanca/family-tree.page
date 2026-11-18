@@ -64,7 +64,7 @@ export function TagPeopleDialog(props: TagPeopleDialogProps) {
       description={
         props.primaryPerson
           ? `Filed under ${props.primaryPerson.displayName}. Tag everyone else who appears here.`
-          : "Tag everyone who appears in this photo."
+          : "Tag everyone who appears in this photo. The first person you pick files it under them."
       }
       footer={
         <div class="flex w-full items-center justify-between gap-3">

@@ -142,8 +142,12 @@ export function GraphSearch(props: {
                     <span class="min-w-0 flex-1">
                       <span class="block truncate text-sm font-medium">{file.name}</span>
                       <span class="block truncate text-xs text-muted-foreground">
-                        {personById().get(file.personId)?.displayName ?? "Unknown person"}
-                        <Show when={props.isOutsideFocus?.(file.personId)}>
+                        {(file.personId
+                          ? personById().get(file.personId)?.displayName
+                          : null) ?? "In the inbox"}
+                        <Show
+                          when={file.personId && props.isOutsideFocus?.(file.personId)}
+                        >
                           {" "}
                           · outside your focus
                         </Show>

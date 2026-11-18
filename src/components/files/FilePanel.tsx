@@ -125,7 +125,7 @@ export function FilePanel(props: FilePanelProps) {
             Download
           </a>
         </Show>
-        <Show when={editable() && isImage()}>
+        <Show when={editable() && isImage() && props.person}>
           <Button
             size="sm"
             variant="secondary"
@@ -192,7 +192,16 @@ export function FilePanel(props: FilePanelProps) {
           <h3 class="field-label">Attached to</h3>
           <Show
             when={props.person}
-            fallback={<p class="mt-1.5 text-xs text-muted-foreground">This person is no longer in the tree.</p>}
+            fallback={
+              <p class="mt-1.5 rounded-xl border border-dashed border-border px-3 py-3 text-xs leading-relaxed text-muted-foreground">
+                <Show
+                  when={props.file.personId}
+                  fallback="Waiting in the tree inbox. Tag someone to file it under them."
+                >
+                  This person is no longer in the tree.
+                </Show>
+              </p>
+            }
           >
             {person => (
               <button

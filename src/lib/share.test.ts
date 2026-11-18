@@ -162,6 +162,21 @@ describe("sanitizeSharedGraph", () => {
     expect(shared.events).toHaveLength(2);
   });
 
+  it("never shares files waiting in the tree inbox", () => {
+    const data = graph();
+    data.files = [
+      ...data.files,
+      { ...image("inbox-image", "dead"), personId: null },
+    ];
+    const shared = sanitizeSharedGraph(data, {
+      livingVisibility: "full",
+      includeMedia: true,
+      thumbUrl: thumb,
+    });
+
+    expect(shared.files.map(file => file.id)).not.toContain("inbox-image");
+  });
+
   it("limits media to images and rewrites thumbnails when media is on", () => {
     const shared = sanitizeSharedGraph(graph(), {
       livingVisibility: "name",

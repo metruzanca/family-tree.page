@@ -145,7 +145,10 @@ export function buildResearchIndex(graph: Pick<TreeGraph, "people" | "relationsh
 
   const files = new Map<string, GraphFile[]>();
   for (const file of graph.files) {
-    const ownerIds = new Set([file.personId, ...file.taggedPersonIds]);
+    const ownerIds = new Set([
+      ...(file.personId ? [file.personId] : []),
+      ...file.taggedPersonIds,
+    ]);
     for (const personId of ownerIds) {
       if (!peopleById.has(personId)) continue;
       files.set(personId, [...(files.get(personId) ?? []), file]);

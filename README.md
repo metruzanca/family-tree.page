@@ -195,9 +195,15 @@ On Railway, `RAILWAY_PUBLIC_DOMAIN` is the source of truth for the public origin
 
 The bucket stays private. Browsers never receive storage credentials. SVG, HTML, JavaScript, and executable files are rejected.
 
+### The tree inbox
+
+Uploads do not have to belong to anyone. A file uploaded without a person is unfiled: it waits in the tree inbox, is listed in the media gallery, and never appears on the graph or in share links. Editors can tag an inbox photo with people, which files it under the first person picked, or move it to a person's folder later. Storage keys for inbox files live under `trees/<treeId>/inbox/`.
+
+Files still have one home, the person they are filed under, which is where a graph node lives. Deleting a person keeps their photos: those files return to the inbox, lose their portrait flag, and leave albums that disappear with the person.
+
 ### Photo tags and dates
 
-Every file is still filed under one person, which is where its graph node lives. Editors can additionally tag any other people who appear in an image. Tags live in `file_tags` with tree-scoped foreign keys, so removing a person or a file removes the tags automatically. A tagged person sees the picture under "Also in photos" on their profile without becoming the owner.
+Editors can tag any other people who appear in an image. Tags live in `file_tags` with tree-scoped foreign keys, so removing a person or a file removes the tags automatically. A tagged person sees the picture under "Also in photos" on their profile without becoming the owner.
 
 Images also carry an optional `taken_at` date. The browser reads EXIF `DateTimeOriginal` with `exifr` during upload and uses it as the initial value; editors can change or clear it in the file panel or lightbox. This is separate from the upload date, so scanned photos can be dated to when they were actually taken, and the date can be partial or approximate.
 
@@ -210,7 +216,7 @@ Editors can link people to individual faces in a photo. Detection runs in the br
 - The detector runs on the 640 px thumbnail after an image upload and on demand from "Check for faces" in the lightbox. Browser support is required; unsupported browsers fall back to tagging without boxes.
 - Only the box is stored, in `file_faces`, as normalized `x`, `y`, `width`, and `height` fractions. No embedding or identity template is created, so nothing can match a face across photos.
 - An unassigned box waits for an editor to link a person. Linking writes a `file_tags` row with `source = face`, so profiles, "Also in photos", activity, and exports keep working.
-- When the first check finds exactly one face, it is linked to the person the photo is filed under. Unlink it if the detector caught someone else. Re-scans never re-apply this, so an unlink stays put.
+- When the first check finds exactly one face, it is linked to the person the photo is filed under. Unlink it if the detector caught someone else. An unfiled photo waits in the inbox with an unassigned box until someone tags it. Re-scans never re-apply this, so an unlink stays put.
 - In a group photo, people already tagged in the picture appear first in the picker under "Already in this photo", followed by everyone else alphabetically.
 - If the detector misses a face, "Add a face" draws a box and links a person in one step. The photo owner is already linked by ownership, so no duplicate tag is created.
 - "Not a face" keeps the box but hides it and protects it from re-scans. Removing a person from the tag list unassigns their face and keeps the box. Re-scanning matches boxes by overlap, so links and ignored faces survive.

@@ -462,7 +462,7 @@ export const renameFileGroupSchema = z.object({
 
 export const prepareUploadSchema = z.object({
   treeId: z.string().uuid(),
-  personId: z.string().uuid(),
+  personId: z.string().uuid().optional().nullable(),
   groupId: z.string().uuid().optional().nullable(),
   fileName: z.string().trim().min(1).max(255),
   mimeType: z.string().trim().min(1).max(120),
@@ -472,6 +472,19 @@ export const prepareUploadSchema = z.object({
   width: z.number().int().positive().max(50_000).optional().nullable(),
   height: z.number().int().positive().max(50_000).optional().nullable(),
   takenAt: optionalFuzzyDate,
+});
+
+export const fileIdsSchema = z.object({
+  treeId: z.string().uuid(),
+  fileIds: z
+    .array(z.string().uuid())
+    .min(1, "Choose at least one file.")
+    .max(200, "That is too many files at once.")
+    .transform(ids => [...new Set(ids)]),
+});
+
+export const assignFilesSchema = fileIdsSchema.extend({
+  personId: z.string().uuid().nullable(),
 });
 
 export const fileTagsSchema = z.object({

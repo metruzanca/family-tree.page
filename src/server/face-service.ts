@@ -140,7 +140,8 @@ export async function recordDetectedFaces(input: {
     }
     // A lone face in a photo is almost always the person the photo is filed
     // under. Only do this on the first check, so unlinking survives a re-scan.
-    if (existing.length === 0 && plan.additions.length === 1) {
+    // An unfiled photo has nobody to link, so its box waits for an editor.
+    if (existing.length === 0 && plan.additions.length === 1 && file.personId) {
       await tx
         .update(fileFaces)
         .set({

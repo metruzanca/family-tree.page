@@ -427,7 +427,12 @@ export const files = pgTable(
     treeId: uuid("tree_id")
       .notNull()
       .references(() => trees.id, { onDelete: "cascade" }),
-    personId: uuid("person_id").notNull(),
+    /**
+     * The person the file is filed under. Null means it waits in the tree
+     * inbox until someone assigns it. The tree-scoped foreign key stays, and
+     * person deletion clears this before removing the row, so photos survive.
+     */
+    personId: uuid("person_id"),
     groupId: uuid("group_id"),
     storageKey: text("storage_key").notNull().unique(),
     thumbKey: text("thumb_key"),

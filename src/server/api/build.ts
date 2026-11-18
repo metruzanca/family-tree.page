@@ -23,7 +23,7 @@ export function createPersonMapper(
 ): PersonMapper {
   const avatarByPerson = new Map<string, StoredFile>();
   for (const file of data.files) {
-    if (file.isAvatar) avatarByPerson.set(file.personId, file);
+    if (file.isAvatar && file.personId) avatarByPerson.set(file.personId, file);
   }
   return person => {
     const avatar = avatarByPerson.get(person.id);
@@ -117,7 +117,11 @@ export function buildPersonDetail(
     data.tags.filter(tag => tag.personId === personId).map(tag => tag.fileId),
   );
   const media = data.files
-    .filter(file => file.personId === personId || taggedFileIds.has(file.id))
+    .filter(
+      (file): file is StoredFile & { personId: string } =>
+        file.personId !== null &&
+        (file.personId === personId || taggedFileIds.has(file.id)),
+    )
     .sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime())
     .map(file =>
       toApiMedia(file, {
@@ -209,11 +213,13 @@ export function toGedcomInput(data: ApiTreeData): GedcomInput {
       date: row.date ?? null,
       description: row.description,
     })),
-    files: data.files.map(row => ({
-      id: row.id,
-      personId: row.personId,
-      originalName: row.originalName,
-      mimeType: row.mimeType,
-    })),
+    files: data.files
+      .filter((row): row is StoredFile & { personId: string } => row.personId !== null)
+      .map(row => ({
+        id: row.id,
+        personId: row.personId,
+        originalName: row.originalName,
+        mimeType: row.mimeType,
+      })),
   };
 }

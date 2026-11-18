@@ -7,7 +7,8 @@ import { makeThumbnail, mimeForFile } from "./image-thumb";
 
 export type UploadOptions = {
   treeId: string;
-  personId: string;
+  /** Null or omitted uploads to the tree inbox, unfiled. */
+  personId?: string | null;
   groupId?: string | null;
   file: File;
   onProgress?: (fraction: number) => void;
@@ -15,7 +16,7 @@ export type UploadOptions = {
 
 export type UploadResult = { ok: true; fileId: string } | { ok: false; error: string };
 
-export async function uploadPersonFile(options: UploadOptions): Promise<UploadResult> {
+export async function uploadFile(options: UploadOptions): Promise<UploadResult> {
   const mimeType = mimeForFile(options.file);
   options.onProgress?.(0.02);
 
@@ -38,7 +39,7 @@ export async function uploadPersonFile(options: UploadOptions): Promise<UploadRe
   try {
     prepared = await prepareUpload({
       treeId: options.treeId,
-      personId: options.personId,
+      personId: options.personId ?? null,
       groupId: options.groupId ?? null,
       fileName: options.file.name,
       mimeType,

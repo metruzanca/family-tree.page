@@ -26,7 +26,6 @@ import type { PersonLink } from "../lib/person-links";
 import type { PersonSex } from "../lib/person-sex";
 import { requireTreeMember, type TreeRole } from "../server/guards";
 import { AppError, runAction, type ActionResult } from "../server/errors";
-import { log } from "../server/logger";
 import {
   addRelativeSchema,
   parentChildSchema,
@@ -38,7 +37,6 @@ import {
   type PersonEventInput,
   type PersonInput,
 } from "../server/validation";
-import { deletePrefix, TREE_PREFIX } from "../server/storage";
 import {
   logActivity,
   peopleNames,
@@ -71,7 +69,8 @@ export type GraphFace = {
 
 export type GraphFile = {
   id: string;
-  personId: string;
+  /** Null means the file waits in the tree inbox, unfiled. */
+  personId: string | null;
   groupId: string | null;
   name: string;
   mimeType: string;
@@ -253,7 +252,7 @@ export async function loadTreeGraph(tree: {
 
   const avatarByPerson = new Map<string, string>();
   for (const file of fileRows) {
-    if (file.isAvatar) avatarByPerson.set(file.personId, file.id);
+    if (file.isAvatar && file.personId) avatarByPerson.set(file.personId, file.id);
   }
 
   const groupViews: GraphFileGroup[] = groupRows
@@ -583,17 +582,16 @@ export async function deletePerson(input: {
       .limit(1);
     if (!person) throw new AppError("That person could not be found.");
 
-    try {
-      await deletePrefix(`${TREE_PREFIX}/${input.treeId}/people/${input.personId}/`);
-    } catch (error) {
-      log.error("people.storage_delete_failed", {
-        treeId: input.treeId,
-        personId: input.personId,
-        error,
-      });
-    }
-
     await db.transaction(async tx => {
+      // Photos outlive the person who filed them. Clear the owner so they wait
+      // in the tree inbox instead of taking the files down with the cascade.
+      // Their albums disappear with the person, so files leave those too.
+      await tx
+        .update(files)
+        .set({ personId: null, groupId: null, isAvatar: false, updatedAt: new Date() })
+        .where(
+          and(eq(files.treeId, access.tree.id), eq(files.personId, input.personId)),
+        );
       // A deleted person should leave their face boxes behind, unlinked.
       await tx
         .update(fileFaces)

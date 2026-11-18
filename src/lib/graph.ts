@@ -283,18 +283,19 @@ export function buildGraphModel(
     }
     for (const file of data.files) {
       if (file.isAvatar || file.groupId) continue;
-      if (!owners.has(file.personId)) continue;
+      if (!file.personId || !owners.has(file.personId)) continue;
+      const ownerId = file.personId;
       const node: GraphNode = {
         id: fileNodeId(file.id),
         kind: "file",
         name: file.name,
         file,
-        ownerId: file.personId,
+        ownerId,
         degree: 1,
-        level: generations.get(file.personId) ?? 0,
+        level: generations.get(ownerId) ?? 0,
       };
       nodes.push(node);
-      addMedia(mediaByOwner, file.personId, node);
+      addMedia(mediaByOwner, ownerId, node);
     }
     for (const [ownerId, media] of mediaByOwner) {
       for (const node of media) {

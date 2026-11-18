@@ -1,4 +1,5 @@
 import { fuzzySortValue } from "~/lib/fuzzy-date";
+import type { StoredFile } from "../../../../../../drizzle/schema";
 import { loadApiTreeData } from "~/server/api/data";
 import { mapPeople } from "~/server/api/build";
 import { toApiEvent, toApiMedia } from "~/server/api/dto";
@@ -93,7 +94,8 @@ export const GET = apiHandler("people:read", async (event, context) => {
   }
 
   const matchedMedia = data.files
-    .filter(file => {
+    .filter((file): file is StoredFile & { personId: string } => {
+      if (!file.personId) return false;
       if ((surname || place) && !matchedPersonIds.has(file.personId)) return false;
       if (query && !includesText(file.originalName, query)) return false;
       return true;

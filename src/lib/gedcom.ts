@@ -385,7 +385,7 @@ export function buildGedcom(
   );
   const fileXref = new Map(
     input.files
-      .filter(file => personXref.has(file.personId))
+      .filter(file => file.personId !== null && personXref.has(file.personId))
       .map(file => [file.id, shortXref("M", file.id, seenXrefs)]),
   );
   const groups = buildFamilyGroups(input);
@@ -445,7 +445,7 @@ export function buildGedcom(
 
   const filesByPerson = new Map<string, GedcomFile[]>();
   for (const file of input.files) {
-    if (!personXref.has(file.personId)) continue;
+    if (!file.personId || !personXref.has(file.personId)) continue;
     filesByPerson.set(file.personId, [
       ...(filesByPerson.get(file.personId) ?? []),
       file,

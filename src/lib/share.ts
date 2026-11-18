@@ -77,6 +77,7 @@ export function sanitizeSharedGraph(
     ? graph.files
         .filter(
           file =>
+            file.personId !== null &&
             visiblePersonIds.has(file.personId) &&
             file.kind === "image" &&
             canShowLivingMedia(file.personId),

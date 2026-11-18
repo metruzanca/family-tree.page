@@ -69,8 +69,13 @@ export function assertAllowedUpload(mimeType: string, sizeBytes: number, hasThum
   }
 }
 
-export function storageKeys(treeId: string, personId: string, fileId: string) {
-  const base = `${TREE_PREFIX}/${treeId}/people/${personId}/${fileId}`;
+export function storageKeys(
+  treeId: string,
+  personId: string | null,
+  fileId: string,
+) {
+  const owner = personId ? `people/${personId}` : "inbox";
+  const base = `${TREE_PREFIX}/${treeId}/${owner}/${fileId}`;
   return { original: `${base}/original`, thumb: `${base}/thumb` };
 }
 
