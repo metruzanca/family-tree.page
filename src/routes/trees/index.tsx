@@ -1,12 +1,13 @@
 import { A, createAsync, revalidate } from "@solidjs/router";
 import { For, Show, createSignal, onMount } from "solid-js";
-import { ArrowUpRight, CalendarDays, Plus, RotateCcw, Sprout, Trash2, Users } from "lucide-solid";
+import { ArrowUpRight, CalendarDays, Plus, RotateCcw, Sprout, Trash2, Upload, Users } from "lucide-solid";
 import { getMyTrees, getPendingDeletionTrees, requireUserPage } from "~/api";
 import { restoreTree } from "~/api/trees-server";
 import { AppErrorBoundary } from "~/components/app/AppErrorBoundary";
 import { AppHeader } from "~/components/app/AppHeader";
 import { VerifyEmailNotice } from "~/components/auth/VerifyEmailNotice";
 import { CreateTreeDialog } from "~/components/trees/CreateTreeDialog";
+import { ImportGedcomDialog } from "~/components/trees/ImportGedcomDialog";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card } from "~/components/ui/card";
@@ -44,6 +45,7 @@ function TreesInner() {
   const pending = createAsync(() => getPendingDeletionTrees());
   const toast = useToast();
   const [creating, setCreating] = createSignal(false);
+  const [importing, setImporting] = createSignal(false);
   const [restoringId, setRestoringId] = createSignal<string | null>(null);
 
   // Tree lists change from other sessions and from the deletion flow, so a
@@ -74,10 +76,25 @@ function TreesInner() {
             <AppHeader
               user={currentUser()}
               actions={
-                <Button size="sm" onClick={() => setCreating(true)}>
-                  <Plus />
-                  New tree
-                </Button>
+                <div class="flex items-center gap-1.5">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => setImporting(true)}
+                    data-testid="trees-import-gedcom"
+                  >
+                    <Upload />
+                    Import
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => setCreating(true)}
+                    data-testid="trees-new-tree"
+                  >
+                    <Plus />
+                    New tree
+                  </Button>
+                </div>
               }
             />
             <main class="mx-auto max-w-7xl px-4 pb-20 pt-10 sm:px-6">
@@ -274,6 +291,7 @@ function TreesInner() {
               </Show>
             </main>
             <CreateTreeDialog open={creating()} onClose={() => setCreating(false)} />
+            <ImportGedcomDialog open={importing()} onClose={() => setImporting(false)} />
           </>
         )}
       </Show>

@@ -23,7 +23,8 @@ export type ActivityAction =
   | "tree.deletion_approved"
   | "tree.deletion_cancelled"
   | "tree.deletion_scheduled"
-  | "tree.restored";
+  | "tree.restored"
+  | "tree.imported";
 
 export type ActivityEntityType =
   | "person"
@@ -156,5 +157,7 @@ export function activityActionLabel(action: ActivityAction) {
       return "Tree scheduled for deletion";
     case "tree.restored":
       return "Tree restored";
+    case "tree.imported":
+      return "Tree imported";
   }
 }

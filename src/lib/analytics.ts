@@ -45,6 +45,7 @@ export type AnalyticsEvent =
   | "relationship_added"
   | "relationship_removed"
   | "tree_created"
+  | "tree_imported"
   | "tree_deleted"
   | "tree_deletion_requested"
   | "tree_left"
@@ -75,6 +76,7 @@ type AnalyticsPayloads = {
   relationship_added: { relation: string; mode: string };
   relationship_removed: { relation: string };
   tree_created: undefined;
+  tree_imported: undefined;
   tree_deleted: undefined;
   tree_deletion_requested: undefined;
   tree_left: undefined;
@@ -106,6 +108,7 @@ const PAYLOAD_KEYS: Record<AnalyticsEvent, readonly string[]> = {
   relationship_added: ["relation", "mode"],
   relationship_removed: ["relation"],
   tree_created: [],
+  tree_imported: [],
   tree_deleted: [],
   tree_deletion_requested: [],
   tree_left: [],

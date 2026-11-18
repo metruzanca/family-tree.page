@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { API_SCOPE_VALUES } from "../lib/api";
 import { PERSON_SEX_VALUES } from "../lib/person-sex";
+import { MAX_GEDCOM_CHARS } from "../lib/gedcom-import";
 import {
   isValidFuzzyDate,
   isValidPartialDate,
@@ -142,6 +143,25 @@ export const inviteSchema = z.object({
 });
 
 export const inviteEmailSchema = emailSchema;
+
+export const importGedcomSchema = z.object({
+  treeName: z
+    .string()
+    .trim()
+    .min(1, "Give the imported tree a name.")
+    .max(80, "That name is too long."),
+  fileName: z
+    .string()
+    .trim()
+    .max(255)
+    .optional()
+    .nullable()
+    .transform(value => value || null),
+  text: z
+    .string()
+    .min(1, "Choose a GEDCOM file.")
+    .max(MAX_GEDCOM_CHARS, "That GEDCOM file is too large."),
+});
 
 export const apiTokenSchema = z.object({
   treeId: z.string().uuid(),
