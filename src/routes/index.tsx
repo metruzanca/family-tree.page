@@ -4,17 +4,19 @@ import { getUser } from "~/api";
 import { AppErrorBoundary } from "~/components/app/AppErrorBoundary";
 import { LandingPage } from "~/components/landing/LandingPage";
 import { LoadingScreen } from "~/components/ui/Loading";
+import { useI18n } from "~/i18n/LocaleProvider";
 
 export const route = {
   preload: () => getUser(),
 };
 
 export default function IndexPage() {
+  const { t } = useI18n();
   return (
     <AppErrorBoundary
-      title="We could not load this page"
+      title={t("home.error.title")}
       revalidateKeys={[getUser.key]}
-      back={{ href: "/", label: "Retry home" }}
+      back={{ href: "/", label: t("home.error.back") }}
     >
       <IndexInner />
     </AppErrorBoundary>
