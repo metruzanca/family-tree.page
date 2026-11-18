@@ -1,6 +1,7 @@
 import { For, Show, createMemo } from "solid-js";
 import type { PresencePeer, PresenceStatus } from "~/lib/presence-protocol";
 import { presenceColor } from "~/lib/presence-color";
+import { useI18n } from "~/i18n/LocaleProvider";
 import { Avatar } from "~/components/ui/Avatar";
 import {
   DropdownMenu,
@@ -24,6 +25,7 @@ type PresenceBarProps = {
 };
 
 export function PresenceBar(props: PresenceBarProps) {
+  const { t } = useI18n();
   const users = createMemo<PresenceUser[]>(() => {
     const map = new Map<string, PresenceUser>();
     for (const peer of props.peers) {
@@ -55,7 +57,7 @@ export function PresenceBar(props: PresenceBarProps) {
       <DropdownMenu placement="bottom-start">
         <DropdownMenuTrigger
           class="flex h-10 items-center gap-2 rounded-full border border-white/10 bg-black/35 px-2 text-white/75 backdrop-blur-md transition hover:bg-black/55 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
-          aria-label="People viewing this tree"
+          aria-label={t("presence.peopleViewing")}
           data-testid="presence-bar"
         >
           <span class="flex -space-x-1.5">
@@ -71,7 +73,9 @@ export function PresenceBar(props: PresenceBarProps) {
             </For>
           </span>
           <span class="hidden text-xs font-medium sm:inline">
-            {props.status === "online" ? `${users().length} viewing` : "Reconnecting"}
+            {props.status === "online"
+              ? t("presence.viewing", { count: users().length })
+              : t("presence.reconnecting")}
           </span>
           <span
             class={`h-1.5 w-1.5 rounded-full ${
@@ -82,8 +86,8 @@ export function PresenceBar(props: PresenceBarProps) {
         <DropdownMenuContent class="w-64 rounded-2xl border-white/10 bg-[#161b14] p-1.5 text-white/80">
           <div class="px-3 py-1.5 text-[0.65rem] uppercase tracking-wide text-white/40">
             {otherUsers().length
-              ? `${users().length} ${users().length === 1 ? "person" : "people"} viewing`
-              : "Only you here"}
+              ? t("presence.viewingCount", { count: users().length })
+              : t("presence.onlyYou")}
           </div>
           <For each={users()}>
             {user => (
@@ -99,15 +103,17 @@ export function PresenceBar(props: PresenceBarProps) {
                   <div class="truncate text-xs font-semibold text-white/85">
                     {user.displayName}
                     <Show when={user.self}>
-                      <span class="font-normal text-white/40"> (you)</span>
+                      <span class="font-normal text-white/40"> {t("presence.you")}</span>
                     </Show>
                   </div>
                   <div class="truncate text-[0.65rem] text-white/45">
-                    {props.resolveNode(user.nodeId) ?? "Viewing the tree"}
+                    {props.resolveNode(user.nodeId) ?? t("presence.viewingTree")}
                   </div>
                 </div>
                 <Show when={user.tabs > 1}>
-                  <span class="shrink-0 text-[0.6rem] text-white/35">{user.tabs} tabs</span>
+                  <span class="shrink-0 text-[0.6rem] text-white/35">
+                    {t("presence.tabs", { count: user.tabs })}
+                  </span>
                 </Show>
               </div>
             )}

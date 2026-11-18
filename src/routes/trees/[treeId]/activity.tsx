@@ -7,12 +7,8 @@ import {
   getTreeMembers,
   requireUserPage,
 } from "~/api";
-import type { ActivityGroup, ActivityItem } from "~/lib/activity";
-import {
-  ACTIVITY_GROUPS,
-  activityActionLabel,
-  activityGroupFor,
-} from "~/lib/activity";
+import type { ActivityAction, ActivityGroup, ActivityItem } from "~/lib/activity";
+import { ACTIVITY_GROUPS, activityGroupFor } from "~/lib/activity";
 import { formatDate, formatRelative } from "~/lib/format";
 import { AppHeader } from "~/components/app/AppHeader";
 import { Avatar } from "~/components/ui/Avatar";
@@ -20,6 +16,47 @@ import { Badge } from "~/components/ui/badge";
 import { Button, buttonVariants } from "~/components/ui/button";
 import { LoadingScreen } from "~/components/ui/Loading";
 import { useToast } from "~/components/ui/Toast";
+import { useI18n } from "~/i18n/LocaleProvider";
+import type { TranslationKey } from "~/i18n";
+
+const groupKeys: Record<ActivityGroup | "", TranslationKey> = {
+  "": "tree.activity.group.all",
+  people: "tree.activity.group.people",
+  relationships: "tree.activity.group.relationships",
+  events: "tree.activity.group.events",
+  media: "tree.activity.group.media",
+  members: "tree.activity.group.members",
+  tree: "tree.activity.group.tree",
+};
+
+const actionKeys: Record<ActivityAction, TranslationKey> = {
+  "person.created": "tree.activity.action.personCreated",
+  "person.updated": "tree.activity.action.personUpdated",
+  "person.deleted": "tree.activity.action.personDeleted",
+  "relationship.created": "tree.activity.action.relationshipCreated",
+  "relationship.removed": "tree.activity.action.relationshipRemoved",
+  "event.created": "tree.activity.action.eventCreated",
+  "event.updated": "tree.activity.action.eventUpdated",
+  "event.deleted": "tree.activity.action.eventDeleted",
+  "file.uploaded": "tree.activity.action.fileUploaded",
+  "file.updated": "tree.activity.action.fileUpdated",
+  "file.deleted": "tree.activity.action.fileDeleted",
+  "group.renamed": "tree.activity.action.groupRenamed",
+  "group.deleted": "tree.activity.action.groupDeleted",
+  "member.role_changed": "tree.activity.action.memberRoleChanged",
+  "member.removed": "tree.activity.action.memberRemoved",
+  "member.left": "tree.activity.action.memberLeft",
+  "invite.created": "tree.activity.action.inviteCreated",
+  "invite.revoked": "tree.activity.action.inviteRevoked",
+  "invite.accepted": "tree.activity.action.inviteAccepted",
+  "tree.updated": "tree.activity.action.treeUpdated",
+  "tree.deletion_requested": "tree.activity.action.treeDeletionRequested",
+  "tree.deletion_approved": "tree.activity.action.treeDeletionApproved",
+  "tree.deletion_cancelled": "tree.activity.action.treeDeletionCancelled",
+  "tree.deletion_scheduled": "tree.activity.action.treeDeletionScheduled",
+  "tree.restored": "tree.activity.action.treeRestored",
+  "tree.imported": "tree.activity.action.treeImported",
+};
 
 export const route = {
   preload: ({ params }: { params: { treeId: string } }) => {
@@ -40,6 +77,7 @@ export default function TreeActivityPage() {
 function TreeActivityInner() {
   const params = useParams<{ treeId: string }>();
   const toast = useToast();
+  const { t, locale } = useI18n();
   const user = createAsync(() => requireUserPage());
   const graph = createAsync(() => getTreeGraph(params.treeId));
   const members = createAsync(() => getTreeMembers(params.treeId));
@@ -84,7 +122,7 @@ function TreeActivityInner() {
       setExtra(current => [...current, ...page.items]);
       setCursor(page.nextCursor);
     } catch {
-      toast.show("Could not load older activity.", "error");
+      toast.show(t("tree.activity.loadOlderError"), "error");
     } finally {
       setLoadingOlder(false);
     }
@@ -104,7 +142,7 @@ function TreeActivityInner() {
             <div class="page-shell min-h-[100dvh]" data-testid="activity-page">
               <AppHeader
                 user={currentUser()}
-                back={{ href: `/trees/${params.treeId}`, label: "Back to tree" }}
+                back={{ href: `/trees/${params.treeId}`, label: t("tree.backToTree") }}
                 center={data().tree.name}
               />
               <main class="mx-auto max-w-4xl px-4 pb-20 pt-8 sm:px-6">
@@ -112,14 +150,13 @@ function TreeActivityInner() {
                   <div>
                     <p class="eyebrow mb-2 flex items-center gap-1.5">
                       <History size={13} />
-                      Tree activity
+                      {t("tree.activity.eyebrow")}
                     </p>
                     <h1 class="font-display text-4xl tracking-tight">
-                      What changed
+                      {t("tree.activity.title")}
                     </h1>
                     <p class="mt-2 max-w-xl text-sm text-muted-foreground">
-                      A running history of people, relationships, photos, events, and members.
-                      Everyone in this tree can see it.
+                      {t("tree.activity.subtitle")}
                     </p>
                   </div>
                   <A
@@ -127,41 +164,41 @@ function TreeActivityInner() {
                     class={buttonVariants({ variant: "secondary", size: "sm" })}
                     data-testid="activity-open-graph"
                   >
-                    Open graph
+                    {t("tree.openGraph")}
                   </A>
                 </div>
 
                 <section class="mt-6 grid gap-2 rounded-2xl border border-border bg-card/60 p-3 sm:grid-cols-3">
                   <label class="flex flex-col gap-1 text-[0.68rem] font-semibold uppercase tracking-wide text-muted-foreground">
-                    Person
+                    {t("tree.activity.person")}
                     <select
                       class="input text-sm normal-case tracking-normal"
                       data-testid="activity-person-filter"
                       value={personId()}
                       onChange={event => setPersonId(event.currentTarget.value)}
                     >
-                      <option value="">Everyone</option>
+                      <option value="">{t("tree.everyone")}</option>
                       <For each={people()}>
                         {person => <option value={person.id}>{person.displayName}</option>}
                       </For>
                     </select>
                   </label>
                   <label class="flex flex-col gap-1 text-[0.68rem] font-semibold uppercase tracking-wide text-muted-foreground">
-                    Member
+                    {t("tree.activity.member")}
                     <select
                       class="input text-sm normal-case tracking-normal"
                       data-testid="activity-actor-filter"
                       value={actorUserId()}
                       onChange={event => setActorUserId(event.currentTarget.value)}
                     >
-                      <option value="">Anyone</option>
+                      <option value="">{t("tree.activity.anyone")}</option>
                       <For each={members() ?? []}>
                         {member => <option value={member.userId}>{member.displayName}</option>}
                       </For>
                     </select>
                   </label>
                   <label class="flex flex-col gap-1 text-[0.68rem] font-semibold uppercase tracking-wide text-muted-foreground">
-                    Type
+                    {t("tree.activity.type")}
                     <select
                       class="input text-sm normal-case tracking-normal"
                       data-testid="activity-group-filter"
@@ -171,7 +208,9 @@ function TreeActivityInner() {
                       }
                     >
                       <For each={ACTIVITY_GROUPS}>
-                        {option => <option value={option.value}>{option.label}</option>}
+                        {option => (
+                          <option value={option.value}>{t(groupKeys[option.value])}</option>
+                        )}
                       </For>
                     </select>
                   </label>
@@ -185,9 +224,9 @@ function TreeActivityInner() {
                       data-testid="activity-empty"
                     >
                       <Clock3 class="mx-auto text-muted-foreground" />
-                      <p class="mt-3 text-sm font-medium">Nothing here yet</p>
+                      <p class="mt-3 text-sm font-medium">{t("tree.activity.empty.title")}</p>
                       <p class="mt-1 text-xs text-muted-foreground">
-                        Add a person, photo, or life event and it will show up here.
+                        {t("tree.activity.empty.body")}
                       </p>
                     </div>
                   }
@@ -206,7 +245,7 @@ function TreeActivityInner() {
                         disabled={loadingOlder()}
                         onClick={() => void loadOlder()}
                       >
-                        {loadingOlder() ? "Loading…" : "Load older"}
+                        {loadingOlder() ? t("common.loading") : t("tree.activity.loadOlder")}
                       </Button>
                     </div>
                   </Show>
@@ -221,6 +260,7 @@ function TreeActivityInner() {
 }
 
 function ActivityRow(props: { item: ActivityItem }) {
+  const { t, locale } = useI18n();
   const group = () => activityGroupFor(props.item.action);
   return (
     <li
@@ -233,12 +273,12 @@ function ActivityRow(props: { item: ActivityItem }) {
           <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
             <p class="text-sm font-semibold">{props.item.summary}</p>
             <Badge variant="secondary" class="px-2 py-0.5 text-[0.62rem] normal-case">
-              {activityActionLabel(props.item.action)}
+              {t(actionKeys[props.item.action])}
             </Badge>
           </div>
           <p class="mt-0.5 text-xs text-muted-foreground">
-            {props.item.actorName} · {formatRelative(props.item.createdAt)} ·{" "}
-            {formatDate(props.item.createdAt)}
+            {props.item.actorName} · {formatRelative(props.item.createdAt, locale())} ·{" "}
+            {formatDate(props.item.createdAt, locale())}
           </p>
           <Show when={props.item.changes?.length}>
             <ul
@@ -249,14 +289,15 @@ function ActivityRow(props: { item: ActivityItem }) {
                 {change => (
                   <li class="text-xs leading-relaxed text-muted-foreground">
                     <span class="font-medium text-foreground">{change.label}:</span>{" "}
-                    {change.from ?? "(empty)"} → {change.to ?? "(empty)"}
+                    {change.from ?? t("tree.activity.emptyValue")} →{" "}
+                    {change.to ?? t("tree.activity.emptyValue")}
                   </li>
                 )}
               </For>
             </ul>
           </Show>
           <p class="mt-1 text-[0.62rem] uppercase tracking-wide text-muted-foreground">
-            {group()}
+            {t(groupKeys[group()])}
           </p>
         </div>
       </div>

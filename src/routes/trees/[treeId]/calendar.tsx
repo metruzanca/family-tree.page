@@ -7,6 +7,7 @@ import { AppHeader } from "~/components/app/AppHeader";
 import { TreeCalendar } from "~/components/calendar/TreeCalendar";
 import { buttonVariants } from "~/components/ui/button";
 import { LoadingScreen } from "~/components/ui/Loading";
+import { useI18n } from "~/i18n/LocaleProvider";
 
 export const route = {
   preload: ({ params }: { params: { treeId: string } }) => {
@@ -16,13 +17,14 @@ export const route = {
 };
 
 export default function TreeCalendarPage() {
+  const { t } = useI18n();
   return (
     <Suspense fallback={<LoadingScreen />}>
       <AppErrorBoundary
-        title="We could not load this calendar"
-        message="The tree may be temporarily unavailable. Try again in a moment."
+        title={t("tree.calendar.error.title")}
+        message={t("tree.error.unavailable")}
         revalidateKeys={[requireUserPage.key, getTreeGraph.key]}
-        back={{ href: "/trees", label: "Back to your trees" }}
+        back={{ href: "/trees", label: t("notFound.back") }}
       >
         <TreeCalendarInner />
       </AppErrorBoundary>
@@ -32,6 +34,7 @@ export default function TreeCalendarPage() {
 
 function TreeCalendarInner() {
   const params = useParams<{ treeId: string }>();
+  const { t } = useI18n();
   const user = createAsync(() => requireUserPage());
   const data = createAsync(() => getTreeGraph(params.treeId));
 
@@ -43,17 +46,16 @@ function TreeCalendarInner() {
             <div class="page-shell min-h-[100dvh]">
               <AppHeader
                 user={currentUser()}
-                back={{ href: `/trees/${params.treeId}`, label: "Back to tree" }}
+                back={{ href: `/trees/${params.treeId}`, label: t("tree.backToTree") }}
                 center={graph().tree.name}
               />
               <main class="mx-auto max-w-6xl px-4 pb-20 pt-8 sm:px-6">
                 <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
                   <div>
-                    <p class="eyebrow mb-2">Tree calendar</p>
+                    <p class="eyebrow mb-2">{t("tree.calendar.eyebrow")}</p>
                     <h1 class="font-display text-4xl tracking-tight">{graph().tree.name}</h1>
                     <p class="mt-2 max-w-xl text-sm text-muted-foreground">
-                      Birthdays and anniversaries for everyone in this tree. Living relatives are
-                      counted forward so you never miss a birthday.
+                      {t("tree.calendar.subtitle")}
                     </p>
                   </div>
                   <div class="flex flex-wrap items-center gap-2">
@@ -62,14 +64,14 @@ function TreeCalendarInner() {
                       class={buttonVariants({ variant: "secondary", size: "sm" })}
                     >
                       <CalendarPlus size={15} />
-                      Subscribe
+                      {t("tree.calendar.subscribe")}
                     </A>
                     <A
                       href={`/trees/${params.treeId}`}
                       class={buttonVariants({ variant: "secondary", size: "sm" })}
                     >
                       <Network size={15} />
-                      Open graph
+                      {t("tree.openGraph")}
                     </A>
                   </div>
                 </div>

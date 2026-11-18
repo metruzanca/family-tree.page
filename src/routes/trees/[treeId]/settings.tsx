@@ -42,7 +42,6 @@ import {
 import {
   API_SCOPES,
   DEFAULT_API_SCOPES,
-  scopeLabel,
   type ApiScope,
 } from "~/lib/api";
 import type { LivingVisibility } from "~/lib/share";
@@ -73,21 +72,39 @@ import {
   TabsTrigger,
 } from "~/components/ui/tabs";
 import { useToast } from "~/components/ui/Toast";
-import { formatRelative, roleLabel } from "~/lib/format";
+import { formatRelative, roleKey } from "~/lib/format";
 import { attemptAction } from "~/lib/action-result";
 import { track } from "~/lib/analytics";
+import { useI18n } from "~/i18n/LocaleProvider";
+import { Trans } from "~/i18n/Trans";
+import type { Locale, TranslationKey, TranslationParams } from "~/i18n";
 
-const roleOptions: { value: TreeRole; label: string }[] = [
-  { value: "owner", label: "Owner" },
-  { value: "editor", label: "Editor" },
-  { value: "viewer", label: "Viewer" },
-];
+type Translate = (key: TranslationKey, params?: TranslationParams) => string;
 
-const expiryOptions = [
-  { value: "1", label: "In 1 day" },
-  { value: "7", label: "In 7 days" },
-  { value: "30", label: "In 30 days" },
-];
+type InviteStatus = "pending" | "used" | "revoked" | "expired";
+
+const inviteStatusKeys: Record<InviteStatus, TranslationKey> = {
+  pending: "tree.invites.status.pending",
+  used: "tree.invites.status.used",
+  revoked: "tree.invites.status.revoked",
+  expired: "tree.invites.status.expired",
+};
+
+const scopeLabels: Record<ApiScope, TranslationKey> = {
+  "tree:read": "tree.settings.api.scope.tree.label",
+  "people:read": "tree.settings.api.scope.people.label",
+  "media:read": "tree.settings.api.scope.media.label",
+  "changes:read": "tree.settings.api.scope.changes.label",
+  "export:read": "tree.settings.api.scope.export.label",
+};
+
+const scopeDescriptions: Record<ApiScope, TranslationKey> = {
+  "tree:read": "tree.settings.api.scope.tree.description",
+  "people:read": "tree.settings.api.scope.people.description",
+  "media:read": "tree.settings.api.scope.media.description",
+  "changes:read": "tree.settings.api.scope.changes.description",
+  "export:read": "tree.settings.api.scope.export.description",
+};
 
 export const route = {
   preload: ({ params }: { params: { treeId: string } }) => {
@@ -98,17 +115,18 @@ export const route = {
 };
 
 export default function TreeSettingsPage() {
+  const { t } = useI18n();
   return (
     <AppErrorBoundary
-      title="We could not load tree settings"
-      message="The tree may be temporarily unavailable. Try again in a moment."
+      title={t("tree.settings.error.title")}
+      message={t("tree.error.unavailable")}
       revalidateKeys={[
         requireUserPage.key,
         overviewQuery.key,
         membersQuery.key,
         invitesQuery.key,
       ]}
-      back={{ href: "/trees", label: "Back to your trees" }}
+      back={{ href: "/trees", label: t("notFound.back") }}
     >
       <TreeSettingsInner />
     </AppErrorBoundary>
@@ -119,6 +137,20 @@ function TreeSettingsInner() {
   const params = useParams<{ treeId: string }>();
   const navigate = useNavigate();
   const toast = useToast();
+  const { t, locale } = useI18n();
+
+  const roleOptions = (): { value: TreeRole; label: string }[] =>
+    (["owner", "editor", "viewer"] as TreeRole[]).map(value => ({
+      value,
+      label: t(roleKey(value)),
+    }));
+
+  const expiryOptions = (): { value: string; label: string }[] => [
+    { value: "1", label: t("tree.settings.in1Day") },
+    { value: "7", label: t("tree.settings.in7Days") },
+    { value: "30", label: t("tree.settings.in30Days") },
+  ];
+
   const [searchParams] = useSearchParams();
   const defaultTab = searchParams.tab === "danger" ? "danger" : "tree";
   const user = createAsync(() => requireUserPage());
@@ -253,7 +285,7 @@ function TreeSettingsInner() {
       return;
     }
     await revalidate([overviewQuery.key, getMyTrees.key, getTreeGraph.key]);
-    toast.show("Tree settings saved.", "success");
+    toast.show(t("tree.settings.saved"), "success");
   }
 
   async function changeRole(userId: string, role: TreeRole) {
@@ -265,7 +297,7 @@ function TreeSettingsInner() {
       return;
     }
     await revalidate([membersQuery.key, overviewQuery.key, getMyTrees.key]);
-    toast.show("Member role updated.", "success");
+    toast.show(t("tree.members.roleUpdated"), "success");
   }
 
   async function unlinkMemberPerson(userId: string, name: string) {
@@ -277,14 +309,14 @@ function TreeSettingsInner() {
       return;
     }
     await revalidate([membersQuery.key, getTreeGraph.key]);
-    toast.show(`${name} is no longer linked to a person.`, "success");
+    toast.show(t("tree.members.unlinked", { name }), "success");
   }
 
   async function createNewInvite() {
     if (creatingInvite()) return;
     const email = inviteMode() === "email" ? inviteEmail().trim() : null;
     if (inviteMode() === "email" && !email) {
-      toast.show("Enter an email address for the invitation.", "error");
+      toast.show(t("tree.invites.emailRequired"), "error");
       return;
     }
     setCreatingInvite(true);
@@ -310,18 +342,15 @@ function TreeSettingsInner() {
       delivery: result.data.email ? "email" : "link",
     });
     if (result.data.email && !result.data.emailSent && !result.data.emailSimulated) {
-      toast.show(result.data.emailError ?? "The email could not be sent. Copy the link instead.", "error");
+      toast.show(result.data.emailError ?? t("tree.invites.emailFailed"), "error");
       return;
     }
     if (result.data.emailSimulated) {
-      toast.show(
-        "Invitation created. The email was printed to the server console instead of being sent.",
-        "success",
-      );
+      toast.show(t("tree.invites.createdSimulated"), "success");
       return;
     }
     toast.show(
-      result.data.email ? "Invitation sent." : "Invite link created. Copy it now.",
+      result.data.email ? t("tree.invites.sent") : t("tree.invites.linkCreated"),
       "success",
     );
   }
@@ -342,13 +371,13 @@ function TreeSettingsInner() {
     await revalidate(invitesQuery.key);
     track("invite_created", { role: result.data.role, delivery: "email" });
     if (!result.data.emailSent && !result.data.emailSimulated) {
-      toast.show(result.data.emailError ?? "The email could not be sent. Copy the link instead.", "error");
+      toast.show(result.data.emailError ?? t("tree.invites.emailFailed"), "error");
       return;
     }
     toast.show(
       result.data.emailSimulated
-        ? "Invitation created. The email was printed to the server console."
-        : "Invitation sent again.",
+        ? t("tree.invites.createdSimulatedShort")
+        : t("tree.invites.resent"),
       "success",
     );
   }
@@ -356,18 +385,18 @@ function TreeSettingsInner() {
   async function copyInvite(url: string) {
     try {
       await navigator.clipboard.writeText(url);
-      toast.show("Invite link copied.", "success");
+      toast.show(t("tree.invites.copied"), "success");
     } catch {
-      window.prompt("Copy this invite link", url);
+      window.prompt(t("tree.invites.copyPrompt"), url);
     }
   }
 
   async function copyShareLink(url: string) {
     try {
       await navigator.clipboard.writeText(url);
-      toast.show("Share link copied.", "success");
+      toast.show(t("tree.settings.share.copied"), "success");
     } catch {
-      window.prompt("Copy this share link", url);
+      window.prompt(t("tree.settings.share.copyPrompt"), url);
     }
   }
 
@@ -382,23 +411,23 @@ function TreeSettingsInner() {
   async function copyApiToken(token: string) {
     try {
       await navigator.clipboard.writeText(token);
-      toast.show("API token copied.", "success");
+      toast.show(t("tree.settings.api.copied"), "success");
     } catch {
-      window.prompt("Copy this API token", token);
+      window.prompt(t("tree.settings.api.copyPrompt"), token);
     }
   }
 
   async function createApiToken() {
     if (creatingApi()) return;
     if (!apiScopes().length) {
-      toast.show("Choose at least one scope.", "error");
+      toast.show(t("tree.settings.api.scopeRequired"), "error");
       return;
     }
     setCreatingApi(true);
     const result = await attemptAction(() =>
       createTreeApiToken({
         treeId: params.treeId,
-        name: apiName().trim() || "API token",
+        name: apiName().trim() || t("tree.settings.api.defaultName"),
         expiresInDays: apiExpiry() === "never" ? null : Number(apiExpiry()),
         scopes: apiScopes(),
       }),
@@ -414,7 +443,7 @@ function TreeSettingsInner() {
     setApiExpiry("90");
     setApiScopes([...DEFAULT_API_SCOPES]);
     await revalidate(apiTokensQuery.key);
-    toast.show("API token created.", "success");
+    toast.show(t("tree.settings.api.created"), "success");
   }
 
   async function createShare() {
@@ -439,7 +468,7 @@ function TreeSettingsInner() {
     setShareRows(rows => [result.data, ...(rows ?? [])]);
     setShareLabel("");
     await revalidate(shareLinksQuery.key);
-    toast.show("Share link created.", "success");
+    toast.show(t("tree.settings.share.created"), "success");
   }
 
   async function runConfirm() {
@@ -453,13 +482,13 @@ function TreeSettingsInner() {
         );
         if (!result.ok) return toast.show(result.error, "error");
         await revalidate([membersQuery.key, overviewQuery.key]);
-        toast.show("Member removed.", "success");
+        toast.show(t("tree.members.removed"), "success");
       } else if (action.kind === "leave") {
         const result = await attemptAction(() => leaveTree(params.treeId));
         if (!result.ok) return toast.show(result.error, "error");
         await revalidate([getMyTrees.key, getPendingDeletionTrees.key]);
         track("tree_left");
-        toast.show("You left the tree.", "success");
+        toast.show(t("tree.settings.danger.left"), "success");
         navigate("/trees");
         return;
       } else if (action.kind === "revoke") {
@@ -473,7 +502,7 @@ function TreeSettingsInner() {
           ) ?? rows,
         );
         await revalidate(invitesQuery.key);
-        toast.show("Invite revoked.", "success");
+        toast.show(t("tree.invites.revoked"), "success");
       } else if (action.kind === "revoke-api") {
         const result = await attemptAction(() =>
           revokeTreeApiToken({ treeId: params.treeId, tokenId: action.tokenId }),
@@ -486,7 +515,7 @@ function TreeSettingsInner() {
         );
         if (createdApi()?.id === action.tokenId) setCreatedApi(null);
         await revalidate(apiTokensQuery.key);
-        toast.show("API token revoked.", "success");
+        toast.show(t("tree.settings.api.revoked"), "success");
       } else if (action.kind === "revoke-share") {
         const result = await attemptAction(() =>
           revokeTreeShareLink({ treeId: params.treeId, linkId: action.linkId }),
@@ -499,7 +528,7 @@ function TreeSettingsInner() {
         );
         if (createdShare()?.id === action.linkId) setCreatedShare(null);
         await revalidate(shareLinksQuery.key);
-        toast.show("Share link revoked.", "success");
+        toast.show(t("tree.settings.share.revoked"), "success");
       }
       setConfirm(null);
     } finally {
@@ -515,7 +544,7 @@ function TreeSettingsInner() {
   const deleteNameMatches = () => deleteName().trim() === (overview()?.tree.name ?? "");
 
   function ownerCountLabel(count: number) {
-    return count === 1 ? "1 owner" : `${count} owners`;
+    return t("tree.settings.ownerCount", { count });
   }
 
   async function submitDeleteRequest(event: SubmitEvent) {
@@ -543,10 +572,7 @@ function TreeSettingsInner() {
     ]);
     if (result.data.scheduled) {
       track("tree_deleted");
-      toast.show(
-        "Tree scheduled for deletion. You can restore it from Your trees for 30 days.",
-        "success",
-      );
+      toast.show(t("tree.settings.danger.scheduled"), "success");
       navigate("/trees");
       return;
     }
@@ -554,8 +580,8 @@ function TreeSettingsInner() {
     const waiting = ownerCountLabel(result.data.ownersAwaiting);
     toast.show(
       result.data.emailsSent > 0
-        ? `Deletion requested. We emailed the other owners. Waiting on ${waiting}.`
-        : `Deletion requested. Waiting on ${waiting} to approve.`,
+        ? t("tree.settings.danger.requestedEmailed", { owners: waiting })
+        : t("tree.settings.danger.requestedWaiting", { owners: waiting }),
       "success",
     );
   }
@@ -577,15 +603,14 @@ function TreeSettingsInner() {
     ]);
     if (result.data.scheduled) {
       track("tree_deleted");
-      toast.show(
-        "Every owner approved. The tree can be restored from Your trees for 30 days.",
-        "success",
-      );
+      toast.show(t("tree.settings.danger.approvedAll"), "success");
       navigate("/trees");
       return;
     }
     toast.show(
-      `Approval recorded. Waiting on ${ownerCountLabel(result.data.ownersAwaiting)}.`,
+      t("tree.settings.danger.approvalRecorded", {
+        owners: ownerCountLabel(result.data.ownersAwaiting),
+      }),
       "success",
     );
   }
@@ -600,7 +625,7 @@ function TreeSettingsInner() {
       return;
     }
     await revalidate([overviewQuery.key]);
-    toast.show("Deletion request cancelled. The tree is unchanged.", "success");
+    toast.show(t("tree.settings.danger.cancelled"), "success");
   }
 
   return (
@@ -609,20 +634,21 @@ function TreeSettingsInner() {
         <div class="page-shell min-h-[100dvh]">
           <AppHeader
             user={currentUser()}
-            back={{ href: `/trees/${params.treeId}`, label: "Back to tree" }}
-            center={overview()?.tree.name ?? "Tree settings"}
+            back={{ href: `/trees/${params.treeId}`, label: t("tree.backToTree") }}
+            center={overview()?.tree.name ?? t("tree.settings.title")}
           />
           <main class="mx-auto max-w-4xl px-4 pb-20 pt-8 sm:px-6">
             <div class="mb-8 flex flex-wrap items-end justify-between gap-4">
               <div>
-                <p class="eyebrow mb-2">Tree settings</p>
+                <p class="eyebrow mb-2">{t("tree.settings.title")}</p>
                 <h1 class="font-display text-4xl tracking-tight">{overview()?.tree.name}</h1>
                 <p class="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                   <span>
-                    {overview()?.peopleCount ?? 0} people · {overview()?.memberCount ?? 0} members
+                    {t("common.person", { count: overview()?.peopleCount ?? 0 })} ·{" "}
+                    {t("trees.member", { count: overview()?.memberCount ?? 0 })}
                   </span>
                   <Badge variant="secondary" class="uppercase tracking-wide">
-                    {roleLabel(overview()?.role ?? "viewer")}
+                    {t(roleKey(overview()?.role ?? "viewer"))}
                   </Badge>
                 </p>
               </div>
@@ -633,35 +659,35 @@ function TreeSettingsInner() {
                 <TabsIndicator />
                 <TabsTrigger value="tree">
                   <Settings />
-                  Tree
+                  {t("tree.settings.tabTree")}
                 </TabsTrigger>
                 <TabsTrigger value="members">
                   <Users />
-                  Members
+                  {t("tree.settings.tabMembers")}
                 </TabsTrigger>
                 <Show when={isOwner()}>
                   <TabsTrigger value="invites">
                     <Link2 />
-                    Invites
+                    {t("tree.settings.tabInvites")}
                   </TabsTrigger>
                   <TabsTrigger value="sharing" data-testid="tree-settings-tab-sharing">
                     <Share2 />
-                    Sharing
+                    {t("tree.settings.tabSharing")}
                   </TabsTrigger>
                 </Show>
                 <TabsTrigger value="danger" data-testid="tree-settings-tab-danger">
                   <ShieldAlert />
-                  Danger
+                  {t("tree.settings.tabDanger")}
                 </TabsTrigger>
               </TabsList>
 
               <TabsContent value="tree">
                 <SectionCard
-                  title="The tree"
-                  description="Name and description shown to everyone in this tree."
+                  title={t("tree.settings.tree.title")}
+                  description={t("tree.settings.tree.description")}
                 >
                   <form class="space-y-4" onSubmit={saveTree}>
-                    <Field label="Tree name" for="settings-name">
+                    <Field label={t("tree.create.name")} for="settings-name">
                       <input
                         id="settings-name"
                         class="input"
@@ -672,7 +698,7 @@ function TreeSettingsInner() {
                         required
                       />
                     </Field>
-                    <Field label="Description" for="settings-description">
+                    <Field label={t("tree.create.descriptionLabel")} for="settings-description">
                       <textarea
                         id="settings-description"
                         class="input min-h-20"
@@ -684,7 +710,7 @@ function TreeSettingsInner() {
                     </Field>
                     <Show when={isOwner()}>
                       <Button type="submit" disabled={saving()}>
-                        {saving() ? "Saving…" : "Save changes"}
+                        {saving() ? t("auth.saving") : t("tree.settings.saveChanges")}
                       </Button>
                     </Show>
                   </form>
@@ -693,7 +719,7 @@ function TreeSettingsInner() {
                 <SectionCard
                   class="mt-5"
                   title="GEDCOM"
-                  description="Move people between genealogy tools. Download 5.5.1 for the widest support or 7 for newer tools. Import with a review before anything changes."
+                  description={t("tree.settings.gedcom.description")}
                 >
                   <div class="flex flex-wrap items-center gap-3">
                     <A
@@ -719,25 +745,28 @@ function TreeSettingsInner() {
                         data-testid="tree-import-gedcom"
                       >
                         <Upload size={15} />
-                        Import into this tree
+                        {t("tree.settings.gedcom.import")}
                       </A>
                     </Show>
                   </div>
                   <p class="mt-2 text-xs text-muted-foreground">
-                    Names, dates, places, events, notes, media references, and families.
+                    {t("tree.settings.gedcom.includes")}
                   </p>
                   <p class="mt-2 text-xs leading-relaxed text-muted-foreground">
-                    The tree does not record sex, so each person exports as
-                    <code class="mx-1 rounded bg-muted px-1">SEX U</code>
-                    and family roles use stable partner order. Review roles after importing.
+                    <Trans
+                      key="tree.settings.gedcom.sexNote"
+                      components={{
+                        code: <code class="mx-1 rounded bg-muted px-1">SEX U</code>,
+                      }}
+                    />
                   </p>
                 </SectionCard>
               </TabsContent>
 
               <TabsContent value="members">
                 <SectionCard
-                  title="Members"
-                  description="Everyone with access to this tree. Editors can add people and files."
+                  title={t("tree.members.title")}
+                  description={t("tree.members.description")}
                 >
                   <div class="space-y-1">
                     <For each={members()}>
@@ -749,7 +778,7 @@ function TreeSettingsInner() {
                               {member.displayName}
                               <Show when={member.userId === currentUser().id}>
                                 <span class="ml-1.5 text-xs font-normal text-muted-foreground">
-                                  you
+                                  {t("tree.members.you")}
                                 </span>
                               </Show>
                             </p>
@@ -757,9 +786,9 @@ function TreeSettingsInner() {
                             <p class="truncate text-xs text-muted-foreground">
                               <Show
                                 when={member.personName}
-                                fallback="Not linked to a person in the tree"
+                                fallback={t("tree.members.notLinked")}
                               >
-                                Linked to {member.personName}
+                                {t("tree.members.linked", { name: member.personName ?? "" })}
                               </Show>
                             </p>
                           </div>
@@ -767,15 +796,15 @@ function TreeSettingsInner() {
                             when={isOwner() && member.userId !== currentUser().id}
                             fallback={
                               <Badge variant="secondary" class="uppercase tracking-wide">
-                                {roleLabel(member.role)}
+                                {t(roleKey(member.role))}
                               </Badge>
                             }
                           >
                             <Select
-                              options={roleOptions}
+                              options={roleOptions()}
                               optionValue="value"
                               optionTextValue="label"
-                              value={roleOptions.find(option => option.value === member.role)}
+                              value={roleOptions().find(option => option.value === member.role)}
                               onChange={option => option && changeRole(member.userId, option.value)}
                               itemComponent={itemProps => (
                                 <SelectItem item={itemProps.item}>
@@ -783,7 +812,11 @@ function TreeSettingsInner() {
                                 </SelectItem>
                               )}
                             >
-                              <SelectTrigger size="sm" class="w-32" aria-label="Member role">
+                              <SelectTrigger
+                                size="sm"
+                                class="w-32"
+                                aria-label={t("tree.members.role")}
+                              >
                                 <SelectValue<{ value: TreeRole; label: string }>>
                                   {state => state.selectedOption().label}
                                 </SelectValue>
@@ -794,7 +827,10 @@ function TreeSettingsInner() {
                             </Select>
                             <Show when={member.personId}>
                               <IconButton
-                                label={`Unlink ${member.displayName} from ${member.personName}`}
+                                label={t("tree.members.unlink", {
+                                  name: member.displayName,
+                                  person: member.personName ?? "",
+                                })}
                                 variant="ghost"
                                 size="icon-sm"
                                 onClick={() =>
@@ -805,7 +841,7 @@ function TreeSettingsInner() {
                               </IconButton>
                             </Show>
                             <IconButton
-                              label={`Remove ${member.displayName}`}
+                              label={t("tree.members.remove", { name: member.displayName })}
                               variant="ghost"
                               size="icon-sm"
                               class="text-destructive hover:bg-destructive/10 hover:text-destructive"
@@ -830,8 +866,8 @@ function TreeSettingsInner() {
               <Show when={isOwner()}>
                 <TabsContent value="invites">
                   <SectionCard
-                    title="Invites"
-                    description="Share a single-use link, or send the invitation straight to someone's inbox."
+                    title={t("tree.invites.title")}
+                    description={t("tree.invites.description")}
                   >
                     <div class="inline-flex rounded-xl border border-border bg-background p-1">
                       <button
@@ -844,7 +880,7 @@ function TreeSettingsInner() {
                         }`}
                         onClick={() => setInviteMode("link")}
                       >
-                        Share a link
+                        {t("tree.invites.shareLink")}
                       </button>
                       <button
                         type="button"
@@ -856,17 +892,17 @@ function TreeSettingsInner() {
                         }`}
                         onClick={() => setInviteMode("email")}
                       >
-                        Send by email
+                        {t("tree.invites.sendByEmail")}
                       </button>
                     </div>
 
                     <div class="mt-4 grid gap-3 sm:grid-cols-2 sm:items-end">
-                      <Field label="Role" for="invite-role">
+                      <Field label={t("tree.invites.role")} for="invite-role">
                         <Select
-                          options={roleOptions}
+                          options={roleOptions()}
                           optionValue="value"
                           optionTextValue="label"
-                          value={roleOptions.find(option => option.value === inviteRole())}
+                          value={roleOptions().find(option => option.value === inviteRole())}
                           onChange={option => option && setInviteRole(option.value)}
                           itemComponent={itemProps => (
                             <SelectItem item={itemProps.item}>
@@ -874,7 +910,11 @@ function TreeSettingsInner() {
                             </SelectItem>
                           )}
                         >
-                          <SelectTrigger id="invite-role" class="w-full" aria-label="Invite role">
+                          <SelectTrigger
+                            id="invite-role"
+                            class="w-full"
+                            aria-label={t("tree.invites.roleAria")}
+                          >
                             <SelectValue<{ value: TreeRole; label: string }>>
                               {state => state.selectedOption().label}
                             </SelectValue>
@@ -884,12 +924,12 @@ function TreeSettingsInner() {
                           </SelectPortal>
                         </Select>
                       </Field>
-                      <Field label="Expires" for="invite-days">
+                      <Field label={t("tree.settings.expires")} for="invite-days">
                         <Select
-                          options={expiryOptions}
+                          options={expiryOptions()}
                           optionValue="value"
                           optionTextValue="label"
-                          value={expiryOptions.find(
+                          value={expiryOptions().find(
                             option => option.value === String(inviteDays()),
                           )}
                           onChange={option => option && setInviteDays(Number(option.value))}
@@ -899,7 +939,11 @@ function TreeSettingsInner() {
                             </SelectItem>
                           )}
                         >
-                          <SelectTrigger id="invite-days" class="w-full" aria-label="Invite expiry">
+                          <SelectTrigger
+                            id="invite-days"
+                            class="w-full"
+                            aria-label={t("tree.invites.expiryAria")}
+                          >
                             <SelectValue<{ value: string; label: string }>>
                               {state => state.selectedOption().label}
                             </SelectValue>
@@ -912,20 +956,16 @@ function TreeSettingsInner() {
 
                       <Show when={inviteMode() === "email"}>
                         <Field
-                          label="Email address"
+                          label={t("tree.invites.email")}
                           for="invite-email"
                           class="sm:col-span-2"
-                          hint={
-                            canEmailInvites()
-                              ? "The invitation link is emailed to this address. You can still copy it below."
-                              : undefined
-                          }
+                          hint={canEmailInvites() ? t("tree.invites.emailHint") : undefined}
                         >
                           <input
                             id="invite-email"
                             type="email"
                             class="input"
-                            placeholder="relative@example.com"
+                            placeholder={t("tree.invites.emailPlaceholder")}
                             autocomplete="email"
                             value={inviteEmail()}
                             onInput={event => setInviteEmail(event.currentTarget.value)}
@@ -934,11 +974,19 @@ function TreeSettingsInner() {
                         </Field>
                         <Show when={!canEmailInvites()}>
                           <p class="rounded-xl border border-dashed border-border px-3 py-2 text-xs leading-relaxed text-muted-foreground sm:col-span-2">
-                            Confirm your own email address before sending invitations.{" "}
-                            <A href="/settings" class="font-semibold text-primary underline decoration-primary/30 underline-offset-4">
-                              Resend the verification link
-                            </A>
-                            .
+                            <Trans
+                              key="tree.invites.confirmEmail"
+                              components={{
+                                resend: (
+                                  <A
+                                    href="/settings"
+                                    class="font-semibold text-primary underline decoration-primary/30 underline-offset-4"
+                                  >
+                                    {t("tree.invites.resendVerification")}
+                                  </A>
+                                ),
+                              }}
+                            />
                           </p>
                         </Show>
                       </Show>
@@ -959,10 +1007,10 @@ function TreeSettingsInner() {
                             <Mail />
                           </Show>
                           {creatingInvite()
-                            ? "Working…"
+                            ? t("tree.settings.working")
                             : inviteMode() === "email"
-                              ? "Send invite"
-                              : "Create link"}
+                              ? t("tree.invites.send")
+                              : t("tree.invites.createLink")}
                         </Button>
                       </div>
                     </div>
@@ -973,11 +1021,17 @@ function TreeSettingsInner() {
                           <p class="mb-2 text-xs font-semibold text-primary">
                             {invite().email
                               ? invite().emailSimulated
-                                ? `Development mode: the email to ${invite().email} was printed to the server console. You can also share this link.`
+                                ? t("tree.invites.created.dev", {
+                                    email: invite().email ?? "",
+                                  })
                                 : invite().emailSent
-                                  ? `Emailed to ${invite().email}. You can also share this link directly.`
-                                  : `We could not email ${invite().email}. Copy this link and send it yourself.`
-                              : "Copy this link now. It will not be shown again."}
+                                  ? t("tree.invites.created.emailed", {
+                                      email: invite().email ?? "",
+                                    })
+                                  : t("tree.invites.created.failed", {
+                                      email: invite().email ?? "",
+                                    })
+                              : t("tree.invites.created.link")}
                           </p>
                           <div class="flex gap-2">
                             <input
@@ -993,7 +1047,7 @@ function TreeSettingsInner() {
                               onClick={() => copyInvite(invite().url)}
                             >
                               <Copy />
-                              Copy
+                              {t("common.copy")}
                             </Button>
                           </div>
                         </div>
@@ -1001,12 +1055,12 @@ function TreeSettingsInner() {
                     </Show>
 
                     <div class="mt-5">
-                      <h3 class="field-label mb-2">Recent invites</h3>
+                      <h3 class="field-label mb-2">{t("tree.invites.recent")}</h3>
                       <Show
                         when={inviteRows()?.length}
                         fallback={
                           <p class="rounded-xl border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
-                            No invites created yet.
+                            {t("tree.invites.empty")}
                           </p>
                         }
                       >
@@ -1021,19 +1075,24 @@ function TreeSettingsInner() {
                                   <Mail size={15} class="text-muted-foreground" />
                                 </Show>
                                 <div class="min-w-0 flex-1">
-                                  <p class="font-medium">{roleLabel(invite.role)} invite</p>
+                                  <p class="font-medium">
+                                    {t("tree.invites.roleInvite", {
+                                      role: t(roleKey(invite.role)),
+                                    })}
+                                  </p>
                                   <Show when={invite.email}>
                                     <p class="truncate text-xs text-foreground">{invite.email}</p>
                                   </Show>
                                   <p class="text-xs text-muted-foreground">
-                                    {inviteStatus(invite)} · {formatRelative(invite.createdAt)}
+                                    {t(inviteStatusKeys[inviteStatus(invite)])} ·{" "}
+                                    {formatRelative(invite.createdAt, locale())}
                                     <Show when={invite.email && invite.sentAt}>
                                       {" "}
-                                      · emailed
+                                      · {t("tree.invites.emailed")}
                                     </Show>
                                   </p>
                                 </div>
-                                <Show when={inviteStatus(invite) === "Pending" && invite.email}>
+                                <Show when={inviteStatus(invite) === "pending" && invite.email}>
                                   <Button
                                     type="button"
                                     variant="ghost"
@@ -1042,10 +1101,12 @@ function TreeSettingsInner() {
                                     onClick={() => sendInviteAgain(invite.id)}
                                   >
                                     <RotateCw />
-                                    {resendingId() === invite.id ? "Sending…" : "Send again"}
+                                    {resendingId() === invite.id
+                                      ? t("auth.sending")
+                                      : t("tree.invites.sendAgain")}
                                   </Button>
                                 </Show>
-                                <Show when={inviteStatus(invite) === "Pending"}>
+                                <Show when={inviteStatus(invite) === "pending"}>
                                   <Button
                                     type="button"
                                     variant="ghost"
@@ -1055,7 +1116,7 @@ function TreeSettingsInner() {
                                       setConfirm({ kind: "revoke", inviteId: invite.id })
                                     }
                                   >
-                                    Revoke
+                                    {t("common.revoke")}
                                   </Button>
                                 </Show>
                               </div>
@@ -1069,22 +1130,26 @@ function TreeSettingsInner() {
 
                 <TabsContent value="sharing">
                   <SectionCard
-                    title="Public share links"
-                    description="Create a read-only link anyone can open without an account. Living people default to names only, and media is off."
+                    title={t("tree.settings.share.title")}
+                    description={t("tree.settings.share.description")}
                   >
                     <div class="grid gap-3 sm:grid-cols-2 sm:items-end">
-                      <Field label="Label" for="share-label" hint="Only you see this.">
+                      <Field
+                        label={t("tree.settings.share.label")}
+                        for="share-label"
+                        hint={t("tree.settings.onlyYouSee")}
+                      >
                         <input
                           id="share-label"
                           class="input"
                           maxlength={80}
-                          placeholder="Cousins in Ohio"
+                          placeholder={t("tree.settings.share.labelPlaceholder")}
                           value={shareLabel()}
                           onInput={event => setShareLabel(event.currentTarget.value)}
                           data-testid="share-create-label"
                         />
                       </Field>
-                      <Field label="Living people" for="share-living">
+                      <Field label={t("tree.settings.share.living")} for="share-living">
                         <select
                           id="share-living"
                           class="input"
@@ -1094,12 +1159,12 @@ function TreeSettingsInner() {
                           }
                           data-testid="share-create-living"
                         >
-                          <option value="hidden">Hide living people</option>
-                          <option value="name">Names only</option>
-                          <option value="full">Full details</option>
+                          <option value="hidden">{t("tree.settings.share.livingHidden")}</option>
+                          <option value="name">{t("tree.settings.share.livingNames")}</option>
+                          <option value="full">{t("tree.settings.share.livingFull")}</option>
                         </select>
                       </Field>
-                      <Field label="Expires" for="share-expiry">
+                      <Field label={t("tree.settings.expires")} for="share-expiry">
                         <select
                           id="share-expiry"
                           class="input"
@@ -1107,11 +1172,11 @@ function TreeSettingsInner() {
                           onChange={event => setShareExpiry(event.currentTarget.value)}
                           data-testid="share-create-expiry"
                         >
-                          <option value="1">In 1 day</option>
-                          <option value="7">In 7 days</option>
-                          <option value="30">In 30 days</option>
-                          <option value="90">In 90 days</option>
-                          <option value="never">Never</option>
+                          <option value="1">{t("tree.settings.in1Day")}</option>
+                          <option value="7">{t("tree.settings.in7Days")}</option>
+                          <option value="30">{t("tree.settings.in30Days")}</option>
+                          <option value="90">{t("tree.settings.in90Days")}</option>
+                          <option value="never">{t("tree.settings.never")}</option>
                         </select>
                       </Field>
                       <label class="flex items-center gap-2.5 rounded-xl border border-border px-3 py-2.5 text-sm">
@@ -1122,7 +1187,7 @@ function TreeSettingsInner() {
                           onChange={event => setShareMedia(event.currentTarget.checked)}
                           data-testid="share-create-media"
                         />
-                        Include photos as thumbnails
+                        {t("tree.settings.share.includeMedia")}
                       </label>
                       <div class="sm:col-span-2">
                         <Button
@@ -1132,7 +1197,9 @@ function TreeSettingsInner() {
                           data-testid="share-create-submit"
                         >
                           <Plus />
-                          {creatingShare() ? "Creating…" : "Create share link"}
+                          {creatingShare()
+                            ? t("tree.create.creating")
+                            : t("tree.settings.share.create")}
                         </Button>
                       </div>
                     </div>
@@ -1144,7 +1211,7 @@ function TreeSettingsInner() {
                           data-testid="share-created"
                         >
                           <p class="text-xs font-semibold text-primary">
-                            Copy this link now. It is not shown again.
+                            {t("tree.settings.share.copyNow")}
                           </p>
                           <div class="mt-2 flex flex-wrap gap-2">
                             <input
@@ -1161,7 +1228,7 @@ function TreeSettingsInner() {
                               data-testid="share-created-copy"
                             >
                               <Copy size={14} />
-                              Copy
+                              {t("common.copy")}
                             </Button>
                           </div>
                         </div>
@@ -1169,7 +1236,7 @@ function TreeSettingsInner() {
                     </Show>
 
                     <div class="mt-6">
-                      <h3 class="field-label">Active and past links</h3>
+                      <h3 class="field-label">{t("tree.settings.share.listTitle")}</h3>
                       <Show
                         when={shareRows()?.length}
                         fallback={
@@ -1177,7 +1244,7 @@ function TreeSettingsInner() {
                             class="mt-2 rounded-xl border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground"
                             data-testid="share-links-empty"
                           >
-                            No share links yet.
+                            {t("tree.settings.share.empty")}
                           </p>
                         }
                       >
@@ -1192,9 +1259,12 @@ function TreeSettingsInner() {
                                 <div class="min-w-0 flex-1">
                                   <p class="font-medium">{link.label}</p>
                                   <p class="text-xs text-muted-foreground">
-                                    {shareLivingLabel(link.livingVisibility)} ·{" "}
-                                    {link.includeMedia ? "Photos on" : "No photos"} ·{" "}
-                                    {shareStatus(link)} · {formatRelative(link.createdAt)}
+                                    {shareLivingLabel(link.livingVisibility, t)} ·{" "}
+                                    {link.includeMedia
+                                      ? t("tree.settings.share.photosOn")
+                                      : t("tree.settings.share.photosOff")}{" "}
+                                    · {shareStatus(link, t, locale())} ·{" "}
+                                    {formatRelative(link.createdAt, locale())}
                                   </p>
                                 </div>
                                 <Show when={!link.revokedAt && linkStatusActive(link)}>
@@ -1208,7 +1278,7 @@ function TreeSettingsInner() {
                                     }
                                     data-testid={`share-link-revoke-${link.id}`}
                                   >
-                                    Revoke
+                                    {t("common.revoke")}
                                   </Button>
                                 </Show>
                               </div>
@@ -1221,22 +1291,26 @@ function TreeSettingsInner() {
 
                   <div class="mt-5">
                     <SectionCard
-                      title="Developer API"
-                      description="Read-only tokens for scripts, notebooks, and other tools. A token can read this entire tree, including living relatives. Only owners can create one."
+                      title={t("tree.settings.api.title")}
+                      description={t("tree.settings.api.description")}
                     >
                       <div class="grid gap-3 sm:grid-cols-2 sm:items-end">
-                        <Field label="Token name" for="api-name" hint="Only you see this.">
+                        <Field
+                          label={t("tree.settings.api.tokenName")}
+                          for="api-name"
+                          hint={t("tree.settings.onlyYouSee")}
+                        >
                           <input
                             id="api-name"
                             class="input"
                             maxlength={80}
-                            placeholder="Research notebook"
+                            placeholder={t("tree.settings.api.tokenNamePlaceholder")}
                             value={apiName()}
                             onInput={event => setApiName(event.currentTarget.value)}
                             data-testid="api-token-name"
                           />
                         </Field>
-                        <Field label="Expires" for="api-expiry">
+                        <Field label={t("tree.settings.expires")} for="api-expiry">
                           <select
                             id="api-expiry"
                             class="input"
@@ -1244,14 +1318,14 @@ function TreeSettingsInner() {
                             onChange={event => setApiExpiry(event.currentTarget.value)}
                             data-testid="api-token-expiry"
                           >
-                            <option value="30">In 30 days</option>
-                            <option value="90">In 90 days</option>
-                            <option value="365">In 1 year</option>
-                            <option value="never">Never</option>
+                            <option value="30">{t("tree.settings.in30Days")}</option>
+                            <option value="90">{t("tree.settings.in90Days")}</option>
+                            <option value="365">{t("tree.settings.in1Year")}</option>
+                            <option value="never">{t("tree.settings.never")}</option>
                           </select>
                         </Field>
                         <div class="sm:col-span-2">
-                          <p class="field-label mb-2">Scopes</p>
+                          <p class="field-label mb-2">{t("tree.settings.api.scopes")}</p>
                           <div class="grid gap-2 sm:grid-cols-2">
                             <For each={API_SCOPES}>
                               {scope => (
@@ -1266,9 +1340,11 @@ function TreeSettingsInner() {
                                     data-testid={`api-token-scope-${scope.value}`}
                                   />
                                   <span>
-                                    <span class="block font-medium">{scope.label}</span>
+                                    <span class="block font-medium">
+                                      {t(scopeLabels[scope.value])}
+                                    </span>
                                     <span class="mt-0.5 block text-xs text-muted-foreground">
-                                      {scope.description}
+                                      {t(scopeDescriptions[scope.value])}
                                     </span>
                                   </span>
                                 </label>
@@ -1284,7 +1360,9 @@ function TreeSettingsInner() {
                             data-testid="api-token-create"
                           >
                             <KeyRound size={15} />
-                            {creatingApi() ? "Creating…" : "Create token"}
+                            {creatingApi()
+                              ? t("tree.create.creating")
+                              : t("tree.settings.api.create")}
                           </Button>
                           <A
                             href="/docs/api"
@@ -1293,7 +1371,7 @@ function TreeSettingsInner() {
                             class={buttonVariants({ variant: "secondary", size: "sm" })}
                             data-testid="api-docs-link"
                           >
-                            API docs
+                            {t("tree.settings.api.docs")}
                           </A>
                           <A
                             href="/api/v1/openapi.json"
@@ -1302,7 +1380,7 @@ function TreeSettingsInner() {
                             class={buttonVariants({ variant: "secondary", size: "sm" })}
                             data-testid="api-openapi-link"
                           >
-                            OpenAPI spec
+                            {t("tree.settings.api.spec")}
                           </A>
                         </div>
                       </div>
@@ -1314,7 +1392,7 @@ function TreeSettingsInner() {
                             data-testid="api-token-created"
                           >
                             <p class="text-xs font-semibold text-primary">
-                              Copy this token now. It is not shown again.
+                              {t("tree.settings.api.copyNow")}
                             </p>
                             <div class="mt-2 flex flex-wrap gap-2">
                               <input
@@ -1339,7 +1417,7 @@ function TreeSettingsInner() {
                       </Show>
 
                       <div class="mt-6">
-                        <h3 class="field-label">Active and past tokens</h3>
+                        <h3 class="field-label">{t("tree.settings.api.listTitle")}</h3>
                         <Show
                           when={apiRows()?.length}
                           fallback={
@@ -1347,7 +1425,7 @@ function TreeSettingsInner() {
                               class="mt-2 rounded-xl border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground"
                               data-testid="api-tokens-empty"
                             >
-                              No API tokens yet.
+                              {t("tree.settings.api.empty")}
                             </p>
                           }
                         >
@@ -1363,17 +1441,25 @@ function TreeSettingsInner() {
                                     <p class="font-medium">{token.name}</p>
                                     <p class="text-xs text-muted-foreground">
                                       {token.tokenPrefix}… ·{" "}
-                                      {token.scopes.map(scopeLabel).join(", ")}
+                                      {token.scopes
+                                        .map(scope => t(scopeLabels[scope]))
+                                        .join(", ")}
                                     </p>
                                     <p class="text-xs text-muted-foreground">
-                                      {apiTokenStatus(token)}
+                                      {apiTokenStatus(token, t)}
                                       <Show when={token.lastUsedAt}>
                                         {" "}
-                                        · used {formatRelative(token.lastUsedAt)}
+                                        ·{" "}
+                                        {t("tree.settings.api.used", {
+                                          when: formatRelative(token.lastUsedAt, locale()),
+                                        })}
                                       </Show>
                                       <Show when={token.expiresAt}>
                                         {" "}
-                                        · expires {formatRelative(token.expiresAt)}
+                                        ·{" "}
+                                        {t("tree.settings.api.expires", {
+                                          when: formatRelative(token.expiresAt, locale()),
+                                        })}
                                       </Show>
                                     </p>
                                   </div>
@@ -1388,7 +1474,7 @@ function TreeSettingsInner() {
                                       }
                                       data-testid={`api-token-revoke-${token.id}`}
                                     >
-                                      Revoke
+                                      {t("common.revoke")}
                                     </Button>
                                   </Show>
                                 </div>
@@ -1410,19 +1496,18 @@ function TreeSettingsInner() {
                         </span>
                         <div>
                           <p class="text-sm font-semibold text-destructive">
-                            Actions here affect everyone in the tree.
+                            {t("tree.settings.danger.warningTitle")}
                           </p>
                           <p class="mt-1 text-xs leading-relaxed text-muted-foreground">
-                            Leaving removes only your access. Deleting locks the tree for every
-                            member, emails them, and erases it after 30 days.
+                            {t("tree.settings.danger.warningBody")}
                           </p>
                         </div>
                       </div>
                     </div>
 
                     <SectionCard
-                      title="Leave this tree"
-                      description="Your access ends, but the tree and everything in it stays for the other members."
+                      title={t("tree.settings.danger.leave")}
+                      description={t("tree.settings.danger.leaveDescription")}
                     >
                       <Button
                         variant="secondary"
@@ -1431,19 +1516,19 @@ function TreeSettingsInner() {
                         data-testid="tree-danger-leave-button"
                       >
                         <LogOut />
-                        Leave this tree
+                        {t("tree.settings.danger.leave")}
                       </Button>
                       <p class="mt-3 text-xs leading-relaxed text-muted-foreground">
                         {isOnlyOwner()
-                          ? "You are the only owner. Promote another member to owner before leaving."
-                          : "You can only rejoin later with a new invite."}
+                          ? t("tree.settings.danger.onlyOwnerLeave")
+                          : t("tree.settings.danger.rejoin")}
                       </p>
                     </SectionCard>
 
                     <Show when={isOwner()}>
                       <SectionCard
-                        title="Delete this tree"
-                        description="Deleting is deliberately slow. It takes the exact tree name, every owner, and a 30 day wait."
+                        title={t("tree.settings.danger.deleteTitle")}
+                        description={t("tree.settings.danger.deleteDescription")}
                       >
                         <Show
                           when={overview()?.deletionRequest}
@@ -1452,18 +1537,17 @@ function TreeSettingsInner() {
                               <ul class="space-y-2 text-xs leading-relaxed text-muted-foreground">
                                 <li class="flex gap-2">
                                   <span class="font-semibold text-foreground">1.</span>
-                                  You type the exact tree name.
+                                  {t("tree.settings.danger.step1")}
                                 </li>
                                 <li class="flex gap-2">
                                   <span class="font-semibold text-foreground">2.</span>
                                   {isOnlyOwner()
-                                    ? "As the only owner, your confirmation schedules the deletion."
-                                    : "Every current owner must approve. One refusal stops it."}
+                                    ? t("tree.settings.danger.step2OnlyOwner")
+                                    : t("tree.settings.danger.step2Owners")}
                                 </li>
                                 <li class="flex gap-2">
                                   <span class="font-semibold text-foreground">3.</span>
-                                  The tree is locked and kept for 30 days. Any owner can restore it
-                                  from Your trees until then.
+                                  {t("tree.settings.danger.step3")}
                                 </li>
                               </ul>
                               <div class="mt-4 flex flex-wrap gap-2">
@@ -1474,7 +1558,7 @@ function TreeSettingsInner() {
                                   data-testid="tree-deletion-export"
                                 >
                                   <Download />
-                                  Download a copy first
+                                  {t("tree.settings.danger.downloadFirst")}
                                 </a>
                                 <Button
                                   variant="destructive"
@@ -1487,13 +1571,12 @@ function TreeSettingsInner() {
                                   data-testid="tree-danger-delete-button"
                                 >
                                   <Trash2 />
-                                  Request deletion
+                                  {t("tree.settings.danger.requestDeletion")}
                                 </Button>
                               </div>
                               <Show when={isOnlyOwner()}>
                                 <p class="mt-3 rounded-xl border border-gold/40 bg-gold/10 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
-                                  You are the only owner of this tree. Requesting deletion schedules
-                                  it straight away, but it stays restorable for 30 days.
+                                  {t("tree.settings.danger.onlyOwnerNote")}
                                 </p>
                               </Show>
                             </div>
@@ -1505,13 +1588,15 @@ function TreeSettingsInner() {
                               data-testid="tree-deletion-request-card"
                             >
                               <p class="text-sm font-semibold text-destructive">
-                                Deletion requested {formatRelative(request().createdAt)}
+                                {t("tree.settings.danger.requested", {
+                                  when: formatRelative(request().createdAt, locale()),
+                                })}
                               </p>
                               <p class="mt-1 text-xs leading-relaxed text-muted-foreground">
-                                {request().requestedByName} asked to delete this tree. Every
-                                current owner must approve. The request expires{" "}
-                                {formatRelative(request().expiresAt)} and nothing happens if it
-                                lapses.
+                                {t("tree.settings.danger.requestBody", {
+                                  name: request().requestedByName,
+                                  when: formatRelative(request().expiresAt, locale()),
+                                })}
                               </p>
 
                               <ul class="mt-3 divide-y divide-border border-y border-border">
@@ -1527,7 +1612,7 @@ function TreeSettingsInner() {
                                           {owner.displayName}
                                           <Show when={owner.userId === currentUser().id}>
                                             <span class="ml-1.5 text-xs font-normal text-muted-foreground">
-                                              you
+                                              {t("tree.members.you")}
                                             </span>
                                           </Show>
                                         </p>
@@ -1539,12 +1624,12 @@ function TreeSettingsInner() {
                                         when={approvedIds().has(owner.userId)}
                                         fallback={
                                           <Badge variant="secondary" class="uppercase tracking-wide">
-                                            Waiting
+                                            {t("tree.settings.danger.waiting")}
                                           </Badge>
                                         }
                                       >
                                         <Badge class="bg-primary/10 uppercase tracking-wide text-primary">
-                                          Approved
+                                          {t("tree.settings.danger.approved")}
                                         </Badge>
                                       </Show>
                                     </li>
@@ -1561,7 +1646,7 @@ function TreeSettingsInner() {
                                     onClick={() => setApproveOpen(true)}
                                     data-testid="tree-deletion-approve-button"
                                   >
-                                    Approve deletion
+                                    {t("tree.settings.danger.approve")}
                                   </Button>
                                 </Show>
                                 <Button
@@ -1572,12 +1657,16 @@ function TreeSettingsInner() {
                                   onClick={() => void cancelDeletionRequest()}
                                   data-testid="tree-deletion-cancel-request-button"
                                 >
-                                  {cancelPending() ? "Cancelling…" : "Cancel request"}
+                                  {cancelPending()
+                                    ? t("tree.settings.danger.cancelling")
+                                    : t("tree.settings.danger.cancelRequest")}
                                 </Button>
                               </div>
                               <Show when={ownersAwaiting().length > 0}>
                                 <p class="mt-2 text-xs text-muted-foreground">
-                                  Waiting on {ownerCountLabel(ownersAwaiting().length)}.
+                                  {t("tree.settings.danger.waitingOn", {
+                                    owners: ownerCountLabel(ownersAwaiting().length),
+                                  })}
                                 </p>
                               </Show>
                             </div>
@@ -1598,31 +1687,34 @@ function TreeSettingsInner() {
               setDeleteOpen(false);
               setDeleteName("");
             }}
-            title={`Delete ${overview()?.tree.name ?? "this tree"}?`}
-            description="This starts the deletion process. Nothing is erased yet."
+            title={t("tree.delete.title", {
+              name: overview()?.tree.name ?? t("tree.settings.thisTree"),
+            })}
+            description={t("tree.settings.danger.modalDescription")}
             testId="tree-delete-dialog"
           >
             <form class="space-y-4" onSubmit={submitDeleteRequest}>
               <div class="rounded-xl border border-destructive/30 bg-destructive/5 px-3.5 py-3 text-xs leading-relaxed text-muted-foreground">
                 <p class="font-semibold text-destructive">
-                  {overview()?.tree.name ?? "This tree"} has{" "}
-                  {overview()?.peopleCount ?? 0} people and{" "}
-                  {overview()?.memberCount ?? 0} members.
+                  {t("tree.settings.danger.modalCounts", {
+                    name: overview()?.tree.name ?? t("tree.settings.thisTreeTitle"),
+                    people: t("common.person", { count: overview()?.peopleCount ?? 0 }),
+                    members: t("trees.member", { count: overview()?.memberCount ?? 0 }),
+                  })}
                 </p>
                 <p class="mt-1.5">
                   {isOnlyOwner()
-                    ? "You are the only owner, so confirming schedules the deletion. It stays restorable for 30 days."
-                    : "Every owner must approve before anything is scheduled. If one owner does not approve, the tree is untouched."}
+                    ? t("tree.settings.danger.modalOnlyOwner")
+                    : t("tree.settings.danger.modalOwners")}
                 </p>
-                <p class="mt-1.5">
-                  Once scheduled, the tree is locked, and any owner can restore it from Your trees
-                  during the 30 day grace period.
-                </p>
+                <p class="mt-1.5">{t("tree.settings.danger.modalGrace")}</p>
               </div>
               <Field
-                label="Tree name"
+                label={t("tree.create.name")}
                 for="tree-delete-name"
-                hint={`Type ${overview()?.tree.name ?? "the tree name"} exactly to continue.`}
+                hint={t("tree.settings.danger.typeName", {
+                  name: overview()?.tree.name ?? t("tree.settings.theTreeName"),
+                })}
               >
                 <input
                   id="tree-delete-name"
@@ -1644,7 +1736,7 @@ function TreeSettingsInner() {
                   }}
                   data-testid="tree-delete-cancel"
                 >
-                  Cancel
+                  {t("common.cancel")}
                 </Button>
                 <Button
                   type="submit"
@@ -1653,10 +1745,10 @@ function TreeSettingsInner() {
                   data-testid="tree-delete-submit"
                 >
                   {deletePending()
-                    ? "Working…"
+                    ? t("tree.settings.working")
                     : isOnlyOwner()
-                      ? "Schedule deletion"
-                      : "Request deletion"}
+                      ? t("tree.settings.danger.schedule")
+                      : t("tree.settings.danger.requestDeletion")}
                 </Button>
               </div>
             </form>
@@ -1665,9 +1757,9 @@ function TreeSettingsInner() {
           <ConfirmDialog
             open={approveOpen()}
             onClose={() => setApproveOpen(false)}
-            title="Approve deleting this tree?"
-            message="This is your approval. When every owner approves, the tree is locked and permanently erased in 30 days. Any owner can restore it before then."
-            confirmLabel="Approve deletion"
+            title={t("tree.settings.danger.approveTitle")}
+            message={t("tree.settings.danger.approveMessage")}
+            confirmLabel={t("tree.settings.danger.approve")}
             danger
             pending={approvalPending()}
             testId="tree-deletion-approve-dialog"
@@ -1677,9 +1769,13 @@ function TreeSettingsInner() {
           <ConfirmDialog
             open={Boolean(confirm())}
             onClose={() => setConfirm(null)}
-            title={confirmTitle(confirm())}
-            message={confirmMessage(confirm(), overview()?.tree.name ?? "this tree")}
-            confirmLabel={confirmLabel(confirm())}
+            title={confirmTitle(confirm(), t)}
+            message={confirmMessage(
+              confirm(),
+              overview()?.tree.name ?? t("tree.settings.thisTree"),
+              t,
+            )}
+            confirmLabel={confirmLabel(confirm(), t)}
             danger={
               confirm()?.kind === "remove" ||
               confirm()?.kind === "revoke-share" ||
@@ -1715,17 +1811,17 @@ function inviteStatus(invite: {
   acceptedAt: Date | null;
   revokedAt: Date | null;
   expiresAt: Date;
-}) {
-  if (invite.revokedAt) return "Revoked";
-  if (invite.acceptedAt) return "Used";
-  if (new Date(invite.expiresAt).getTime() <= Date.now()) return "Expired";
-  return "Pending";
+}): InviteStatus {
+  if (invite.revokedAt) return "revoked";
+  if (invite.acceptedAt) return "used";
+  if (new Date(invite.expiresAt).getTime() <= Date.now()) return "expired";
+  return "pending";
 }
 
-function shareLivingLabel(visibility: LivingVisibility) {
-  if (visibility === "hidden") return "Living hidden";
-  if (visibility === "full") return "Living full details";
-  return "Living names only";
+function shareLivingLabel(visibility: LivingVisibility, t: Translate) {
+  if (visibility === "hidden") return t("tree.settings.share.summaryHidden");
+  if (visibility === "full") return t("tree.settings.share.summaryFull");
+  return t("tree.settings.share.summaryNames");
 }
 
 function linkStatusActive(link: { revokedAt: Date | null; expiresAt: Date | null }) {
@@ -1734,56 +1830,73 @@ function linkStatusActive(link: { revokedAt: Date | null; expiresAt: Date | null
   return true;
 }
 
-function shareStatus(link: {
-  revokedAt: Date | null;
-  expiresAt: Date | null;
-  lastAccessedAt: Date | null;
-}) {
-  if (link.revokedAt) return "Revoked";
-  if (link.expiresAt && new Date(link.expiresAt).getTime() <= Date.now()) return "Expired";
-  if (link.expiresAt) return `Expires ${formatRelative(link.expiresAt)}`;
-  return "No expiry";
+function shareStatus(
+  link: {
+    revokedAt: Date | null;
+    expiresAt: Date | null;
+    lastAccessedAt: Date | null;
+  },
+  t: Translate,
+  locale: Locale,
+) {
+  if (link.revokedAt) return t("tree.settings.status.revoked");
+  if (link.expiresAt && new Date(link.expiresAt).getTime() <= Date.now()) {
+    return t("tree.settings.status.expired");
+  }
+  if (link.expiresAt) {
+    return t("tree.settings.share.expiresIn", {
+      when: formatRelative(link.expiresAt, locale),
+    });
+  }
+  return t("tree.settings.share.noExpiry");
 }
 
-function confirmTitle(action: { kind: string } | null) {
+function confirmTitle(action: { kind: string } | null, t: Translate) {
   if (!action) return "";
-  if (action.kind === "remove") return "Remove this member?";
-  if (action.kind === "leave") return "Leave this tree?";
-  if (action.kind === "revoke-share") return "Revoke this share link?";
-  if (action.kind === "revoke-api") return "Revoke this API token?";
-  return "Revoke this invite?";
+  if (action.kind === "remove") return t("tree.members.confirmRemoveTitle");
+  if (action.kind === "leave") return t("tree.settings.danger.confirmLeaveTitle");
+  if (action.kind === "revoke-share") return t("tree.settings.share.confirmRevokeTitle");
+  if (action.kind === "revoke-api") return t("tree.settings.api.confirmRevokeTitle");
+  return t("tree.invites.confirmRevokeTitle");
 }
 
-function confirmLabel(action: { kind: string } | null) {
-  if (!action) return "Confirm";
-  if (action.kind === "remove") return "Remove member";
-  if (action.kind === "leave") return "Leave tree";
-  if (action.kind === "revoke-share") return "Revoke link";
-  if (action.kind === "revoke-api") return "Revoke token";
-  return "Revoke invite";
+function confirmLabel(action: { kind: string } | null, t: Translate) {
+  if (!action) return t("common.confirm");
+  if (action.kind === "remove") return t("tree.members.confirmRemove");
+  if (action.kind === "leave") return t("tree.settings.danger.confirmLeave");
+  if (action.kind === "revoke-share") return t("tree.settings.share.confirmRevoke");
+  if (action.kind === "revoke-api") return t("tree.settings.api.confirmRevoke");
+  return t("tree.invites.confirmRevoke");
 }
 
-function confirmMessage(action: { kind: string; name?: string } | null, treeName: string) {
+function confirmMessage(
+  action: { kind: string; name?: string } | null,
+  treeName: string,
+  t: Translate,
+) {
   if (!action) return "";
   if (action.kind === "remove") {
-    return `${action.name ?? "This person"} will lose access to ${treeName}. The people and files they added stay in the tree.`;
+    return t("tree.members.confirmRemoveMessage", {
+      name: action.name ?? t("tree.members.thisPerson"),
+      tree: treeName,
+    });
   }
   if (action.kind === "leave") {
-    return `You will lose access to ${treeName}. You can only rejoin with a new invite.`;
+    return t("tree.settings.danger.confirmLeaveMessage", { tree: treeName });
   }
   if (action.kind === "revoke-share") {
-    return "Anyone with this link will lose access immediately. You can create a new link at any time.";
+    return t("tree.settings.share.confirmRevokeMessage");
   }
   if (action.kind === "revoke-api") {
-    return "Any script or app using this token will start receiving 401 responses immediately. This cannot be undone.";
+    return t("tree.settings.api.confirmRevokeMessage");
   }
-  return "Anyone using this link will no longer be able to join.";
+  return t("tree.invites.confirmRevokeMessage");
 }
 
-function apiTokenStatus(token: ApiTokenView) {
-  if (token.revokedAt) return "Revoked";
+function apiTokenStatus(token: ApiTokenView, t: Translate) {
+  if (token.revokedAt) return t("tree.settings.status.revoked");
   if (token.expiresAt && new Date(token.expiresAt).getTime() <= Date.now()) {
-    return "Expired";
+    return t("tree.settings.status.expired");
   }
-  return "Active";
+  return t("tree.settings.status.active");
 }

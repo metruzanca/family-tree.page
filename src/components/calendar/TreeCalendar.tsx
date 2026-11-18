@@ -14,11 +14,12 @@ import {
   type DateParts,
 } from "~/lib/calendar";
 import { formatFuzzyYearRange } from "~/lib/fuzzy-date";
+import { localeTag } from "~/i18n";
+import type { TranslationKey, TranslationParams } from "~/i18n";
+import { useI18n } from "~/i18n/LocaleProvider";
 import { cx } from "~/lib/utils";
 import { Avatar } from "../ui/Avatar";
 import { Button } from "../ui/button";
-
-const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 type TreeCalendarProps = {
   treeId: string;
@@ -26,6 +27,7 @@ type TreeCalendarProps = {
 };
 
 export function TreeCalendar(props: TreeCalendarProps) {
+  const { t, locale } = useI18n();
   const today = partsFromDate(new Date());
   const [view, setView] = createSignal({ year: today.year, month: today.month });
   const [selected, setSelected] = createSignal<DateParts | null>(null);
@@ -60,10 +62,20 @@ export function TreeCalendar(props: TreeCalendarProps) {
   }
 
   const monthLabel = createMemo(() =>
-    new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" }).format(
+    new Intl.DateTimeFormat(localeTag(locale()), { month: "long", year: "numeric" }).format(
       new Date(view().year, view().month, 1),
     ),
   );
+
+  const weekdays = createMemo(() => {
+    const formatter = new Intl.DateTimeFormat(localeTag(locale()), {
+      weekday: "short",
+    });
+    // 1 January 2024 was a Monday, so the week starts there.
+    return Array.from({ length: 7 }, (_, index) =>
+      formatter.format(new Date(2024, 0, 1 + index)),
+    );
+  });
 
   return (
     <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
@@ -72,11 +84,10 @@ export function TreeCalendar(props: TreeCalendarProps) {
           <div>
             <h2 class="font-display text-2xl tracking-tight">{monthLabel()}</h2>
             <p class="mt-0.5 text-xs text-muted-foreground">
-              {livingCount()} living {livingCount() === 1 ? "relative" : "relatives"}
+              {t("tree.calendar.living", { count: livingCount() })}
               <Show when={monthBirthdays()}>
                 {" "}
-                · {monthBirthdays()} {monthBirthdays() === 1 ? "birthday" : "birthdays"} this
-                month
+                · {t("tree.calendar.birthdaysThisMonth", { count: monthBirthdays() })}
               </Show>
             </p>
           </div>
@@ -85,19 +96,19 @@ export function TreeCalendar(props: TreeCalendarProps) {
               type="button"
               variant="ghost"
               size="icon-sm"
-              aria-label="Previous month"
+              aria-label={t("tree.calendar.previousMonth")}
               onClick={() => shiftMonth(-1)}
             >
               <ChevronLeft />
             </Button>
             <Button type="button" variant="secondary" size="sm" onClick={jumpToToday}>
-              Today
+              {t("tree.calendar.today")}
             </Button>
             <Button
               type="button"
               variant="ghost"
               size="icon-sm"
-              aria-label="Next month"
+              aria-label={t("tree.calendar.nextMonth")}
               onClick={() => shiftMonth(1)}
             >
               <ChevronRight />
@@ -106,7 +117,7 @@ export function TreeCalendar(props: TreeCalendarProps) {
         </div>
 
         <div class="grid grid-cols-7 border-b border-border bg-muted/40">
-          <For each={WEEKDAYS}>
+          <For each={weekdays()}>
             {day => (
               <div class="px-1 py-2 text-center text-[0.62rem] font-semibold uppercase tracking-wide text-muted-foreground">
                 {day}
@@ -142,7 +153,9 @@ export function TreeCalendar(props: TreeCalendarProps) {
                           ? "text-foreground"
                           : "text-muted-foreground",
                     )}
-                    aria-label={`Select ${formatMonthDay(cell.date)}`}
+                    aria-label={t("tree.calendar.selectDay", {
+                      date: formatMonthDay(cell.date, locale()),
+                    })}
                     onClick={event => {
                       event.stopPropagation();
                       setSelected(cell.date);
@@ -159,7 +172,7 @@ export function TreeCalendar(props: TreeCalendarProps) {
                     </For>
                     <Show when={dayEvents().length > 2}>
                       <span class="pl-1 text-[0.62rem] font-medium text-muted-foreground">
-                        +{dayEvents().length - 2} more
+                        {t("tree.calendar.more", { count: dayEvents().length - 2 })}
                       </span>
                     </Show>
                   </span>
@@ -188,13 +201,16 @@ export function TreeCalendar(props: TreeCalendarProps) {
 
         <div class="flex flex-wrap items-center gap-3 border-t border-border px-4 py-2.5 text-[0.65rem] text-muted-foreground sm:px-5">
           <span class="flex items-center gap-1.5">
-            <span class="size-2 rounded-full bg-warning" /> Living birthday
+            <span class="size-2 rounded-full bg-warning" />{" "}
+            {t("tree.calendar.legend.living")}
           </span>
           <span class="flex items-center gap-1.5">
-            <span class="size-2 rounded-full bg-muted-foreground/60" /> Remembrance
+            <span class="size-2 rounded-full bg-muted-foreground/60" />{" "}
+            {t("tree.calendar.legend.remembrance")}
           </span>
           <span class="flex items-center gap-1.5">
-            <span class="size-2 rounded-full bg-destructive" /> Death anniversary
+            <span class="size-2 rounded-full bg-destructive" />{" "}
+            {t("tree.calendar.legend.death")}
           </span>
         </div>
       </section>
@@ -206,8 +222,12 @@ export function TreeCalendar(props: TreeCalendarProps) {
               <Cake size={16} />
             </span>
             <div>
-              <h2 class="font-display text-xl tracking-tight">Upcoming birthdays</h2>
-              <p class="text-[0.68rem] text-muted-foreground">Living relatives only</p>
+              <h2 class="font-display text-xl tracking-tight">
+                {t("tree.calendar.upcoming.title")}
+              </h2>
+              <p class="text-[0.68rem] text-muted-foreground">
+                {t("tree.calendar.upcoming.subtitle")}
+              </p>
             </div>
           </div>
 
@@ -215,7 +235,7 @@ export function TreeCalendar(props: TreeCalendarProps) {
             when={upcoming().length}
             fallback={
               <p class="mt-4 rounded-2xl border border-dashed border-border px-3 py-5 text-center text-xs leading-relaxed text-muted-foreground">
-                No upcoming birthdays. Add birth dates to living relatives to see them here.
+                {t("tree.calendar.upcoming.empty")}
               </p>
             }
           >
@@ -237,12 +257,14 @@ export function TreeCalendar(props: TreeCalendarProps) {
                           {entry.person.displayName}
                         </span>
                         <span class="block text-xs text-muted-foreground">
-                          {formatMonthDay(entry.date)}
-                          {entry.age === null ? " · birthday" : ` · turns ${entry.age}`}
+                          {formatMonthDay(entry.date, locale())}
+                          {entry.age === null
+                            ? ` · ${t("tree.calendar.birthday")}`
+                            : ` · ${t("tree.calendar.turns", { age: entry.age })}`}
                         </span>
                       </span>
                       <span class="shrink-0 rounded-full bg-warning/10 px-2 py-0.5 text-[0.65rem] font-semibold text-warning">
-                        {relativeDay(entry.daysAway)}
+                        {relativeDay(entry.daysAway, t)}
                       </span>
                     </A>
                   </li>
@@ -255,17 +277,17 @@ export function TreeCalendar(props: TreeCalendarProps) {
         <section class="rounded-3xl border border-border bg-card p-4 shadow-card sm:p-5">
           <div class="flex items-center justify-between gap-2">
             <h2 class="font-display text-xl tracking-tight">
-              {formatMonthDay(agendaDay())}
+              {formatMonthDay(agendaDay(), locale())}
             </h2>
             <span class="text-[0.68rem] font-medium text-muted-foreground">
-              {agendaEvents().length} {agendaEvents().length === 1 ? "event" : "events"}
+              {t("tree.calendar.eventCount", { count: agendaEvents().length })}
             </span>
           </div>
           <Show
             when={agendaEvents().length}
             fallback={
               <p class="mt-3 rounded-2xl border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
-                Nothing on this day.
+                {t("tree.calendar.emptyDay")}
               </p>
             }
           >
@@ -281,7 +303,7 @@ export function TreeCalendar(props: TreeCalendarProps) {
           <div class="rounded-3xl border border-dashed border-border p-6 text-center">
             <Sparkles class="mx-auto text-muted-foreground" />
             <p class="mt-2 text-sm text-muted-foreground">
-              This tree has no people yet, so the calendar is empty.
+              {t("tree.calendar.noPeople")}
             </p>
           </div>
         </Show>
@@ -291,6 +313,7 @@ export function TreeCalendar(props: TreeCalendarProps) {
 }
 
 function EventChip(props: { event: CalendarEvent; treeId: string; compact?: boolean }) {
+  const { t, locale } = useI18n();
   const living = () => !props.event.person.deathDate;
   const isDeath = () => props.event.kind === "death";
   const color = () =>
@@ -302,12 +325,18 @@ function EventChip(props: { event: CalendarEvent; treeId: string; compact?: bool
 
   const detail = () => {
     if (isDeath()) {
-      return `Died ${formatFuzzyYearRange(props.event.person.deathDate, null)}`;
+      return t("tree.calendar.event.died", {
+        years: formatFuzzyYearRange(props.event.person.deathDate, null, locale()),
+      });
     }
     if (!living()) {
-      return `Born ${formatFuzzyYearRange(props.event.person.birthDate, null)}`;
+      return t("tree.calendar.event.born", {
+        years: formatFuzzyYearRange(props.event.person.birthDate, null, locale()),
+      });
     }
-    return props.event.years === null ? "Birthday" : `Turns ${props.event.years}`;
+    return props.event.years === null
+      ? t("tree.calendar.event.birthday")
+      : t("tree.calendar.event.turns", { years: props.event.years });
   };
 
   return (
@@ -318,7 +347,10 @@ function EventChip(props: { event: CalendarEvent; treeId: string; compact?: bool
         color(),
         props.compact && "block truncate px-1 py-0.5 text-[0.62rem]",
       )}
-      title={`${props.event.person.displayName}: ${detail()}`}
+      title={t("tree.calendar.event.title", {
+        name: props.event.person.displayName,
+        detail: detail(),
+      })}
     >
       <Show
         when={!props.compact}
@@ -334,8 +366,11 @@ function EventChip(props: { event: CalendarEvent; treeId: string; compact?: bool
   );
 }
 
-function relativeDay(daysAway: number) {
-  if (daysAway <= 0) return "Today";
-  if (daysAway === 1) return "Tomorrow";
-  return `In ${daysAway} days`;
+function relativeDay(
+  daysAway: number,
+  t: (key: TranslationKey, params?: TranslationParams) => string,
+) {
+  if (daysAway <= 0) return t("tree.calendar.relative.today");
+  if (daysAway === 1) return t("tree.calendar.relative.tomorrow");
+  return t("tree.calendar.inDays", { count: daysAway });
 }
