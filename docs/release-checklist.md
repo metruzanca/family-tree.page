@@ -83,7 +83,7 @@ These require dashboard or provider access and are not covered by local checks.
 - [ ] Enable Railway Postgres point-in-time recovery.
   Blocked: Railway reports that point-in-time recovery is only available for Pro workspaces.
 - [x] Create the Railway cron service from `railway.backup.json` after the branch is pushed.
-  Provisioned as `roots-backup` on `0 3 * * *`. The first manual run wrote a 70 KB dump and copied 48 media objects (44 MB). See [Backups](../README.md#backups).
+  Provisioned as `roots-backup` on `0 3 * * *`. The first manual run wrote a 70 KB dump and copied 48 media objects (44 MB). See [Backups](operations.md#backups).
 - [ ] Add an external uptime monitor on `/api/health`.
 
 ## Test data cleanup
