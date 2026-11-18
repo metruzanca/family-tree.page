@@ -80,20 +80,23 @@ import {
 import { analyzeRelationships, type RelationshipConflict } from "~/lib/relationships";
 import { sizeBucket, track } from "~/lib/analytics";
 import { createTreePresence } from "~/lib/presence";
+import { localeTag } from "~/i18n";
+import { useI18n } from "~/i18n/LocaleProvider";
 
 export const route = {
   preload: ({ params }: { params: { treeId: string } }) => getTreeGraph(params.treeId),
 };
 
 export default function TreePage() {
+  const { t } = useI18n();
   return (
     <Suspense fallback={<GraphLoading />}>
       <AppErrorBoundary
-        title="We could not load this tree"
-        message="The tree may be temporarily unavailable. Try again, or head back to your trees."
+        title={t("tree.error.title")}
+        message={t("tree.error.message")}
         variant="graph"
         revalidateKeys={[getTreeGraph.key, getTreeOverview.key, getMyTrees.key]}
-        back={{ href: "/trees", label: "Back to your trees" }}
+        back={{ href: "/trees", label: t("notFound.back") }}
       >
         <TreePageInner />
       </AppErrorBoundary>
@@ -103,6 +106,7 @@ export default function TreePage() {
 
 function TreePageInner() {
   const params = useParams<{ treeId: string }>();
+  const { t, locale } = useI18n();
   const toast = useToast();
   const navigate = useNavigate();
   const data = createAsync(() => getTreeGraph(params.treeId));
@@ -288,9 +292,7 @@ function TreePageInner() {
     await revalidate([getTreeGraph.key, getTreeMembers.key]);
     track(personId ? "focus_identity_claimed" : "focus_identity_cleared");
     toast.show(
-      personId
-        ? "Your place in the tree is saved. The graph now opens around you."
-        : "Your link to this tree was cleared. Everyone is visible again.",
+      personId ? t("tree.focus.claimed") : t("tree.focus.cleared"),
       "success",
     );
   }
@@ -312,17 +314,23 @@ function TreePageInner() {
   });
 
   function conflictPersonName(personId: string) {
-    return data()?.people.find(person => person.id === personId)?.displayName ?? "Someone";
+    return (
+      data()?.people.find(person => person.id === personId)?.displayName ??
+      t("tree.conflict.someone")
+    );
   }
 
   function conflictTitle(conflict: RelationshipConflict) {
     if (conflict.kind === "partner-ancestor") {
       const [first, second] = conflict.personIds;
-      return `${conflictPersonName(first)} is both partner and ancestor of ${conflictPersonName(second)}.`;
+      return t("tree.conflict.partnerAncestor", {
+        first: conflictPersonName(first),
+        second: conflictPersonName(second),
+      });
     }
-    return `A parent loop connects ${conflict.personIds
-      .map(conflictPersonName)
-      .join(", ")}.`;
+    return t("tree.conflict.parentLoop", {
+      people: conflict.personIds.map(conflictPersonName).join(", "),
+    });
   }
 
   const presence = createTreePresence({
@@ -355,10 +363,7 @@ function TreePageInner() {
   function refreshFromRemote() {
     if (dialogOpen()) {
       if (!pendingRefresh()) {
-        toast.show(
-          "Another member changed this tree. It will refresh when you close this dialog.",
-          "info",
-        );
+        toast.show(t("tree.refresh.pending"), "info");
       }
       setPendingRefresh(true);
       return;
@@ -540,10 +545,11 @@ function TreePageInner() {
     const totalBytes = files.reduce((sum, file) => sum + file.size, 0);
     let groupId: string | null = null;
     if (files.length > 1) {
-      const albumName = `Album · ${new Intl.DateTimeFormat(undefined, {
+      const albumDate = new Intl.DateTimeFormat(localeTag(locale()), {
         month: "short",
         day: "numeric",
-      }).format(new Date())}`;
+      }).format(new Date());
+      const albumName = t("tree.media.albumName", { date: albumDate });
       const groupResult = await attemptAction(() =>
         createFileGroup({
           treeId: params.treeId,
@@ -596,8 +602,8 @@ function TreePageInner() {
       });
       toast.show(
         groupId
-          ? `${uploaded} files added to an album.`
-          : `${uploaded} file${uploaded === 1 ? "" : "s"} added.`,
+          ? t("tree.upload.albumAdded", { count: uploaded })
+          : t("tree.upload.added", { count: uploaded }),
         "success",
       );
     }
@@ -613,7 +619,7 @@ function TreePageInner() {
     }
     await revalidate(getTreeGraph.key);
     track(fileId ? "portrait_set" : "portrait_removed");
-    toast.show(fileId ? "Portrait updated." : "Portrait removed.", "success");
+    toast.show(fileId ? t("tree.portrait.updated") : t("tree.portrait.removed"), "success");
   }
 
   async function handleSaveTags(fileId: string, personIds: string[]) {
@@ -628,7 +634,7 @@ function TreePageInner() {
     }
     await revalidate(getTreeGraph.key);
     track("file_people_tagged", { count: result.data.length });
-    toast.show("Photo tags updated.", "success");
+    toast.show(t("tree.tags.updated"), "success");
   }
 
   async function handleAssignFace(fileId: string, faceId: string, personId: string) {
@@ -643,7 +649,7 @@ function TreePageInner() {
     }
     await revalidate(getTreeGraph.key);
     track("face_linked");
-    toast.show("Face linked.", "success");
+    toast.show(t("tree.face.linked"), "success");
   }
 
   async function handleUnlinkFace(fileId: string, faceId: string) {
@@ -657,7 +663,7 @@ function TreePageInner() {
       return;
     }
     await revalidate(getTreeGraph.key);
-    toast.show("Face link removed.", "success");
+    toast.show(t("tree.face.unlinked"), "success");
   }
 
   async function handleSetFaceIgnored(fileId: string, faceId: string, ignored: boolean) {
@@ -671,7 +677,7 @@ function TreePageInner() {
       return;
     }
     await revalidate(getTreeGraph.key);
-    toast.show(ignored ? "Face ignored." : "Face restored.", "success");
+    toast.show(ignored ? t("tree.face.ignored") : t("tree.face.restored"), "success");
   }
 
   async function handleDeleteFace(fileId: string, faceId: string) {
@@ -685,7 +691,7 @@ function TreePageInner() {
       return;
     }
     await revalidate(getTreeGraph.key);
-    toast.show("Face box removed.", "success");
+    toast.show(t("tree.face.boxRemoved"), "success");
   }
 
   async function handleAddFace(fileId: string, personId: string, box: FaceBox) {
@@ -700,7 +706,7 @@ function TreePageInner() {
     }
     await revalidate(getTreeGraph.key);
     track("face_linked");
-    toast.show("Face added.", "success");
+    toast.show(t("tree.face.added"), "success");
   }
 
   async function handleScanFaces(fileId: string) {
@@ -715,8 +721,8 @@ function TreePageInner() {
     track("faces_scanned", { count: result.count });
     toast.show(
       result.count === 0
-        ? "No faces found in this photo."
-        : `${result.count} face${result.count === 1 ? "" : "s"} found.`,
+        ? t("tree.face.none")
+        : t("tree.face.found", { count: result.count }),
       "success",
     );
   }
@@ -733,7 +739,7 @@ function TreePageInner() {
     }
     await revalidate(getTreeGraph.key);
     track("file_date_taken_set", { cleared: !value });
-    toast.show(value ? "Date taken updated." : "Date taken cleared.", "success");
+    toast.show(value ? t("tree.takenAt.updated") : t("tree.takenAt.cleared"), "success");
   }
 
   async function handleDeleteFile() {
@@ -757,7 +763,7 @@ function TreePageInner() {
     setDeleteFileTarget(null);
     track("file_deleted", { album: Boolean(file.groupId) });
     await revalidate([getTreeGraph.key, getTreeOverview.key, getMyTrees.key]);
-    toast.show("File deleted.", "success");
+    toast.show(t("tree.file.deleted"), "success");
   }
 
   async function handleDeleteGroup() {
@@ -774,7 +780,7 @@ function TreePageInner() {
     selectPerson(null);
     track("album_deleted");
     await revalidate([getTreeGraph.key, getTreeOverview.key, getMyTrees.key]);
-    toast.show("Album deleted.", "success");
+    toast.show(t("tree.album.deleted"), "success");
   }
 
   async function handleRenameGroup(name: string) {
@@ -787,7 +793,7 @@ function TreePageInner() {
     }
     await revalidate(getTreeGraph.key);
     track("album_renamed");
-    toast.show("Album renamed.", "success");
+    toast.show(t("tree.album.renamed"), "success");
   }
 
   async function handleDeletePerson() {
@@ -806,7 +812,7 @@ function TreePageInner() {
     selectPerson(null);
     track("person_deleted");
     await revalidate([getTreeGraph.key, getTreeOverview.key, getMyTrees.key]);
-    toast.show("Person removed.", "success");
+    toast.show(t("tree.person.removed"), "success");
   }
 
   async function handleRemoveRelationship(relationship: GraphRelationship) {
@@ -821,7 +827,7 @@ function TreePageInner() {
     }
     await revalidate([getTreeGraph.key, getTreeOverview.key, getMyTrees.key]);
     track("relationship_removed", { relation: relationship.type });
-    toast.show("Connection removed.", "success");
+    toast.show(t("tree.relationship.removed"), "success");
   }
 
   function openAddEvent() {
@@ -848,7 +854,7 @@ function TreePageInner() {
     }
     setDeleteEventTarget(null);
     await revalidate(getTreeGraph.key);
-    toast.show("Event removed.", "success");
+    toast.show(t("tree.event.removed"), "success");
   }
 
   const lightboxFiles = createMemo(() => {
@@ -895,11 +901,10 @@ function TreePageInner() {
                 class="pointer-events-auto max-w-xl border-destructive/30 bg-card/95 shadow-xl backdrop-blur"
               >
                 <TriangleAlert size={16} />
-                <AlertTitle>Some relationships contradict each other</AlertTitle>
+                <AlertTitle>{t("tree.conflict.title")}</AlertTitle>
                 <AlertDescription class="text-xs">
                   <p>
-                    The graph may look wrong until {editable() ? "you fix" : "an editor fixes"} one
-                    of these links.
+                    {editable() ? t("tree.conflict.bodyOwner") : t("tree.conflict.bodyEditor")}
                   </p>
                   <ul class="mt-1 space-y-1">
                     <For each={conflicts()}>
@@ -960,11 +965,9 @@ function TreePageInner() {
                 <div class="mx-auto grid h-14 w-14 place-items-center rounded-3xl bg-white/10 text-gold">
                   <Sprout size={27} />
                 </div>
-                <h1 class="mt-5 font-display text-3xl tracking-tight">An empty branch</h1>
+                <h1 class="mt-5 font-display text-3xl tracking-tight">{t("tree.empty.title")}</h1>
                 <p class="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-white/55">
-                  {editable()
-                    ? "Add the first person. From there you can connect parents, partners and children."
-                    : "The people who manage this tree have not added anyone yet."}
+                  {editable() ? t("tree.empty.bodyEditable") : t("tree.empty.bodyReadOnly")}
                 </p>
                 <Show when={editable()}>
                   <Button
@@ -973,7 +976,7 @@ function TreePageInner() {
                     onClick={() => setAddPersonOpen(true)}
                   >
                     <Plus size={16} />
-                    Add the first person
+                    {t("tree.empty.add")}
                   </Button>
                 </Show>
               </div>
@@ -1071,13 +1074,14 @@ function TreePageInner() {
             data-testid="tree-legend"
           >
             <span class="flex items-center gap-1.5">
-              <span class="h-1.5 w-4 rounded-full bg-[#66735f]" /> Parent
+              <span class="h-1.5 w-4 rounded-full bg-[#66735f]" /> {t("tree.legend.parent")}
             </span>
             <span class="flex items-center gap-1.5">
-              <span class="h-px w-4 border-t border-dashed border-[#b97c63]" /> Partner
+              <span class="h-px w-4 border-t border-dashed border-[#b97c63]" />{" "}
+              {t("tree.legend.partner")}
             </span>
             <span class="flex items-center gap-1.5">
-              <span class="h-1.5 w-4 rounded-full bg-[#8d846c]" /> File
+              <span class="h-1.5 w-4 rounded-full bg-[#8d846c]" /> {t("tree.legend.file")}
             </span>
           </div>
 
@@ -1089,8 +1093,7 @@ function TreePageInner() {
               >
                 <Target size={14} class="text-gold" />
                 <span class="pr-1">
-                  {focus().nextRingCount} more{" "}
-                  {focus().nextRingCount === 1 ? "relative" : "relatives"}
+                  {t("tree.moreRelatives", { count: focus().nextRingCount })}
                 </span>
                 <button
                   type="button"
@@ -1098,7 +1101,7 @@ function TreePageInner() {
                   data-testid="tree-show-more-button"
                   onClick={showMore}
                 >
-                  Show more
+                  {t("tree.showMore")}
                 </button>
                 <button
                   type="button"
@@ -1106,7 +1109,7 @@ function TreePageInner() {
                   data-testid="tree-show-more-everyone"
                   onClick={() => chooseFocusRadius("all")}
                 >
-                  Everyone
+                  {t("tree.everyone")}
                 </button>
               </div>
             </div>
@@ -1121,16 +1124,15 @@ function TreePageInner() {
                 <button
                   type="button"
                   class="absolute right-2 top-2 grid size-7 place-items-center rounded-full text-white/45 transition hover:bg-white/10 hover:text-white"
-                  aria-label="Dismiss"
+                  aria-label={t("tree.focusPrompt.dismiss")}
                   data-testid="tree-focus-prompt-dismiss"
                   onClick={dismissFocusPrompt}
                 >
                   <X size={15} />
                 </button>
-                <p class="text-sm font-semibold">Who are you in this tree?</p>
+                <p class="text-sm font-semibold">{t("tree.focusPrompt.title")}</p>
                 <p class="mt-1 text-xs leading-relaxed text-white/55">
-                  Pick yourself and the tree will open around your part of the family.
-                  Everyone can still see the whole tree with one click.
+                  {t("tree.focusPrompt.body")}
                 </p>
                 <Button
                   size="sm"
@@ -1139,7 +1141,7 @@ function TreePageInner() {
                   onClick={() => setFocusPersonOpen(true)}
                 >
                   <Target size={14} />
-                  Find yourself
+                  {t("tree.focusPrompt.find")}
                 </Button>
               </div>
             </div>
@@ -1149,7 +1151,7 @@ function TreePageInner() {
             <button
               type="button"
               class="absolute bottom-5 right-5 z-20 grid h-14 w-14 place-items-center rounded-full bg-gold text-[#161a12] shadow-2xl transition hover:scale-105 sm:hidden"
-              aria-label="Add a person"
+              aria-label={t("tree.addPerson")}
               data-testid="tree-add-person-mobile"
               onClick={() => setAddPersonOpen(true)}
             >
@@ -1223,9 +1225,11 @@ function TreePageInner() {
           <ConfirmDialog
             open={Boolean(deleteEventTarget())}
             onClose={() => setDeleteEventTarget(null)}
-            title={`Delete ${deleteEventTarget()?.title ?? "this event"}?`}
-            message="The life event will be removed from this person's timeline."
-            confirmLabel="Delete event"
+            title={t("tree.delete.title", {
+              name: deleteEventTarget()?.title ?? t("tree.delete.eventName"),
+            })}
+            message={t("tree.delete.eventMessage")}
+            confirmLabel={t("tree.delete.eventConfirm")}
             danger
             pending={pendingDeleteEvent()}
             testId="tree-confirm-delete-event"
@@ -1235,14 +1239,11 @@ function TreePageInner() {
           <ConfirmDialog
             open={deletePersonOpen()}
             onClose={() => setDeletePersonOpen(false)}
-            title={`Delete ${selectedPerson()?.displayName ?? "this person"}?`}
-            message={
-              <>
-                This removes the person and their connections. Their photos move to the tree
-                inbox so you can file them under someone else. This cannot be undone.
-              </>
-            }
-            confirmLabel="Delete person"
+            title={t("tree.delete.title", {
+              name: selectedPerson()?.displayName ?? t("tree.delete.personName"),
+            })}
+            message={t("tree.delete.personMessage")}
+            confirmLabel={t("tree.delete.personConfirm")}
             danger
             pending={pendingDelete()}
             testId="tree-confirm-delete-person"
@@ -1252,9 +1253,11 @@ function TreePageInner() {
           <ConfirmDialog
             open={Boolean(deleteFileTarget())}
             onClose={() => setDeleteFileTarget(null)}
-            title={`Delete ${deleteFileTarget()?.name ?? "this file"}?`}
-            message="The file will be removed from storage and from this person's profile."
-            confirmLabel="Delete file"
+            title={t("tree.delete.title", {
+              name: deleteFileTarget()?.name ?? t("tree.delete.fileName"),
+            })}
+            message={t("tree.delete.fileMessage")}
+            confirmLabel={t("tree.delete.fileConfirm")}
             danger
             pending={pendingDelete()}
             testId="tree-confirm-delete-file"
@@ -1264,9 +1267,11 @@ function TreePageInner() {
           <ConfirmDialog
             open={Boolean(deleteGroupTarget())}
             onClose={() => setDeleteGroupTarget(null)}
-            title={`Delete ${deleteGroupTarget()?.name ?? "this album"}?`}
-            message="Every file in this album will be removed from storage. This cannot be undone."
-            confirmLabel="Delete album"
+            title={t("tree.delete.title", {
+              name: deleteGroupTarget()?.name ?? t("tree.delete.albumName"),
+            })}
+            message={t("tree.delete.albumMessage")}
+            confirmLabel={t("tree.delete.albumConfirm")}
             danger
             pending={pendingDelete()}
             testId="tree-confirm-delete-album"
@@ -1279,6 +1284,7 @@ function TreePageInner() {
 }
 
 function GraphLoading() {
+  const { t } = useI18n();
   return (
     <div class="graph-shell relative" data-testid="tree-loading">
       <div class="pointer-events-none absolute inset-x-0 top-0 z-20 p-3 sm:p-4">
@@ -1295,7 +1301,7 @@ function GraphLoading() {
       <div class="grid h-full place-items-center">
         <div class="flex items-center gap-3 rounded-full border border-white/10 bg-black/30 px-4 py-2 text-xs text-white/60 backdrop-blur">
           <span class="size-2 animate-pulse rounded-full bg-gold" />
-          Finding the branches…
+          {t("tree.loading")}
         </div>
       </div>
     </div>
