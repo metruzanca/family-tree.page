@@ -1,5 +1,6 @@
 import { Show, type JSX } from "solid-js";
 import { Button } from "./button";
+import { useI18n } from "~/i18n/LocaleProvider";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -21,6 +22,7 @@ export function ConfirmDialog(props: {
   onClose: () => void;
   onConfirm: () => void;
 }) {
+  const { t } = useI18n();
   const baseTestId = () => props.testId ?? "confirm-dialog";
   return (
     <AlertDialog
@@ -51,7 +53,7 @@ export function ConfirmDialog(props: {
               onClick={props.onClose}
               data-testid={`${baseTestId()}-cancel`}
             >
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button
               variant={props.danger ? "destructive" : "default"}
@@ -60,7 +62,7 @@ export function ConfirmDialog(props: {
               data-testid={`${baseTestId()}-confirm`}
               onClick={props.onConfirm}
             >
-              {props.pending ? "Working…" : (props.confirmLabel ?? "Confirm")}
+              {props.pending ? t("common.working") : (props.confirmLabel ?? t("common.confirm"))}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

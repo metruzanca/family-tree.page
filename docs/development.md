@@ -95,6 +95,7 @@ drizzle/            schema and SQL migrations
 scripts/            migration, seed, storage, dev-service scripts
 src/api/            server functions and query wrappers
 src/components/     graph, people, files, trees, UI primitives
+src/i18n/           English and Italian dictionaries, locale provider, switcher
 src/lib/            pure client helpers: graph model, focus distances, thumbnails, uploads, formatting, presence socket
 src/routes/         file-based routes and API handlers
 src/server/         auth, guards, storage, file service, config, presence state
@@ -110,5 +111,6 @@ The interface uses [shadcn-solid](https://shadcn-solid.com) components on top of
 - Add a component with `pnpm dlx shadcn-solid@latest add <name>` (configured by `components.json`), then edit it in place like any other source file.
 - `~/components/ui/button.tsx` holds the shared button variants, `icon-button.tsx` wraps icon-only buttons with a tooltip, and `~/lib/utils.ts` exports `cva`/`cx` with `tailwind-merge` applied.
 - `Modal`, `ConfirmDialog`, `Field`, `Toast` and `Loading` are thin adapters over the generated primitives, so app code does not need to change when a primitive is restyled.
+- All user-facing copy goes through `useI18n()` and the dictionaries in `src/i18n/`. See [Translations](i18n.md) before adding text; `pnpm typecheck` and `pnpm test` enforce key parity between languages.
 - Dark mode is the `.dark` class on `<html>`, set by `ThemeProvider`, and is wired into Tailwind through `@custom-variant dark` in `src/app.css`.
 - The graph canvas draws with its own hardcoded colours in `src/components/graph/GraphView.tsx`; theme tokens do not affect it.

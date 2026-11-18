@@ -40,7 +40,8 @@ function initialLocale(): Locale {
 
   return resolveLocale({
     cookie: document.cookie,
-    languages: navigator.languages ?? [navigator.language],
+    languages:
+      navigator.languages?.length ? navigator.languages : [navigator.language],
   });
 }
 

@@ -1,7 +1,7 @@
 // @refresh reload
 import { StartServer, createHandler } from "@solidjs/start/server";
 import { optionalEnv, publicOrigin } from "./server/config";
-import { resolveLocaleFromHeaders, translate } from "./i18n";
+import { resolveLocaleFromHeaders, translate, cookieValue, LOCALE_COOKIE, LOCALE_MAX_AGE } from "./i18n";
 
 const themeScript = `try{const s=localStorage.getItem("family-tree-theme");const d=s==="dark"||(!s&&matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.classList.toggle("dark",d);document.documentElement.style.colorScheme=d?"dark":"light";}catch(e){}`;
 
@@ -21,6 +21,12 @@ const umami =
 
 export default createHandler(context => {
   const locale = resolveLocaleFromHeaders(context.request.headers);
+  if (!cookieValue(context.request.headers.get("cookie"), LOCALE_COOKIE)) {
+    context.response.headers.append(
+      "set-cookie",
+      `${LOCALE_COOKIE}=${locale}; Path=/; Max-Age=${LOCALE_MAX_AGE}; SameSite=Lax`,
+    );
+  }
   return (
   <StartServer
     document={({ assets, children, scripts }) => (

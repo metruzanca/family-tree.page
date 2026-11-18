@@ -7,6 +7,8 @@
   "common.languageDescription": "Scegli la lingua dell'app.",
   "common.dialog": "Finestra",
   "common.closeDialog": "Chiudi la finestra",
+  "common.confirm": "Conferma",
+  "common.working": "In corso…",
   "common.dismissNotification": "Chiudi la notifica",
   "common.save": "Salva",
   "common.cancel": "Annulla",

@@ -98,6 +98,7 @@ Railway is the happy path and is what production uses, but nothing is Railway-sp
 | [Features](docs/features.md) | Everything the app does, plus known limitations |
 | [Architecture](docs/architecture.md) | Graph rendering, live refresh, presence, calendar feeds |
 | [Development](docs/development.md) | Local setup, scripts, project layout, UI conventions |
+| [Translations](docs/i18n.md) | English and Italian dictionaries, locale detection, adding a language |
 | [Operations](docs/operations.md) | Environment variables, deployment, backups, privacy |
 | [API](docs/api.md) | The read-only `/api/v1` and its OpenAPI contract |
 | [GEDCOM](docs/gedcom.md) | Export and import details |

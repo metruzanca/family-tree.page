@@ -7,6 +7,8 @@
   "common.languageDescription": "Choose the language for the app.",
   "common.dialog": "Dialog",
   "common.closeDialog": "Close dialog",
+  "common.confirm": "Confirm",
+  "common.working": "Working…",
   "common.dismissNotification": "Dismiss notification",
   "common.save": "Save",
   "common.cancel": "Cancel",
