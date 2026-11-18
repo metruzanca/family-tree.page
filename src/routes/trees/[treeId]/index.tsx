@@ -9,7 +9,7 @@ import {
   onCleanup,
   onMount,
 } from "solid-js";
-import { createAsync, revalidate, useParams, useSearchParams } from "@solidjs/router";
+import { createAsync, revalidate, useNavigate, useParams, useSearchParams } from "@solidjs/router";
 import { Plus, Sprout, Target, TriangleAlert, X } from "lucide-solid";
 import type {
   GraphFile,
@@ -104,6 +104,7 @@ export default function TreePage() {
 function TreePageInner() {
   const params = useParams<{ treeId: string }>();
   const toast = useToast();
+  const navigate = useNavigate();
   const data = createAsync(() => getTreeGraph(params.treeId));
   const [searchParams, setSearchParams] = useSearchParams();
   const [handle, setHandle] = createSignal<GraphHandle>();
@@ -1162,7 +1163,15 @@ function TreePageInner() {
             data={graph()}
             isOutsideFocus={personId => !focus().visible.has(personId)}
             onPerson={person => focusPerson(person.id)}
-            onFile={file => focusFile(file.id)}
+            onFile={file => {
+              // Inbox files have no graph node. Send the search result to the
+              // place they live instead of focusing a missing node.
+              if (!file.personId) {
+                navigate(`/trees/${params.treeId}/media?person=inbox`);
+                return;
+              }
+              focusFile(file.id);
+            }}
           />
 
           <FocusPersonDialog
