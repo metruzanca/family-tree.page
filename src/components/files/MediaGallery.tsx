@@ -24,6 +24,7 @@ import { FileUploadButton } from "./FileUploadButton";
 import { MediaTile } from "./MediaTile";
 import { MoveToPersonDialog } from "./MoveToPersonDialog";
 import { PersonFolders } from "./PersonFolders";
+import { useI18n } from "~/i18n/LocaleProvider";
 
 type MediaGalleryProps = {
   treeId: string;
@@ -43,6 +44,7 @@ const uploadAccept =
   "image/jpeg,image/png,image/webp,image/gif,image/avif,image/heic,image/heif";
 
 export function MediaGallery(props: MediaGalleryProps) {
+  const { t } = useI18n();
   const editable = () => props.role === "owner" || props.role === "editor";
   const [view, setView] = createSignal<"gallery" | "people">("gallery");
   const [location, setLocation] = createSignal<MediaLocation>(
@@ -75,15 +77,23 @@ export function MediaGallery(props: MediaGalleryProps) {
     const value = location();
     return value === "all" || value === "inbox" ? null : value;
   });
-  const destinationLabel = createMemo(() => {
-    if (view() === "people") {
-      if (folder() === "inbox") return "the inbox";
-      const name =
-        props.data.people.find(person => person.id === folder())?.displayName ??
-        "this folder";
-      return `${name}'s folder`;
-    }
-    return uploadTarget() ? "this folder" : "the inbox";
+  const destinationName = createMemo(() => {
+    const personId = view() === "people" ? folder() : uploadTarget();
+    if (!personId || personId === "inbox") return null;
+    return props.data.people.find(person => person.id === personId)?.displayName ?? null;
+  });
+  const destinationInFolder = createMemo(() =>
+    view() === "people" ? folder() !== "inbox" : Boolean(uploadTarget()),
+  );
+  const uploadTargetLabel = createMemo(() => {
+    const name = destinationName();
+    if (name) return t("media.upload.toPerson", { name });
+    return destinationInFolder() ? t("media.upload.toFolder") : t("media.upload.toInbox");
+  });
+  const dropTargetLabel = createMemo(() => {
+    const name = destinationName();
+    if (name) return t("media.drop.toPerson", { name });
+    return destinationInFolder() ? t("media.drop.toFolder") : t("media.drop.toInbox");
   });
 
   // A photo can be deleted or moved from the lightbox, so drop selections that
@@ -158,12 +168,12 @@ export function MediaGallery(props: MediaGalleryProps) {
     >
       <div class="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 class="font-display text-3xl tracking-tight">Photos</h1>
+          <h1 class="font-display text-3xl tracking-tight">{t("media.title")}</h1>
           <p class="mt-1 text-sm text-muted-foreground">
-            {imageCount()} {imageCount() === 1 ? "photo" : "photos"} in this tree
+            {t("media.count", { count: imageCount() })}
             <Show when={inbox().length}>
               {" "}
-              · {inbox().length} waiting in the inbox
+              · {t("media.inboxWaiting", { count: inbox().length })}
             </Show>
           </p>
         </div>
@@ -171,7 +181,7 @@ export function MediaGallery(props: MediaGalleryProps) {
           <div
             class="flex items-center rounded-full border border-border bg-muted/70 p-1"
             role="tablist"
-            aria-label="Photo views"
+            aria-label={t("media.viewsAria")}
           >
             <button
               type="button"
@@ -186,7 +196,7 @@ export function MediaGallery(props: MediaGalleryProps) {
               data-testid="media-tab-gallery"
             >
               <Images size={13} />
-              Gallery
+              {t("media.view.gallery")}
             </button>
             <button
               type="button"
@@ -201,7 +211,7 @@ export function MediaGallery(props: MediaGalleryProps) {
               data-testid="media-tab-people"
             >
               <FolderOpen size={13} />
-              People
+              {t("media.view.people")}
             </button>
           </div>
           <Show when={editable()}>
@@ -218,7 +228,7 @@ export function MediaGallery(props: MediaGalleryProps) {
               data-testid="media-select-toggle"
             >
               {selecting() ? <X size={14} /> : <Check size={14} />}
-              {selecting() ? "Done" : "Select"}
+              {selecting() ? t("common.done") : t("media.select")}
             </button>
           </Show>
           <Show when={editable()}>
@@ -232,10 +242,10 @@ export function MediaGallery(props: MediaGalleryProps) {
             >
               <Upload size={14} />
               {props.uploading
-                ? "Uploading…"
+                ? t("person.panel.uploading")
                 : view() === "people" || uploadTarget()
-                  ? "Upload here"
-                  : "Add photos"}
+                  ? t("media.upload.here")
+                  : t("media.upload.add")}
             </FileUploadButton>
           </Show>
         </div>
@@ -245,9 +255,7 @@ export function MediaGallery(props: MediaGalleryProps) {
         <div class="mt-4" data-testid="media-upload-progress">
           <Progress value={props.uploadProgress * 100} class="gap-1.5">
             <ProgressGroup class="text-xs text-muted-foreground">
-              <ProgressLabel>
-                Uploading to {destinationLabel()}
-              </ProgressLabel>
+              <ProgressLabel>{uploadTargetLabel()}</ProgressLabel>
               <ProgressValueLabel />
             </ProgressGroup>
           </Progress>
@@ -264,7 +272,7 @@ export function MediaGallery(props: MediaGalleryProps) {
             <input
               type="search"
               class="input pl-9"
-              placeholder="Search filenames"
+              placeholder={t("media.search.placeholder")}
               value={query()}
               onInput={event => setQuery(event.currentTarget.value)}
               data-testid="media-search"
@@ -276,14 +284,14 @@ export function MediaGallery(props: MediaGalleryProps) {
             onChange={event => setLocation(event.currentTarget.value)}
             data-testid="media-filter-person"
           >
-            <option value="all">All photos</option>
-            <option value="inbox">Inbox ({inbox().length})</option>
+            <option value="all">{t("media.filter.all")}</option>
+            <option value="inbox">{t("media.filter.inbox", { count: inbox().length })}</option>
             <For each={locations()}>
               {person => <option value={person.id}>{person.displayName}</option>}
             </For>
           </select>
           <span class="text-xs text-muted-foreground">
-            {galleryFiles().length} shown
+            {t("media.shown", { count: galleryFiles().length })}
           </span>
         </div>
       </Show>
@@ -320,14 +328,14 @@ export function MediaGallery(props: MediaGalleryProps) {
                 </Show>
               </div>
               <h2 class="mt-4 font-display text-xl">
-                {imageCount() ? "No photos match" : "No photos yet"}
+                {imageCount() ? t("media.empty.noMatch") : t("media.empty.none")}
               </h2>
               <p class="mt-1 max-w-sm text-sm text-muted-foreground">
                 {imageCount()
-                  ? "Try another person, or clear the search."
+                  ? t("media.empty.noMatchHint")
                   : editable()
-                    ? "Drop photos anywhere on this page. They land in the tree inbox until you file them under someone."
-                    : "The people who manage this tree have not added any photos yet."}
+                    ? t("media.empty.dropHint")
+                    : t("media.empty.readOnly")}
               </p>
             </div>
           }
@@ -338,7 +346,7 @@ export function MediaGallery(props: MediaGalleryProps) {
                 <section data-testid={`media-year-${group.year ?? "undated"}`}>
                   <div class="sticky top-16 z-10 -mx-1 mb-2 flex items-center gap-2 bg-background/85 px-1 py-1 backdrop-blur">
                     <h2 class="font-display text-lg tracking-tight">
-                      {group.year ?? "Undated"}
+                      {group.year ?? t("media.undated")}
                     </h2>
                     <span class="text-xs text-muted-foreground">
                       {group.files.length}
@@ -370,7 +378,7 @@ export function MediaGallery(props: MediaGalleryProps) {
           data-testid="media-selection-bar"
         >
           <span class="ml-1 text-sm font-semibold">
-            {selected().length} selected
+            {t("media.selected", { count: selected().length })}
           </span>
           <div class="ml-auto flex items-center gap-1.5">
             <Button
@@ -380,7 +388,7 @@ export function MediaGallery(props: MediaGalleryProps) {
               data-testid="media-selection-file"
             >
               <FolderInput size={14} />
-              File under…
+              {t("media.fileUnder")}
             </Button>
             <Button
               size="sm"
@@ -390,7 +398,7 @@ export function MediaGallery(props: MediaGalleryProps) {
               data-testid="media-selection-delete"
             >
               <Trash2 size={14} />
-              Delete
+              {t("common.delete")}
             </Button>
             <Button
               size="sm"
@@ -398,7 +406,7 @@ export function MediaGallery(props: MediaGalleryProps) {
               onClick={clearSelection}
               data-testid="media-selection-clear"
             >
-              Clear
+              {t("media.clearSelection")}
             </Button>
           </div>
         </div>
@@ -412,10 +420,10 @@ export function MediaGallery(props: MediaGalleryProps) {
           <div class="rounded-3xl border-2 border-dashed border-primary/50 bg-card px-10 py-8 text-center shadow-xl">
             <Upload size={28} class="mx-auto text-primary" />
             <p class="mt-3 font-display text-xl">
-              Drop into {destinationLabel()}
+              {dropTargetLabel()}
             </p>
             <p class="mt-1 text-sm text-muted-foreground">
-              They stay private to this tree.
+              {t("media.drop.private")}
             </p>
           </div>
         </div>

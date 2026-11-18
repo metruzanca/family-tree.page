@@ -2,6 +2,7 @@ import { Show } from "solid-js";
 import { Check, Image as ImageIcon, Inbox } from "lucide-solid";
 import type { GraphFile } from "~/api/people-server";
 import { Badge } from "../ui/badge";
+import { useI18n } from "~/i18n/LocaleProvider";
 
 type MediaTileProps = {
   file: GraphFile;
@@ -16,6 +17,7 @@ type MediaTileProps = {
 };
 
 export function MediaTile(props: MediaTileProps) {
+  const { t } = useI18n();
   return (
     <div
       class={`group relative aspect-square overflow-hidden rounded-xl border bg-muted transition ${
@@ -65,7 +67,7 @@ export function MediaTile(props: MediaTileProps) {
           class="pointer-events-none absolute left-1.5 top-1.5 gap-1 bg-black/55 text-[0.6rem] text-white backdrop-blur"
         >
           <Inbox size={10} />
-          Inbox
+          {t("media.inbox")}
         </Badge>
       </Show>
 
@@ -77,7 +79,9 @@ export function MediaTile(props: MediaTileProps) {
               ? "border-primary bg-primary text-primary-foreground"
               : "border-white/70 bg-black/40"
           }`}
-          aria-label={props.selected ? "Deselect photo" : "Select photo"}
+          aria-label={
+            props.selected ? t("media.tile.deselect") : t("media.tile.select")
+          }
           aria-pressed={props.selected}
           onClick={props.onToggle}
           data-testid={`media-tile-select-${props.file.id}`}
@@ -90,7 +94,7 @@ export function MediaTile(props: MediaTileProps) {
 
       <Show when={props.file.isAvatar}>
         <span class="pointer-events-none absolute bottom-1.5 right-1.5 rounded-full bg-black/55 px-1.5 py-0.5 text-[0.58rem] font-semibold uppercase tracking-wide text-white backdrop-blur">
-          Portrait
+          {t("person.panel.portrait")}
         </span>
       </Show>
     </div>

@@ -3,6 +3,7 @@ import { RotateCcw, ScanFace, Trash2, UserRoundPlus } from "lucide-solid";
 import type { GraphFile } from "~/api/people-server";
 import { Button } from "../ui/button";
 import { FaceCrop } from "./FaceCrop";
+import { useI18n } from "~/i18n/LocaleProvider";
 
 type FaceListSectionProps = {
   file: GraphFile;
@@ -20,6 +21,7 @@ type FaceListSectionProps = {
  * people chips, so only faces that still need a name appear here.
  */
 export function FaceListSection(props: FaceListSectionProps) {
+  const { t } = useI18n();
   const unassigned = createMemo(() =>
     props.file.faces.filter(face => face.status === "unassigned"),
   );
@@ -33,7 +35,7 @@ export function FaceListSection(props: FaceListSectionProps) {
   return (
     <section class="mt-5 border-t border-border pt-4" data-testid="file-faces">
       <div class="flex flex-wrap items-center justify-between gap-2">
-        <h3 class="field-label">Faces</h3>
+        <h3 class="field-label">{t("media.face.title")}</h3>
         <div class="flex items-center gap-1">
           <Button
             size="sm"
@@ -45,7 +47,7 @@ export function FaceListSection(props: FaceListSectionProps) {
             onClick={props.onAddFace}
           >
             <UserRoundPlus size={13} />
-            Add a face
+            {t("media.face.add")}
           </Button>
           <Button
             size="sm"
@@ -58,18 +60,17 @@ export function FaceListSection(props: FaceListSectionProps) {
           >
             <ScanFace size={13} />
             {props.scanning
-              ? "Checking…"
+              ? t("media.face.checking")
               : props.file.facesScannedAt
-                ? "Check again"
-                : "Check for faces"}
+                ? t("media.face.checkAgain")
+                : t("media.face.check")}
           </Button>
         </div>
       </div>
 
       <Show when={unassigned().length}>
         <p class="mt-2 text-xs text-muted-foreground" data-testid="file-faces-summary">
-          {unassigned().length} {unassigned().length === 1 ? "face needs" : "faces need"} a name.
-          Choose one and link a person.
+          {t("media.face.needsName", { count: unassigned().length })}
         </p>
         <ul class="mt-2 flex flex-wrap gap-2">
           <For each={unassigned()}>
@@ -94,7 +95,7 @@ export function FaceListSection(props: FaceListSectionProps) {
                     {numberOf(face.id)}
                   </span>
                   <span class="absolute inset-x-0 bottom-0 bg-black/65 py-0.5 text-center text-[0.6rem] font-semibold uppercase tracking-wide text-white">
-                    Link
+                    {t("media.face.link")}
                   </span>
                 </button>
               </li>
@@ -113,24 +114,23 @@ export function FaceListSection(props: FaceListSectionProps) {
             fallback={
               <Show
                 when={props.file.facesScannedAt}
-                fallback="This photo has not been checked for faces yet."
+                fallback={t("media.face.notChecked")}
               >
                 <Show
                   when={ignored().length}
-                  fallback="No faces found in this photo. Add one if someone is missing."
+                  fallback={t("media.face.noneHint")}
                 >
-                  Every face in this photo is ignored.
+                  {t("media.face.allIgnored")}
                 </Show>
               </Show>
             }
           >
-            Every face in this photo is linked to a person.
+            {t("media.face.allLinked")}
           </Show>
         </p>
         <Show when={assignedCount() > 0}>
           <p class="mt-1 text-[0.68rem] text-muted-foreground">
-            {assignedCount()} {assignedCount() === 1 ? "face" : "faces"} linked. Click a box
-            on the photo to change it.
+            {t("media.face.linkedCount", { count: assignedCount() })}
           </p>
         </Show>
       </Show>
@@ -141,7 +141,7 @@ export function FaceListSection(props: FaceListSectionProps) {
             class="cursor-pointer text-[0.7rem] text-muted-foreground"
             data-testid="file-faces-ignored-toggle"
           >
-            Ignored ({ignored().length})
+            {t("media.face.ignoredCount", { count: ignored().length })}
           </summary>
           <ul class="mt-2 flex flex-wrap gap-2">
             <For each={ignored()}>
@@ -161,7 +161,7 @@ export function FaceListSection(props: FaceListSectionProps) {
                   <button
                     type="button"
                     class="rounded-md p-1 text-muted-foreground hover:bg-primary/5 hover:text-foreground"
-                    aria-label="Restore this face"
+                    aria-label={t("media.face.restore")}
                     disabled={props.pending}
                     data-testid={`file-face-restore-${face.id}`}
                     onClick={() => props.onUnignore(face.id)}
@@ -171,7 +171,7 @@ export function FaceListSection(props: FaceListSectionProps) {
                   <button
                     type="button"
                     class="rounded-md p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                    aria-label="Remove this face box"
+                    aria-label={t("media.face.removeBox")}
                     disabled={props.pending}
                     data-testid={`file-face-delete-${face.id}`}
                     onClick={() => props.onDeleteFace(face.id)}

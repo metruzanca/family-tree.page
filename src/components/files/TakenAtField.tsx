@@ -4,6 +4,7 @@ import { formatFuzzyDate, type FuzzyDate } from "~/lib/fuzzy-date";
 import { Button } from "../ui/button";
 import { FuzzyDateField } from "../ui/FuzzyDateField";
 import { Modal } from "../ui/Modal";
+import { useI18n } from "~/i18n/LocaleProvider";
 
 type TakenAtFieldProps = {
   value: FuzzyDate | null;
@@ -14,6 +15,7 @@ type TakenAtFieldProps = {
 };
 
 export function TakenAtField(props: TakenAtFieldProps) {
+  const { t, locale } = useI18n();
   const [open, setOpen] = createSignal(false);
   const [draft, setDraft] = createSignal<FuzzyDate | null>(null);
 
@@ -38,7 +40,9 @@ export function TakenAtField(props: TakenAtFieldProps) {
       when={props.editable}
       fallback={
         <span class={props.value ? "" : "text-muted-foreground"}>
-          {props.value ? formatFuzzyDate(props.value) : "Not set"}
+          {props.value
+            ? formatFuzzyDate(props.value, { locale: locale() })
+            : t("media.takenAt.notSet")}
         </span>
       }
     >
@@ -52,15 +56,17 @@ export function TakenAtField(props: TakenAtFieldProps) {
         >
           <CalendarDays size={12} class="text-muted-foreground" />
           <span class={props.value ? "" : "text-muted-foreground"}>
-            {props.value ? formatFuzzyDate(props.value) : "Set date"}
+            {props.value
+              ? formatFuzzyDate(props.value, { locale: locale() })
+              : t("media.takenAt.set")}
           </span>
         </button>
         <Show when={props.value}>
           <button
             type="button"
             class="rounded-full p-1 text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"
-            aria-label="Clear date taken"
-            title="Clear date taken"
+            aria-label={t("media.takenAt.clear")}
+            title={t("media.takenAt.clear")}
             disabled={props.pending}
             data-testid="file-taken-at-clear"
             onClick={() => props.onChange(null)}
@@ -70,7 +76,7 @@ export function TakenAtField(props: TakenAtFieldProps) {
         </Show>
         <Show when={props.pending}>
           <span class="text-[0.65rem] text-muted-foreground">
-            {props.pendingLabel ?? "Saving…"}
+            {props.pendingLabel ?? t("person.form.saving")}
           </span>
         </Show>
       </span>
@@ -78,14 +84,14 @@ export function TakenAtField(props: TakenAtFieldProps) {
       <Modal
         open={open()}
         onClose={() => setOpen(false)}
-        title="Date taken"
-        description="Use a full date, a year or month, or an approximate range."
+        title={t("media.takenAt.title")}
+        description={t("media.takenAt.description")}
         testId="file-taken-at-dialog"
         footer={
           <>
             <Show when={draft()}>
               <Button variant="ghost" type="button" onClick={clear} data-testid="file-taken-at-clear-draft">
-                Clear
+                {t("media.takenAt.clearDraft")}
               </Button>
             </Show>
             <Button
@@ -94,10 +100,10 @@ export function TakenAtField(props: TakenAtFieldProps) {
               onClick={() => setOpen(false)}
               data-testid="file-taken-at-cancel"
             >
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button type="button" onClick={save} data-testid="file-taken-at-save">
-              Save date
+              {t("media.takenAt.save")}
             </Button>
           </>
         }

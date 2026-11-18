@@ -4,6 +4,7 @@ import type { GraphPerson } from "~/api/people-server";
 import { Avatar } from "../ui/Avatar";
 import { Button } from "../ui/button";
 import { Modal } from "../ui/Modal";
+import { useI18n } from "~/i18n/LocaleProvider";
 
 type MoveToPersonDialogProps = {
   open: boolean;
@@ -16,6 +17,7 @@ type MoveToPersonDialogProps = {
 };
 
 export function MoveToPersonDialog(props: MoveToPersonDialogProps) {
+  const { t } = useI18n();
   const [query, setQuery] = createSignal("");
 
   createEffect(() => {
@@ -38,8 +40,8 @@ export function MoveToPersonDialog(props: MoveToPersonDialogProps) {
     <Modal
       open={props.open}
       onClose={props.onClose}
-      title="File photos"
-      description={`Move ${props.count} ${props.count === 1 ? "photo" : "photos"} to a person's folder.`}
+      title={t("media.move.title")}
+      description={t("media.move.description", { count: props.count })}
       testId="move-to-person-dialog"
     >
       <div class="flex min-h-0 flex-col">
@@ -51,7 +53,7 @@ export function MoveToPersonDialog(props: MoveToPersonDialogProps) {
           <input
             class="input pl-9"
             type="search"
-            placeholder="Search people"
+            placeholder={t("media.search.people")}
             value={query()}
             onInput={event => setQuery(event.currentTarget.value)}
             data-testid="move-to-person-search"
@@ -69,9 +71,11 @@ export function MoveToPersonDialog(props: MoveToPersonDialogProps) {
             <Inbox size={17} />
           </span>
           <span class="min-w-0 flex-1">
-            <span class="block truncate text-sm font-semibold">Tree inbox</span>
+            <span class="block truncate text-sm font-semibold">
+              {t("media.move.inbox")}
+            </span>
             <span class="block text-[0.7rem] text-muted-foreground">
-              Keep it unfiled for now
+              {t("media.move.inboxHint")}
             </span>
           </span>
         </button>
@@ -81,7 +85,7 @@ export function MoveToPersonDialog(props: MoveToPersonDialogProps) {
             when={candidates().length}
             fallback={
               <p class="px-2 py-6 text-center text-sm text-muted-foreground">
-                No people match that search.
+                {t("media.move.noMatches")}
               </p>
             }
           >
@@ -105,7 +109,8 @@ export function MoveToPersonDialog(props: MoveToPersonDialogProps) {
                     </span>
                     <Show when={person.nickname || person.maidenName}>
                       <span class="block truncate text-[0.7rem] text-muted-foreground">
-                        {person.nickname ?? `Born ${person.maidenName}`}
+                        {person.nickname ??
+                          t("person.panel.bornName", { name: person.maidenName ?? "" })}
                       </span>
                     </Show>
                   </span>
@@ -117,7 +122,7 @@ export function MoveToPersonDialog(props: MoveToPersonDialogProps) {
 
         <div class="flex justify-end border-t border-border px-5 py-3">
           <Button variant="ghost" onClick={props.onClose} data-testid="move-to-person-cancel">
-            Cancel
+            {t("common.cancel")}
           </Button>
         </div>
       </div>

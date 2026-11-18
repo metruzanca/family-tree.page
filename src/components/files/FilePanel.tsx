@@ -18,6 +18,7 @@ import { FilePeopleSection } from "./FilePeopleSection";
 import { TakenAtField } from "./TakenAtField";
 import { formatBytes, formatDate, formatRelative } from "~/lib/format";
 import type { FuzzyDate } from "~/lib/fuzzy-date";
+import { useI18n } from "~/i18n/LocaleProvider";
 
 type FilePanelProps = {
   file: GraphFile;
@@ -40,6 +41,7 @@ type FilePanelProps = {
 };
 
 export function FilePanel(props: FilePanelProps) {
+  const { t, locale } = useI18n();
   const editable = () => props.role === "owner" || props.role === "editor";
   const isImage = () => props.file.kind === "image";
 
@@ -51,7 +53,7 @@ export function FilePanel(props: FilePanelProps) {
       <div class="flex items-center justify-between px-4 pb-1 pt-2 sm:hidden">
         <span class="mx-auto h-1 w-10 rounded-full bg-border" />
         <IconButton
-          label="Close"
+          label={t("common.close")}
           onClick={props.onClose}
           class="!absolute right-2 top-2"
           data-testid="file-panel-close-mobile"
@@ -83,21 +85,31 @@ export function FilePanel(props: FilePanelProps) {
           </h2>
           <p class="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
             <CalendarDays size={12} />
-            Added {formatRelative(props.file.createdAt)}
+            {t("media.added", { when: formatRelative(props.file.createdAt, locale()) })}
           </p>
           <div class="mt-2 flex flex-wrap gap-1.5">
             <Badge variant="secondary" class="uppercase tracking-wide">
-              {props.file.kind}
+              {t(
+                props.file.kind === "image"
+                  ? "media.kind.image"
+                  : props.file.kind === "document"
+                    ? "media.kind.document"
+                    : "media.kind.other",
+              )}
             </Badge>
             <Show when={props.file.isAvatar}>
               <Badge variant="secondary" class="uppercase tracking-wide">
-                Portrait
+                {t("person.panel.portrait")}
               </Badge>
             </Show>
           </div>
         </div>
         <div class="hidden sm:block">
-          <IconButton label="Close" onClick={props.onClose} data-testid="file-panel-close">
+          <IconButton
+            label={t("common.close")}
+            onClick={props.onClose}
+            data-testid="file-panel-close"
+          >
             <X size={17} />
           </IconButton>
         </div>
@@ -111,7 +123,7 @@ export function FilePanel(props: FilePanelProps) {
             onClick={props.onPreview}
             data-testid="file-panel-preview"
           >
-            View full size
+            {t("media.panel.viewFullSize")}
           </Button>
         </Show>
         <Show when={props.allowDownload !== false}>
@@ -122,7 +134,7 @@ export function FilePanel(props: FilePanelProps) {
             data-testid="file-panel-download"
           >
             <Download size={14} />
-            Download
+            {t("media.download")}
           </a>
         </Show>
         <Show when={editable() && isImage() && props.person}>
@@ -133,12 +145,14 @@ export function FilePanel(props: FilePanelProps) {
             data-testid="file-panel-portrait"
           >
             <UserRound size={14} />
-            {props.file.isAvatar ? "Remove portrait" : "Use as portrait"}
+            {props.file.isAvatar
+              ? t("person.panel.removePortrait")
+              : t("person.panel.useAsPortrait")}
           </Button>
         </Show>
         <Show when={editable()}>
           <IconButton
-            label="Delete file"
+            label={t("tree.delete.fileConfirm")}
             class="ml-auto text-destructive"
             onClick={props.onDelete}
             data-testid="file-panel-delete"
@@ -150,31 +164,41 @@ export function FilePanel(props: FilePanelProps) {
 
       <div class="scroll-thin min-h-0 flex-1 overflow-y-auto px-5 py-4">
         <section data-testid="file-panel-details">
-          <h3 class="field-label">Details</h3>
+          <h3 class="field-label">{t("media.panel.details")}</h3>
           <dl class="mt-2 grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
             <div>
-              <dt class="text-[0.68rem] text-muted-foreground">Type</dt>
+              <dt class="text-[0.68rem] text-muted-foreground">
+                {t("person.event.type")}
+              </dt>
               <dd class="mt-0.5 truncate">{props.file.mimeType}</dd>
             </div>
             <div>
-              <dt class="text-[0.68rem] text-muted-foreground">Size</dt>
+              <dt class="text-[0.68rem] text-muted-foreground">
+                {t("media.field.size")}
+              </dt>
               <dd class="mt-0.5">{formatBytes(props.file.sizeBytes)}</dd>
             </div>
             <Show when={props.file.width && props.file.height}>
               <div>
-                <dt class="text-[0.68rem] text-muted-foreground">Dimensions</dt>
+                <dt class="text-[0.68rem] text-muted-foreground">
+                  {t("media.field.dimensions")}
+                </dt>
                 <dd class="mt-0.5">
                   {props.file.width} × {props.file.height}
                 </dd>
               </div>
             </Show>
             <div>
-              <dt class="text-[0.68rem] text-muted-foreground">Added</dt>
-              <dd class="mt-0.5">{formatDate(props.file.createdAt)}</dd>
+              <dt class="text-[0.68rem] text-muted-foreground">
+                {t("media.field.added")}
+              </dt>
+              <dd class="mt-0.5">{formatDate(props.file.createdAt, locale())}</dd>
             </div>
             <Show when={isImage()}>
               <div>
-                <dt class="text-[0.68rem] text-muted-foreground">Taken</dt>
+                <dt class="text-[0.68rem] text-muted-foreground">
+                  {t("media.field.taken")}
+                </dt>
                 <dd class="mt-0.5">
                   <TakenAtField
                     value={props.file.takenAt}
@@ -189,16 +213,16 @@ export function FilePanel(props: FilePanelProps) {
         </section>
 
         <section class="mt-6" data-testid="file-panel-attached">
-          <h3 class="field-label">Attached to</h3>
+          <h3 class="field-label">{t("media.field.attachedTo")}</h3>
           <Show
             when={props.person}
             fallback={
               <p class="mt-1.5 rounded-xl border border-dashed border-border px-3 py-3 text-xs leading-relaxed text-muted-foreground">
                 <Show
                   when={props.file.personId}
-                  fallback="Waiting in the tree inbox. Tag someone to file it under them."
+                  fallback={t("media.attached.inbox")}
                 >
-                  This person is no longer in the tree.
+                  {t("media.attached.missingPerson")}
                 </Show>
               </p>
             }
@@ -224,7 +248,9 @@ export function FilePanel(props: FilePanelProps) {
                   <span class="block truncate text-sm font-semibold">
                     {person().displayName}
                   </span>
-                  <span class="block text-[0.7rem] text-muted-foreground">Open their profile</span>
+                  <span class="block text-[0.7rem] text-muted-foreground">
+                    {t("media.attached.openProfile")}
+                  </span>
                 </span>
               </button>
             )}
@@ -247,9 +273,9 @@ export function FilePanel(props: FilePanelProps) {
         <p class="mt-6 text-[0.68rem] leading-relaxed text-muted-foreground">
           <Show
             when={props.allowDownload !== false}
-            fallback="This tree is shared read-only. Media is shown as thumbnails."
+            fallback={t("media.footer.readOnly")}
           >
-            Files stay private to this tree. Downloads use a short-lived signed link.
+            {t("media.footer.private")}
           </Show>
         </p>
       </div>

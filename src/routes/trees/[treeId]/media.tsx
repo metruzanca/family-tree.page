@@ -28,6 +28,7 @@ import { scanFileForFaces } from "~/lib/face-scan";
 import type { FaceBox } from "~/lib/face-box";
 import { attemptAction } from "~/lib/action-result";
 import { sizeBucket, track } from "~/lib/analytics";
+import { useI18n } from "~/i18n/LocaleProvider";
 
 export const route = {
   preload: ({ params }: { params: { treeId: string } }) => {
@@ -37,13 +38,14 @@ export const route = {
 };
 
 export default function TreeMediaPage() {
+  const { t } = useI18n();
   return (
     <Suspense fallback={<LoadingScreen />}>
       <AppErrorBoundary
-        title="We could not load these photos"
-        message="The tree may be temporarily unavailable. Try again in a moment."
+        title={t("media.error.title")}
+        message={t("tree.error.unavailable")}
         revalidateKeys={[requireUserPage.key, getTreeGraph.key]}
-        back={{ href: "/trees", label: "Back to your trees" }}
+        back={{ href: "/trees", label: t("notFound.back") }}
       >
         <TreeMediaInner />
       </AppErrorBoundary>
@@ -56,6 +58,7 @@ function TreeMediaInner() {
   const [searchParams] = useSearchParams<{ person?: string }>();
   const navigate = useNavigate();
   const toast = useToast();
+  const { t } = useI18n();
   const user = createAsync(() => requireUserPage());
   const data = createAsync(() => getTreeGraph(params.treeId));
 
@@ -129,9 +132,9 @@ function TreeMediaInner() {
       size_bucket: sizeBucket(totalBytes),
     });
     toast.show(
-      `${uploaded} ${uploaded === 1 ? "photo" : "photos"} added to ${
-        personId ? "their folder" : "the inbox"
-      }.`,
+      t(personId ? "media.upload.addedToFolder" : "media.upload.addedToInbox", {
+        count: uploaded,
+      }),
       "success",
     );
   }
@@ -148,16 +151,17 @@ function TreeMediaInner() {
     await refresh();
     const count = result.data.moved;
     if (!count) {
-      toast.show("Those photos are already filed there.", "info");
+      toast.show(t("media.assign.alreadyFiled"), "info");
       return;
     }
     track("media_filed", { count, inbox: !personId });
     toast.show(
       personId
-        ? `${count} ${count === 1 ? "photo" : "photos"} filed under ${
-            peopleById().get(personId)?.displayName ?? "that person"
-          }.`
-        : `${count} ${count === 1 ? "photo" : "photos"} moved to the inbox.`,
+        ? t("media.assign.filedUnder", {
+            count,
+            name: peopleById().get(personId)?.displayName ?? t("media.assign.thatPerson"),
+          })
+        : t("media.assign.movedToInbox", { count }),
       "success",
     );
   }
@@ -182,12 +186,7 @@ function TreeMediaInner() {
     setLightboxIds(null);
     await refresh();
     track("file_deleted", { album: false });
-    toast.show(
-      result.data.deleted === 1
-        ? "Photo deleted."
-        : `${result.data.deleted} photos deleted.`,
-      "success",
-    );
+    toast.show(t("media.deleted", { count: result.data.deleted }), "success");
   }
 
   async function handleSetAvatar(personId: string, fileId: string | null) {
@@ -200,7 +199,10 @@ function TreeMediaInner() {
     }
     await refresh();
     track(fileId ? "portrait_set" : "portrait_removed");
-    toast.show(fileId ? "Portrait updated." : "Portrait removed.", "success");
+    toast.show(
+      fileId ? t("tree.portrait.updated") : t("tree.portrait.removed"),
+      "success",
+    );
   }
 
   async function handleSaveTags(fileId: string, personIds: string[]) {
@@ -215,7 +217,7 @@ function TreeMediaInner() {
     }
     await refresh();
     track("file_people_tagged", { count: result.data.length });
-    toast.show("Photo tags updated.", "success");
+    toast.show(t("tree.tags.updated"), "success");
   }
 
   async function handleSetTakenAt(fileId: string, value: Parameters<typeof updateFileTakenAt>[0]["takenAt"]) {
@@ -230,7 +232,10 @@ function TreeMediaInner() {
     }
     await refresh();
     track("file_date_taken_set", { cleared: !value });
-    toast.show(value ? "Date taken updated." : "Date taken cleared.", "success");
+    toast.show(
+      value ? t("tree.takenAt.updated") : t("tree.takenAt.cleared"),
+      "success",
+    );
   }
 
   async function handleAssignFace(fileId: string, faceId: string, personId: string) {
@@ -245,7 +250,7 @@ function TreeMediaInner() {
     }
     await refresh();
     track("face_linked");
-    toast.show("Face linked.", "success");
+    toast.show(t("tree.face.linked"), "success");
   }
 
   async function handleUnlinkFace(fileId: string, faceId: string) {
@@ -259,7 +264,7 @@ function TreeMediaInner() {
       return;
     }
     await refresh();
-    toast.show("Face link removed.", "success");
+    toast.show(t("tree.face.unlinked"), "success");
   }
 
   async function handleSetFaceIgnored(fileId: string, faceId: string, ignored: boolean) {
@@ -273,7 +278,10 @@ function TreeMediaInner() {
       return;
     }
     await refresh();
-    toast.show(ignored ? "Face ignored." : "Face restored.", "success");
+    toast.show(
+      ignored ? t("tree.face.ignored") : t("tree.face.restored"),
+      "success",
+    );
   }
 
   async function handleDeleteFace(fileId: string, faceId: string) {
@@ -287,7 +295,7 @@ function TreeMediaInner() {
       return;
     }
     await refresh();
-    toast.show("Face box removed.", "success");
+    toast.show(t("tree.face.boxRemoved"), "success");
   }
 
   async function handleAddFace(fileId: string, personId: string, box: FaceBox) {
@@ -302,7 +310,7 @@ function TreeMediaInner() {
     }
     await refresh();
     track("face_linked");
-    toast.show("Face added.", "success");
+    toast.show(t("tree.face.added"), "success");
   }
 
   async function handleScanFaces(fileId: string) {
@@ -317,8 +325,8 @@ function TreeMediaInner() {
     track("faces_scanned", { count: result.count });
     toast.show(
       result.count === 0
-        ? "No faces found in this photo."
-        : `${result.count} face${result.count === 1 ? "" : "s"} found.`,
+        ? t("tree.face.none")
+        : t("tree.face.found", { count: result.count }),
       "success",
     );
   }
@@ -337,7 +345,7 @@ function TreeMediaInner() {
             <div class="page-shell min-h-[100dvh]">
               <AppHeader
                 user={currentUser()}
-                back={{ href: `/trees/${params.treeId}`, label: "Back to tree" }}
+                back={{ href: `/trees/${params.treeId}`, label: t("tree.backToTree") }}
                 center={graph().tree.name}
               />
               <main class="mx-auto max-w-7xl px-4 pb-20 pt-8 sm:px-6">
@@ -363,7 +371,7 @@ function TreeMediaInner() {
                 <MediaLightbox
                   files={lightboxFiles()}
                   initialFileId={lightboxInitialId()}
-                  title="Photos"
+                  title={t("media.title")}
                   person={lightboxPerson()}
                   people={graph().people}
                   role={graph().role}
@@ -396,15 +404,9 @@ function TreeMediaInner() {
               <ConfirmDialog
                 open={deleteIds().length > 0}
                 onClose={() => setDeleteIds([])}
-                title={
-                  deleteIds().length === 1
-                    ? "Delete this photo?"
-                    : `Delete ${deleteIds().length} photos?`
-                }
-                message="The files are removed from storage and from this tree. This cannot be undone."
-                confirmLabel={
-                  deleteIds().length === 1 ? "Delete photo" : "Delete photos"
-                }
+                title={t("media.delete.title", { count: deleteIds().length })}
+                message={t("media.delete.message")}
+                confirmLabel={t("media.delete.confirm", { count: deleteIds().length })}
                 danger
                 pending={pendingDelete()}
                 testId="media-confirm-delete"

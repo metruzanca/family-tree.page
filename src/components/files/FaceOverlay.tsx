@@ -1,6 +1,7 @@
 import { For, Show, createEffect, createSignal, onCleanup, onMount } from "solid-js";
 import type { GraphFace, GraphPerson } from "~/api/people-server";
 import type { FaceBox } from "~/lib/face-box";
+import { useI18n } from "~/i18n/LocaleProvider";
 
 type FaceOverlayProps = {
   /** The rendered image the boxes must sit on. */
@@ -24,6 +25,7 @@ const MIN_DRAW = 0.02;
  * matches the photo.
  */
 export function FaceOverlay(props: FaceOverlayProps) {
+  const { t } = useI18n();
   let overlay: HTMLDivElement | undefined;
   const [rect, setRect] = createSignal<Rect>({ left: 0, top: 0, width: 0, height: 0 });
   const [draft, setDraft] = createSignal<FaceBox | null>(null);
@@ -94,7 +96,10 @@ export function FaceOverlay(props: FaceOverlayProps) {
 
   function personName(personId: string | null) {
     if (!personId) return null;
-    return props.people.find(person => person.id === personId)?.displayName ?? "Linked";
+    return (
+      props.people.find(person => person.id === personId)?.displayName ??
+      t("media.face.linkedLabel")
+    );
   }
 
   function pointFor(event: PointerEvent) {
@@ -179,8 +184,8 @@ export function FaceOverlay(props: FaceOverlayProps) {
               style={styleFor(face.box)}
               aria-label={
                 face.status === "assigned"
-                  ? `Face ${index() + 1}, linked to ${label()}`
-                  : `Face ${index() + 1}, not linked`
+                  ? t("media.face.ariaLinked", { number: index() + 1, name: label() })
+                  : t("media.face.ariaUnlinked", { number: index() + 1 })
               }
               data-testid={`face-box-${face.id}`}
               onClick={event => {
@@ -206,7 +211,7 @@ export function FaceOverlay(props: FaceOverlayProps) {
           onPointerCancel={onPointerUp}
         >
           <span class="pointer-events-none absolute left-1/2 top-2 -translate-x-1/2 rounded-full bg-[#080a07]/80 px-3 py-1 text-[0.7rem] font-medium text-white">
-            Drag a box over a face. Esc to cancel.
+            {t("media.face.drawHint")}
           </span>
           <Show when={draft()}>
             {box => (

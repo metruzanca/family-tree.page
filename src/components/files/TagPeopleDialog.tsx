@@ -5,6 +5,7 @@ import { formatYears } from "~/lib/format";
 import { Avatar } from "../ui/Avatar";
 import { Button } from "../ui/button";
 import { Modal } from "../ui/Modal";
+import { useI18n } from "~/i18n/LocaleProvider";
 
 type TagPeopleDialogProps = {
   open: boolean;
@@ -18,6 +19,7 @@ type TagPeopleDialogProps = {
 };
 
 export function TagPeopleDialog(props: TagPeopleDialogProps) {
+  const { t, locale } = useI18n();
   const [query, setQuery] = createSignal("");
   const [selected, setSelected] = createSignal<string[]>([]);
 
@@ -59,17 +61,17 @@ export function TagPeopleDialog(props: TagPeopleDialogProps) {
     <Modal
       open={props.open}
       onClose={props.onClose}
-      title="People in this photo"
+      title={t("media.tags.title")}
       testId="tag-people-dialog"
       description={
         props.primaryPerson
-          ? `Filed under ${props.primaryPerson.displayName}. Tag everyone else who appears here.`
-          : "Tag everyone who appears in this photo. The first person you pick files it under them."
+          ? t("media.tag.descriptionFiled", { name: props.primaryPerson.displayName })
+          : t("media.tag.description")
       }
       footer={
         <div class="flex w-full items-center justify-between gap-3">
           <span class="text-xs text-muted-foreground">
-            {selected().length} tagged
+            {t("media.tag.selected", { count: selected().length })}
           </span>
           <div class="flex gap-2">
             <Button
@@ -79,7 +81,7 @@ export function TagPeopleDialog(props: TagPeopleDialogProps) {
               onClick={props.onClose}
               data-testid="tag-people-cancel"
             >
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button
               size="sm"
@@ -89,7 +91,7 @@ export function TagPeopleDialog(props: TagPeopleDialogProps) {
               onClick={() => props.onSave(selected())}
             >
               <Tag size={14} />
-              {props.pending ? "Saving…" : "Save tags"}
+              {props.pending ? t("person.form.saving") : t("media.tags.save")}
             </Button>
           </div>
         </div>
@@ -104,11 +106,11 @@ export function TagPeopleDialog(props: TagPeopleDialogProps) {
           <input
             class="input pl-9"
             type="search"
-            placeholder="Search people"
+            placeholder={t("media.search.people")}
             value={query()}
             autofocus
             onInput={event => setQuery(event.currentTarget.value)}
-            aria-label="Search people"
+            aria-label={t("media.search.people")}
             data-testid="tag-people-search"
           />
         </div>
@@ -122,9 +124,9 @@ export function TagPeopleDialog(props: TagPeopleDialogProps) {
             >
               <Show
                 when={props.people.length > 1}
-                fallback="There is nobody else in this tree to tag yet."
+                fallback={t("media.tag.emptyTree")}
               >
-                No people match “{query()}”.
+                {t("media.noMatches", { query: query() })}
               </Show>
             </p>
           }
@@ -153,9 +155,9 @@ export function TagPeopleDialog(props: TagPeopleDialogProps) {
                         <span class="block truncate text-sm font-medium">
                           {person.displayName}
                         </span>
-                        <Show when={formatYears(person.birthDate, person.deathDate)}>
+                        <Show when={formatYears(person.birthDate, person.deathDate, locale())}>
                           <span class="block text-[0.68rem] text-muted-foreground">
-                            {formatYears(person.birthDate, person.deathDate)}
+                            {formatYears(person.birthDate, person.deathDate, locale())}
                           </span>
                         </Show>
                       </span>
@@ -183,11 +185,13 @@ export function TagPeopleDialog(props: TagPeopleDialogProps) {
                 const person = () => props.people.find(candidate => candidate.id === personId);
                 return (
                   <span class="inline-flex items-center gap-1 rounded-full border border-border bg-background py-0.5 pl-1.5 pr-1 text-xs">
-                    {person()?.displayName ?? "Unknown"}
+                    {person()?.displayName ?? t("common.unknown")}
                     <button
                       type="button"
                       class="rounded-full p-0.5 text-muted-foreground hover:text-destructive"
-                      aria-label={`Untag ${person()?.displayName ?? "person"}`}
+                      aria-label={t("media.tag.untag", {
+                        name: person()?.displayName ?? t("common.unknown"),
+                      })}
                       data-testid={`tag-people-untag-${personId}`}
                       onClick={() => toggle(personId)}
                     >

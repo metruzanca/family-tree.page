@@ -33,6 +33,7 @@ import { FilePeopleSection } from "./FilePeopleSection";
 import { TakenAtField } from "./TakenAtField";
 import { formatBytes, formatDate, formatRelative } from "~/lib/format";
 import type { FuzzyDate } from "~/lib/fuzzy-date";
+import { useI18n } from "~/i18n/LocaleProvider";
 
 type MediaLightboxProps = {
   files: GraphFile[];
@@ -71,6 +72,7 @@ type MediaLightboxProps = {
 };
 
 export function MediaLightbox(props: MediaLightboxProps) {
+  const { t, locale } = useI18n();
   const editable = () => props.role === "owner" || props.role === "editor";
   const canDownload = () => props.allowDownload !== false;
   const previewUrl = (file: GraphFile) => {
@@ -177,7 +179,7 @@ export function MediaLightbox(props: MediaLightboxProps) {
           <button
             type="button"
             class="absolute right-4 top-4 z-20 grid h-10 w-10 place-items-center rounded-full bg-black/50 text-white/80 transition hover:bg-black/75 hover:text-white"
-            aria-label="Close lightbox"
+            aria-label={t("media.lightbox.close")}
             data-testid="media-lightbox-close"
             onClick={props.onClose}
           >
@@ -196,7 +198,7 @@ export function MediaLightbox(props: MediaLightboxProps) {
                 <div class="flex max-w-sm flex-col items-center gap-4 text-center">
                   <FileText size={54} class="text-white/35" />
                   <p class="text-sm text-white/60">
-                    This file is downloaded rather than previewed.
+                    {t("media.lightbox.downloadOnly")}
                   </p>
                   <Show when={canDownload() ? current() : null}>
                     {file => (
@@ -207,7 +209,7 @@ export function MediaLightbox(props: MediaLightboxProps) {
                         data-testid="media-lightbox-download-fallback"
                       >
                         <Download size={14} />
-                        Download file
+                        {t("media.lightbox.downloadFile")}
                       </a>
                     )}
                   </Show>
@@ -246,7 +248,7 @@ export function MediaLightbox(props: MediaLightboxProps) {
               <button
                 type="button"
                 class="absolute left-3 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-black/25 text-white/55 backdrop-blur transition hover:bg-black/45 hover:text-white/85 sm:left-6"
-                aria-label="Previous file"
+                aria-label={t("media.lightbox.previous")}
                 data-testid="media-lightbox-prev"
                 onClick={previous}
               >
@@ -255,7 +257,7 @@ export function MediaLightbox(props: MediaLightboxProps) {
               <button
                 type="button"
                 class="absolute right-3 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-black/25 text-white/55 backdrop-blur transition hover:bg-black/45 hover:text-white/85 sm:right-6"
-                aria-label="Next file"
+                aria-label={t("media.lightbox.next")}
                 data-testid="media-lightbox-next"
                 onClick={next}
               >
@@ -275,7 +277,7 @@ export function MediaLightbox(props: MediaLightboxProps) {
                         ? "border-gold opacity-100"
                         : "border-white/15 opacity-55 hover:opacity-90"
                     }`}
-                    aria-label={`Show ${file.name}`}
+                    aria-label={t("media.lightbox.show", { name: file.name })}
                     data-testid={`media-lightbox-thumb-${file.id}`}
                     onClick={() => setIndex(fileIndex())}
                   >
@@ -336,7 +338,7 @@ export function MediaLightbox(props: MediaLightboxProps) {
                       value={albumName()}
                       onInput={event => setAlbumName(event.currentTarget.value)}
                       maxlength={80}
-                      aria-label="Album name"
+                      aria-label={t("media.lightbox.albumName")}
                       data-testid="media-lightbox-album-name"
                     />
                     <Button
@@ -346,7 +348,7 @@ export function MediaLightbox(props: MediaLightboxProps) {
                       data-testid="media-lightbox-album-save"
                       onClick={() => props.onRenameGroup?.(albumName().trim())}
                     >
-                      Save
+                      {t("common.save")}
                     </Button>
                   </div>
                 </Show>
@@ -355,18 +357,32 @@ export function MediaLightbox(props: MediaLightboxProps) {
                     when={props.group}
                     fallback={
                       <>
-                        Added {formatRelative(current()?.createdAt)}
+                        {t("media.added", {
+                          when: formatRelative(current()?.createdAt, locale()),
+                        })}
                       </>
                     }
                   >
-                    {props.files.length} {props.files.length === 1 ? "item" : "items"} · Added{" "}
-                    {formatRelative(props.group?.createdAt)}
+                    {t("media.lightbox.groupSummary", {
+                      count: props.files.length,
+                      when: formatRelative(props.group?.createdAt, locale()),
+                    })}
                   </Show>
                 </p>
                 <div class="mt-1.5 flex flex-wrap gap-1.5">
-                  <Badge variant="secondary" class="uppercase tracking-wide">{current()?.kind ?? "file"}</Badge>
+                  <Badge variant="secondary" class="uppercase tracking-wide">
+                    {t(
+                      current()?.kind === "image"
+                        ? "media.kind.image"
+                        : current()?.kind === "document"
+                          ? "media.kind.document"
+                          : "media.kind.other",
+                    )}
+                  </Badge>
                   <Show when={current()?.isAvatar}>
-                    <Badge variant="secondary" class="uppercase tracking-wide">Portrait</Badge>
+                    <Badge variant="secondary" class="uppercase tracking-wide">
+                      {t("person.panel.portrait")}
+                    </Badge>
                   </Show>
                   <Show when={props.files.length > 1}>
                     <Badge variant="secondary">{index() + 1} / {props.files.length}</Badge>
@@ -385,7 +401,7 @@ export function MediaLightbox(props: MediaLightboxProps) {
                     data-testid="media-lightbox-download"
                   >
                     <Download size={14} />
-                    Download
+                    {t("media.download")}
                   </a>
                 )}
               </Show>
@@ -403,12 +419,14 @@ export function MediaLightbox(props: MediaLightboxProps) {
                   }}
                 >
                   <UserRound size={14} />
-                  {current()?.isAvatar ? "Remove portrait" : "Use as portrait"}
+                  {current()?.isAvatar
+                    ? t("person.panel.removePortrait")
+                    : t("person.panel.useAsPortrait")}
                 </Button>
               </Show>
               <Show when={editable()}>
                 <IconButton
-                  label="Delete file"
+                  label={t("tree.delete.fileConfirm")}
                   class="ml-auto text-destructive"
                   data-testid="media-lightbox-delete"
                   onClick={() => current() && props.onDeleteFile(current()!)}
@@ -421,32 +439,42 @@ export function MediaLightbox(props: MediaLightboxProps) {
             <Show when={current()}>
               {file => (
                 <section class="mt-5" data-testid="media-lightbox-file-details">
-                  <h3 class="field-label">Current file</h3>
+                  <h3 class="field-label">{t("media.lightbox.currentFile")}</h3>
                   <p class="mt-1 truncate text-sm font-medium">{file().name}</p>
                   <dl class="mt-2 grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
                     <div>
-                      <dt class="text-[0.68rem] text-muted-foreground">Type</dt>
+                      <dt class="text-[0.68rem] text-muted-foreground">
+                        {t("person.event.type")}
+                      </dt>
                       <dd class="mt-0.5 truncate">{file().mimeType}</dd>
                     </div>
                     <div>
-                      <dt class="text-[0.68rem] text-muted-foreground">Size</dt>
+                      <dt class="text-[0.68rem] text-muted-foreground">
+                        {t("media.field.size")}
+                      </dt>
                       <dd class="mt-0.5">{formatBytes(file().sizeBytes)}</dd>
                     </div>
                     <Show when={file().width && file().height}>
                       <div>
-                        <dt class="text-[0.68rem] text-muted-foreground">Dimensions</dt>
+                        <dt class="text-[0.68rem] text-muted-foreground">
+                          {t("media.field.dimensions")}
+                        </dt>
                         <dd class="mt-0.5">
                           {file().width} × {file().height}
                         </dd>
                       </div>
                     </Show>
                     <div>
-                      <dt class="text-[0.68rem] text-muted-foreground">Added</dt>
-                      <dd class="mt-0.5">{formatDate(file().createdAt)}</dd>
+                      <dt class="text-[0.68rem] text-muted-foreground">
+                        {t("media.field.added")}
+                      </dt>
+                      <dd class="mt-0.5">{formatDate(file().createdAt, locale())}</dd>
                     </div>
                     <Show when={file().kind === "image"}>
                       <div>
-                        <dt class="text-[0.68rem] text-muted-foreground">Taken</dt>
+                        <dt class="text-[0.68rem] text-muted-foreground">
+                          {t("media.field.taken")}
+                        </dt>
                         <dd class="mt-0.5">
                           <TakenAtField
                             value={file().takenAt}
@@ -463,16 +491,16 @@ export function MediaLightbox(props: MediaLightboxProps) {
             </Show>
 
             <section class="mt-5" data-testid="media-lightbox-attached">
-              <h3 class="field-label">Attached to</h3>
+              <h3 class="field-label">{t("media.field.attachedTo")}</h3>
               <Show
                 when={props.person}
                 fallback={
                   <p class="mt-1.5 rounded-xl border border-dashed border-border px-3 py-3 text-xs leading-relaxed text-muted-foreground">
                     <Show
                       when={current()?.personId}
-                      fallback="Waiting in the tree inbox. Tag someone to file it under them."
+                      fallback={t("media.attached.inbox")}
                     >
-                      This person is no longer in the tree.
+                      {t("media.attached.missingPerson")}
                     </Show>
                   </p>
                 }
@@ -498,7 +526,9 @@ export function MediaLightbox(props: MediaLightboxProps) {
                       <span class="block truncate text-sm font-semibold">
                         {person().displayName}
                       </span>
-                      <span class="block text-[0.7rem] text-muted-foreground">Open their profile</span>
+                      <span class="block text-[0.7rem] text-muted-foreground">
+                        {t("media.attached.openProfile")}
+                      </span>
                     </span>
                   </button>
                 )}
@@ -546,10 +576,10 @@ export function MediaLightbox(props: MediaLightboxProps) {
                   onClick={() => props.onDeleteGroup?.()}
                 >
                   <Trash2 size={14} />
-                  Delete album
+                  {t("tree.delete.albumConfirm")}
                 </Button>
                 <p class="mt-2 text-[0.68rem] leading-relaxed text-muted-foreground">
-                  This removes every file in the album.
+                  {t("media.album.deleteHint")}
                 </p>
               </section>
             </Show>
@@ -557,9 +587,9 @@ export function MediaLightbox(props: MediaLightboxProps) {
             <p class="mt-5 text-[0.68rem] leading-relaxed text-muted-foreground">
               <Show
                 when={canDownload()}
-                fallback="This tree is shared read-only. Media is shown as thumbnails."
+                fallback={t("media.footer.readOnly")}
               >
-                Files stay private to this tree. Downloads use a short-lived signed link.
+                {t("media.footer.private")}
               </Show>
             </p>
           </div>

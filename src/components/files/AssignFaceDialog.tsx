@@ -7,6 +7,7 @@ import { Button } from "../ui/button";
 import { Modal } from "../ui/Modal";
 import { FaceCrop } from "./FaceCrop";
 import type { FaceBox } from "~/lib/face-box";
+import { useI18n } from "~/i18n/LocaleProvider";
 
 type AssignFaceDialogProps = {
   open: boolean;
@@ -23,6 +24,7 @@ type AssignFaceDialogProps = {
 };
 
 export function AssignFaceDialog(props: AssignFaceDialogProps) {
+  const { t, locale } = useI18n();
   const [query, setQuery] = createSignal("");
 
   createEffect(() => {
@@ -83,9 +85,9 @@ export function AssignFaceDialog(props: AssignFaceDialogProps) {
           <Avatar name={person.displayName} fileId={person.avatarFileId} size={32} />
           <span class="min-w-0 flex-1">
             <span class="block truncate text-sm font-medium">{person.displayName}</span>
-            <Show when={formatYears(person.birthDate, person.deathDate)}>
+            <Show when={formatYears(person.birthDate, person.deathDate, locale())}>
               <span class="block text-[0.68rem] text-muted-foreground">
-                {formatYears(person.birthDate, person.deathDate)}
+                {formatYears(person.birthDate, person.deathDate, locale())}
               </span>
             </Show>
           </span>
@@ -103,8 +105,8 @@ export function AssignFaceDialog(props: AssignFaceDialogProps) {
     <Modal
       open={props.open}
       onClose={props.onClose}
-      title="Who is this?"
-      description="Link a person to this face."
+      title={t("media.faceAssign.title")}
+      description={t("media.faceAssign.description")}
       testId="assign-face-dialog"
       footer={
         <div class="flex w-full items-center justify-between gap-3">
@@ -118,7 +120,7 @@ export function AssignFaceDialog(props: AssignFaceDialogProps) {
               onClick={props.onIgnore}
             >
               <UserRoundX size={14} />
-              Not a face
+              {t("media.faceAssign.notAFace")}
             </Button>
           </Show>
           <Button
@@ -129,7 +131,7 @@ export function AssignFaceDialog(props: AssignFaceDialogProps) {
             onClick={props.onClose}
             data-testid="assign-face-cancel"
           >
-            Cancel
+            {t("common.cancel")}
           </Button>
         </div>
       }
@@ -154,7 +156,7 @@ export function AssignFaceDialog(props: AssignFaceDialogProps) {
               when={assignedPerson()}
               fallback={
                 <p class="text-sm text-muted-foreground">
-                  This face is not linked to anyone yet.
+                  {t("media.faceAssign.notLinked")}
                 </p>
               }
             >
@@ -178,7 +180,7 @@ export function AssignFaceDialog(props: AssignFaceDialogProps) {
                     onClick={props.onUnlink}
                   >
                     <Link2Off size={13} />
-                    Remove link
+                    {t("media.faceAssign.unlink")}
                   </Button>
                 </>
               )}
@@ -194,11 +196,11 @@ export function AssignFaceDialog(props: AssignFaceDialogProps) {
           <input
             class="input pl-9"
             type="search"
-            placeholder="Search people"
+            placeholder={t("media.search.people")}
             value={query()}
             autofocus
             onInput={event => setQuery(event.currentTarget.value)}
-            aria-label="Search people"
+            aria-label={t("media.search.people")}
             data-testid="assign-face-search"
           />
         </div>
@@ -210,7 +212,7 @@ export function AssignFaceDialog(props: AssignFaceDialogProps) {
               class="rounded-xl border border-dashed border-border px-3 py-8 text-center text-xs leading-relaxed text-muted-foreground"
               data-testid="assign-face-empty"
             >
-              No people match “{query()}”.
+              {t("media.noMatches", { query: query() })}
             </p>
           }
         >
@@ -228,7 +230,7 @@ export function AssignFaceDialog(props: AssignFaceDialogProps) {
                   class="mb-1 px-2 text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground"
                   data-testid="assign-face-tagged-heading"
                 >
-                  Already in this photo
+                  {t("media.faceAssign.alreadyInPhoto")}
                 </p>
                 <ul class="space-y-1">
                   <For each={priorityPeople()}>{person => personRow(person)}</For>
@@ -237,7 +239,7 @@ export function AssignFaceDialog(props: AssignFaceDialogProps) {
               <Show when={otherPeople().length}>
                 <div data-testid="assign-face-others">
                   <p class="mb-1 px-2 text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground">
-                    Everyone else
+                    {t("media.faceAssign.everyoneElse")}
                   </p>
                   <ul class="space-y-1">
                     <For each={otherPeople()}>{person => personRow(person)}</For>

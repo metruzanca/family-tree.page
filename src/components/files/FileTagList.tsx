@@ -3,6 +3,7 @@ import { Tag, X } from "lucide-solid";
 import type { GraphPerson } from "~/api/people-server";
 import { Avatar } from "../ui/Avatar";
 import { Button } from "../ui/button";
+import { useI18n } from "~/i18n/LocaleProvider";
 
 type FileTagListProps = {
   people: GraphPerson[];
@@ -14,6 +15,7 @@ type FileTagListProps = {
 };
 
 export function FileTagList(props: FileTagListProps) {
+  const { t } = useI18n();
   const tagged = () =>
     props.taggedPersonIds
       .map(personId => props.people.find(person => person.id === personId))
@@ -22,7 +24,7 @@ export function FileTagList(props: FileTagListProps) {
   return (
     <section data-testid="file-tags">
       <div class="flex items-center justify-between gap-2">
-        <h3 class="field-label">People in this photo</h3>
+        <h3 class="field-label">{t("media.tags.title")}</h3>
         <Show when={props.editable}>
           <Button
             size="sm"
@@ -34,7 +36,7 @@ export function FileTagList(props: FileTagListProps) {
             onClick={props.onEdit}
           >
             <Tag size={12} />
-            {tagged().length ? "Edit" : "Tag people"}
+            {tagged().length ? t("common.edit") : t("media.tags.add")}
           </Button>
         </Show>
       </div>
@@ -43,8 +45,8 @@ export function FileTagList(props: FileTagListProps) {
         fallback={
           <p class="mt-1.5 text-xs text-muted-foreground" data-testid="file-tags-empty">
             {props.editable
-              ? "Nobody else is tagged in this photo yet."
-              : "Nobody else is tagged in this photo."}
+              ? t("media.tags.emptyEditable")
+              : t("media.tags.empty")}
           </p>
         }
       >
@@ -61,8 +63,8 @@ export function FileTagList(props: FileTagListProps) {
                   <button
                     type="button"
                     class="rounded-full p-0.5 text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"
-                    aria-label={`Remove ${person.displayName} from this photo`}
-                    title={`Remove ${person.displayName}`}
+                    aria-label={t("media.tags.removeAria", { name: person.displayName })}
+                    title={t("media.tags.remove", { name: person.displayName })}
                     disabled={props.pending}
                     data-testid={`file-tag-remove-${person.id}`}
                     onClick={() => props.onRemove(person.id)}

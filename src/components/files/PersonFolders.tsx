@@ -11,6 +11,7 @@ import {
 } from "~/lib/media";
 import { Avatar } from "../ui/Avatar";
 import { MediaTile } from "./MediaTile";
+import { useI18n } from "~/i18n/LocaleProvider";
 
 const DRAG_TYPE = "application/x-family-tree-files";
 
@@ -32,6 +33,7 @@ type PersonFoldersProps = {
 };
 
 export function PersonFolders(props: PersonFoldersProps) {
+  const { t } = useI18n();
   const [query, setQuery] = createSignal("");
   const [dragOver, setDragOver] = createSignal<string | null>(null);
   const [draggingIds, setDraggingIds] = createSignal<string[]>([]);
@@ -49,7 +51,7 @@ export function PersonFolders(props: PersonFoldersProps) {
   const active = createMemo(() => {
     if (props.folder === "inbox") {
       return {
-        name: "Inbox",
+        name: t("media.inbox"),
         personId: null as string | null,
         files: inbox(),
         count: inbox().length,
@@ -59,7 +61,7 @@ export function PersonFolders(props: PersonFoldersProps) {
     const person = props.people.find(candidate => candidate.id === props.folder);
     const files = looseFilesForPerson(props.files, props.folder);
     return {
-      name: person?.displayName ?? "Unknown person",
+      name: person?.displayName ?? t("media.folders.unknownPerson"),
       personId: props.folder,
       files,
       count: filesForPerson(props.files, props.folder).length,
@@ -122,7 +124,7 @@ export function PersonFolders(props: PersonFoldersProps) {
           <input
             type="search"
             class="input pl-8 text-sm"
-            placeholder="Find a person"
+            placeholder={t("media.folders.findPerson")}
             value={query()}
             onInput={event => setQuery(event.currentTarget.value)}
             data-testid="person-folder-search"
@@ -134,7 +136,7 @@ export function PersonFolders(props: PersonFoldersProps) {
           data-testid="person-folder-rail"
         >
           <FolderButton
-            label="Inbox"
+            label={t("media.inbox")}
             count={inbox().length}
             active={props.folder === "inbox"}
             highlight={dragOver() === "inbox"}
@@ -194,13 +196,13 @@ export function PersonFolders(props: PersonFoldersProps) {
               {active().name}
             </h2>
             <p class="mt-0.5 text-sm text-muted-foreground">
-              {active().count} {active().count === 1 ? "photo" : "photos"}
+              {t("media.photos", { count: active().count })}
               <Show when={props.editable}>
                 {" "}
                 ·{" "}
                 {props.folder === "inbox"
-                  ? "drop photos here to keep them unfiled"
-                  : "drop photos here to file them"}
+                  ? t("media.folders.dropUnfiled")
+                  : t("media.folders.dropFiled")}
               </Show>
             </p>
           </div>
@@ -234,13 +236,13 @@ export function PersonFolders(props: PersonFoldersProps) {
                       <Upload size={22} />
                     </Show>
                   </div>
-                  <p class="mt-3 text-sm font-semibold">This folder is empty</p>
+                  <p class="mt-3 text-sm font-semibold">{t("media.folders.empty.title")}</p>
                   <p class="mx-auto mt-1 max-w-xs text-xs leading-relaxed text-muted-foreground">
                     {props.editable
                       ? props.folder === "inbox"
-                        ? "Drag a photo here to unfile it. It waits in the inbox until you choose a person."
-                        : `Drag photos here from the gallery or another folder to file them under ${active().name}.`
-                      : "No photos are filed under this person yet."}
+                        ? t("media.folders.empty.inboxHint")
+                        : t("media.folders.empty.personHint", { name: active().name })
+                      : t("media.folders.empty.readOnly")}
                   </p>
                 </div>
               </div>
@@ -283,7 +285,7 @@ export function PersonFolders(props: PersonFoldersProps) {
           </Show>
 
           <Show when={!props.editable && !looseFiles().length && !albums().length}>
-            <p class="sr-only">No photos to show.</p>
+            <p class="sr-only">{t("media.folders.none")}</p>
           </Show>
         </div>
       </section>
@@ -303,6 +305,7 @@ function FolderButton(props: {
   onDrop: (event: DragEvent) => void;
   children: JSX.Element;
 }) {
+  const { t } = useI18n();
   return (
     <button
       type="button"
@@ -324,7 +327,7 @@ function FolderButton(props: {
       <span class="min-w-0 flex-1">
         <span class="block truncate text-sm font-semibold">{props.label}</span>
         <span class="block text-[0.68rem] text-muted-foreground">
-          {props.count} {props.count === 1 ? "photo" : "photos"}
+          {t("media.photos", { count: props.count })}
         </span>
       </span>
       <Show when={props.highlight}>
@@ -335,12 +338,13 @@ function FolderButton(props: {
 }
 
 function AlbumTile(props: { group: GraphFileGroup; onClick: () => void }) {
+  const { t } = useI18n();
   return (
     <button
       type="button"
       class="group relative aspect-square overflow-hidden rounded-xl border border-border bg-muted text-left"
       onClick={props.onClick}
-      aria-label={`Open ${props.group.name}`}
+      aria-label={t("trees.open", { name: props.group.name })}
       data-testid={`media-album-${props.group.id}`}
     >
       <Show
@@ -361,7 +365,7 @@ function AlbumTile(props: { group: GraphFileGroup; onClick: () => void }) {
       </Show>
       <span class="absolute left-1.5 top-1.5 inline-flex items-center gap-1 rounded-full bg-black/55 px-2 py-0.5 text-[0.6rem] font-semibold text-white backdrop-blur">
         <FolderOpen size={10} />
-        Album
+        {t("media.album.label")}
       </span>
       <span class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-2 pb-1.5 pt-6 text-[0.68rem] font-medium text-white">
         {props.group.name}
