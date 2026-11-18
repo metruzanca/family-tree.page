@@ -67,6 +67,7 @@ The graph is the main view. People are nodes, parent and partner relationships a
 - Multi-file uploads become albums rendered as stacked nodes on the graph
 - Portraits stay on the person node and are not duplicated as file nodes
 - Person profiles with parents, partners, children, and life notes
+- Social profile icons from Simple Icons, one personal-website house link, and optional contact email and phone
 - Sex per person, used for father and mother labels and GEDCOM `SEX`
 - Partial and approximate dates for people, partnerships, and photos, including unknown-year birthdays
 - A life events timeline for each person: residence, occupation, education, military service, migration, marriage, divorce, burial, and custom events

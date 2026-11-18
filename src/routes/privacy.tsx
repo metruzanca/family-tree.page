@@ -2,7 +2,7 @@ import { A } from "@solidjs/router";
 import { LegalList, LegalPage, LegalSection } from "~/components/legal/LegalPage";
 
 const CONTACT_EMAIL = "samuele+family-tree@zanca.dev";
-const UPDATED = "16 November 2026";
+const UPDATED = "18 November 2026";
 
 export default function PrivacyPage() {
   return (
@@ -58,6 +58,12 @@ export default function PrivacyPage() {
           may carry EXIF metadata such as the date taken, camera model, and, if the camera recorded it,
           GPS coordinates. Originals are stored as uploaded, so that metadata stays with the file and is
           visible to people who can see the tree.
+        </p>
+        <p>
+          <span class="font-medium text-foreground">Links and contact details.</span> Social-profile
+          links and optional contact email and phone numbers you add to a person. Contact details are
+          visible to tree members and never appear on share links. Social links appear on a share link
+          only when the owner chooses full living-person details.
         </p>
         <p>
           <span class="font-medium text-foreground">Face boxes.</span> If a tree uses face detection,
