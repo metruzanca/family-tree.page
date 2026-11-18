@@ -38,6 +38,7 @@ import {
   pathSlice,
   polylineLength,
   quadraticPoints,
+  seedLayout,
   segmentDistance,
   splitPathOutsideCircles,
   type Circle as LayoutCircle,
@@ -201,19 +202,28 @@ export function GraphView(props: GraphViewProps) {
    * force-graph re-seeds every node that has no coordinates. Carry the previous
    * position over by id so a refresh, media toggle, or focus change keeps the
    * people that stay on screen where they were and only the newcomers move.
+   * A truly cold node gets the deterministic generation band instead of d3's
+   * dense spiral, so the first cooling cycle starts from a readable tree.
    */
   function seedPositions(target: GraphModel) {
     const current = new Map<string, GraphNode>();
     for (const node of (graph?.graphData().nodes ?? []) as GraphNode[]) {
       current.set(node.id, node);
     }
+    const seeds = seedLayout(target);
     for (const node of target.nodes) {
       const previous = current.get(node.id);
-      if (!previous) continue;
-      node.x = previous.x;
-      node.y = previous.y;
-      node.vx = previous.vx;
-      node.vy = previous.vy;
+      if (previous) {
+        node.x = previous.x;
+        node.y = previous.y;
+        node.vx = previous.vx;
+        node.vy = previous.vy;
+        continue;
+      }
+      const seed = seeds.get(node.id);
+      if (!seed) continue;
+      node.x = seed.x;
+      node.y = seed.y;
     }
   }
 

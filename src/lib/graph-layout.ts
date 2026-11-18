@@ -388,6 +388,96 @@ export function generationTargetY(level: number, maxLevel: number) {
   return (level - maxLevel / 2) * LEVEL_SPACING;
 }
 
+/** Gap kept between two people seeded on the same generation band. */
+const SEED_GAP = 36;
+/** Media cards start in a small grid beside their owner. */
+const SEED_MEDIA_COLUMNS = 3;
+const SEED_MEDIA_STEP_X = 120;
+const SEED_MEDIA_STEP_Y = 110;
+
+function seedOrder(left: GraphNode, right: GraphNode) {
+  const leftYear = left.person ? fuzzyOrderYear(left.person.birthDate) : null;
+  const rightYear = right.person ? fuzzyOrderYear(right.person.birthDate) : null;
+  if (leftYear !== rightYear) {
+    if (leftYear === null) return 1;
+    if (rightYear === null) return -1;
+    return leftYear < rightYear ? -1 : 1;
+  }
+  const byName = left.name.localeCompare(right.name);
+  return byName !== 0 ? byName : left.id.localeCompare(right.id);
+}
+
+/**
+ * Starting coordinates for a cold graph. D3 otherwise drops every node on a
+ * tight spiral, and the first cooling cycle has to untangle the whole tree.
+ * Seeding each generation on its band in birth order lets the simulation spend
+ * its ticks on spacing instead of on escaping a knot. Nodes with an existing
+ * position keep it, so callers merge this with the positions already on screen.
+ */
+export function seedLayout(model: GraphModel): Map<string, Point> {
+  const seeds = new Map<string, Point>();
+  const maxLevel = maxGenerationLevel(model.generations.values());
+
+  const peopleByLevel = new Map<number, GraphNode[]>();
+  for (const person of model.people) {
+    const bucket = peopleByLevel.get(person.level);
+    if (bucket) bucket.push(person);
+    else peopleByLevel.set(person.level, [person]);
+  }
+
+  for (const [level, people] of peopleByLevel) {
+    people.sort(seedOrder);
+    let cursor = 0;
+    const placed: Array<{ node: GraphNode; x: number }> = [];
+    for (const node of people) {
+      const radius = nodeRadius(node);
+      placed.push({ node, x: cursor + radius });
+      cursor += radius * 2 + SEED_GAP;
+    }
+    // Centre the row, then pull every person onto the band of their level.
+    const middle = (cursor - SEED_GAP) / 2;
+    const y = generationTargetY(level, maxLevel);
+    for (const { node, x } of placed) seeds.set(node.id, { x: x - middle, y });
+  }
+
+  const parentsByJunction = new Map<string, string[]>();
+  for (const link of model.links) {
+    if (link.kind !== "parent") continue;
+    const junctionId = nodeIdOf(link.target);
+    const parents = parentsByJunction.get(junctionId);
+    if (parents) parents.push(nodeIdOf(link.source));
+    else parentsByJunction.set(junctionId, [nodeIdOf(link.source)]);
+  }
+  for (const junction of model.junctions) {
+    const parentXs = (parentsByJunction.get(junction.id) ?? [])
+      .map(id => seeds.get(id)?.x)
+      .filter((x): x is number => x !== undefined);
+    const x = parentXs.length
+      ? parentXs.reduce((total, value) => total + value, 0) / parentXs.length
+      : 0;
+    seeds.set(junction.id, {
+      x,
+      y: generationTargetY(junction.level, maxLevel),
+    });
+  }
+
+  for (const [ownerId, media] of model.mediaByOwner) {
+    const owner = seeds.get(ownerId);
+    if (!owner) continue;
+    const rows = Math.ceil(media.length / SEED_MEDIA_COLUMNS);
+    media.forEach((node, index) => {
+      const column = index % SEED_MEDIA_COLUMNS;
+      const row = Math.floor(index / SEED_MEDIA_COLUMNS);
+      seeds.set(node.id, {
+        x: owner.x + 90 + column * SEED_MEDIA_STEP_X,
+        y: owner.y + (row - (rows - 1) / 2) * SEED_MEDIA_STEP_Y,
+      });
+    });
+  }
+
+  return seeds;
+}
+
 type ResolvedSegment = {
   ax: number;
   ay: number;

@@ -13,6 +13,7 @@ import {
   pathSlice,
   polylineLength,
   quadraticPoints,
+  seedLayout,
   segmentDistance,
   splitPathOutsideCircles,
 } from "./graph-layout";
@@ -20,6 +21,7 @@ import {
   buildGraphModel,
   junctionNodeId,
   nodeIdOf,
+  nodeRadius,
   type GraphLink,
   type GraphNode,
 } from "./graph";
@@ -459,6 +461,61 @@ describe("generationTargetY", () => {
   it("finds the deepest generation", () => {
     expect(maxGenerationLevel([0, 3, 1])).toBe(3);
     expect(maxGenerationLevel([])).toBe(0);
+  });
+});
+
+describe("seedLayout", () => {
+  const model = buildGraphModel(
+    treeWith(
+      [
+        person("a", "Homer", 1956),
+        person("b", "Marge", 1956),
+        person("c", "Bart", 2001),
+        person("d", "Lisa", 1999),
+      ],
+      [
+        partner("p1", "a", "b"),
+        parent("r1", "a", "c"),
+        parent("r2", "b", "c"),
+        parent("r3", "a", "d"),
+        parent("r4", "b", "d"),
+      ],
+    ),
+    false,
+  );
+
+  it("places every node on the band of its generation", () => {
+    const seeds = seedLayout(model);
+    const maxLevel = maxGenerationLevel(model.generations.values());
+    for (const node of model.nodes) {
+      const seed = seeds.get(node.id);
+      expect(seed, node.id).toBeDefined();
+      expect(seed!.y).toBeCloseTo(generationTargetY(node.level, maxLevel));
+    }
+  });
+
+  it("keeps older generations above younger ones", () => {
+    const seeds = seedLayout(model);
+    expect(seeds.get("a")!.y).toBeLessThan(seeds.get("c")!.y);
+  });
+
+  it("lists a generation in birth order and never overlaps a neighbour", () => {
+    const seeds = seedLayout(model);
+    expect(seeds.get("d")!.x).toBeLessThan(seeds.get("c")!.x);
+
+    const people = model.people.filter(person => person.level === 0);
+    for (let index = 0; index < people.length - 1; index += 1) {
+      const left = people[index];
+      const right = people[index + 1];
+      const gap = Math.abs(seeds.get(right.id)!.x - seeds.get(left.id)!.x);
+      expect(gap).toBeGreaterThanOrEqual(
+        nodeRadius(left) + nodeRadius(right),
+      );
+    }
+  });
+
+  it("is stable across calls", () => {
+    expect([...seedLayout(model)]).toEqual([...seedLayout(model)]);
   });
 });
 

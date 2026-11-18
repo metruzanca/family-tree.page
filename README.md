@@ -297,6 +297,7 @@ A force layout can put an edge behind a person who is not on it, and two edges c
 - Junctions are painted as a small knot. Arms terminate at a visible joint instead of reading as one line running straight through it.
 - Dimmed links paint first and the hovered or selected family's links paint last, so tracing a relative never runs under a stranger's line.
 - A clearance force pushes people out of the corridor of links that do not belong to them, and a weak generation force pulls each level into its own loose band. Partners already share a level, so a couple is never split across bands.
+- A cold load seeds each person on their generation band in birth order before the first tick. D3 would otherwise start every node on a tight spiral, and the single cooling cycle would leave the tree knotted. Existing positions are carried over on a refresh, so only new people need the seed.
 
 In development, `window.__familyTreeNodes()` reports the settled positions and `window.__familyTreeLinkAudit()` lists the people still sitting on a foreign line. That audit is the quickest way to check a layout change against a dense tree.
 
