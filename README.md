@@ -53,7 +53,7 @@ The graph is the main view. People are nodes, parent and partner relationships a
 - Read-only `/demo` that runs the real tree workspace on sample data
 - Public read-only share links with living-person privacy, optional thumbnails, expiry, and revocation
 - A read-only developer API with tree-scoped tokens, cursor pagination, ETags, and an OpenAPI 3.1 contract at `/docs/api`
-- GEDCOM 5.5.1 export from tree settings and the API, with dates, places, events, notes, media references, and families
+- GEDCOM 5.5.1 and 7 export from tree settings and the API, with dates, places, events, notes, media references, and families
 - GEDCOM 5.5.1 import into a new or existing tree, with a parsed preview, per-person create, merge, or skip decisions, and gap-filling merges
 - Nightly PostgreSQL and media backups to a second private bucket, with checksum verification and a one-command restore
 - Optional Sentry error tracking with PII scrubbing
@@ -628,7 +628,7 @@ The API lives under `/api/v1`:
 - `GET /trees/:treeId/people/:personId` returns the person, immediate family, partners, events, and media.
 - `GET /trees/:treeId/relationships`, `/events`, `/search`, and `/changes` cover the rest of the tree.
 - `GET /trees/:treeId/export.json` returns a complete snapshot. Media is referenced by URL, not embedded.
-- `GET /trees/:treeId/gedcom` returns a GEDCOM 5.5.1 file for other genealogy tools.
+- `GET /trees/:treeId/gedcom` returns GEDCOM 5.5.1, or 7 with `?version=7`, for other genealogy tools.
 - `GET /trees/:treeId/media/:fileId/thumb` and `/download` serve binaries with the same token.
 
 Lists use an opaque cursor over `(updatedAt, id)`. Tree metadata, relationships, and exports support `ETag` with `If-None-Match`. Requests are limited to 120 per minute per token and exports to 10 per hour. The limiter is in-process, matching the single-replica presence design.
@@ -639,9 +639,11 @@ The changes feed is derived from the human activity log. It reports creates, upd
 
 ## GEDCOM export
 
-Tree settings has **Download GEDCOM** on the Tree tab, and the API exposes the same file at `GET /api/v1/trees/:treeId/gedcom` with the `export:read` scope. Both are limited to ten exports per hour.
+Tree settings has **GEDCOM 5.5.1** and **GEDCOM 7** downloads on the Tree tab, and the API exposes the same files at `GET /api/v1/trees/:treeId/gedcom` with the `export:read` scope, adding `?version=7` for the newer format. Both are limited to ten exports per hour.
 
-The file is GEDCOM 5.5.1, the format Ancestry, MyHeritage, Gramps, RootsMagic, Family Tree Maker, and most other tools import:
+5.5.1 is the default because Ancestry, MyHeritage, Gramps, RootsMagic, Family Tree Maker, and most other tools import it. 7 is there for tools that support it: a 7.0 header, no `CHAR` or `GEDC.FORM`, no `CONC`, MIME media types, `TITL` under `FILE`, and `SEX X` for other. Both versions import into this app, with 5.5.1 the better tested path.
+
+The file contains:
 
 - A header with UTF-8, LINEAGE-LINKED, a submitter, and a note about couple roles.
 - One `INDI` per person with the primary name, nickname, maiden name, birth, death, biography, life events, and media references.
@@ -668,7 +670,7 @@ Import always creates a new tree and never touches an existing one. It reads GED
 - The account people quota still applies. An import that would exceed it rolls back.
 - Imports are limited to 5 MB and 5,000 people, to five new trees or ten merges per hour per account.
 - Media files and source citations are skipped because a GEDCOM file contains references, not the files or a source model.
-- GEDCOM 7, source records, media bundles, and resumable processing for very large files are follow-ups.
+- Full GEDCOM 7 import validation, source records, media bundles, and resumable processing for very large files are follow-ups.
 
 The parser lives in `src/lib/gedcom-import.ts` with tests, including a round trip from an exported tree back through the parser.
 

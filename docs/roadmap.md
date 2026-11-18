@@ -4,11 +4,11 @@ Deferred work beyond v0.1.0. None of this is shipped yet. The order is a suggest
 
 ## 1. GEDCOM import follow-ups
 
-GEDCOM 5.5.1 export is shipped, and so is import into a new tree and a reviewed merge into an existing tree: a browser-side preview, duplicate suggestions, per-person create, merge, or skip, one transaction, gap-filling merges, warnings for missing references and unreadable dates, and quota enforcement. The remaining work is deeper fidelity.
+GEDCOM 5.5.1 and 7 export are shipped, and so is import into a new tree and a reviewed merge into an existing tree: a browser-side preview, duplicate suggestions, per-person create, merge, or skip, one transaction, gap-filling merges, warnings for missing references and unreadable dates, and quota enforcement. The remaining work is deeper fidelity.
 
 Scope:
 
-- GEDCOM 7, after 5.5.1.
+- Full GEDCOM 7 import validation. The parser already reads 7.0 files best effort, including `SEX X` and `SNOTE`.
 - Source and citation records, then import `SOUR` and `REPO` instead of skipping them.
 - Media by file name or an uploaded bundle. GEDCOM references files; it does not contain them.
 - Resumable processing for very large files, beyond the current 5 MB and 5,000 people limits.
@@ -96,7 +96,7 @@ Shipped: read-only `/api/v1` endpoints, tree-scoped hashed tokens with scopes an
 
 Remaining:
 
-- GEDCOM 7 export and import. GEDCOM 5.5.1 export and new-tree import are shipped; the remaining interop work is tracked in item 1.
+- GEDCOM 7 export is shipped; full 7 import validation and the remaining interop work are tracked in item 1.
 - A public share JSON feed under the existing share token, with the living-person redaction in `src/lib/share.ts`.
 - Write scopes with conflict handling and an explicit merge policy. Reads were deliberately first.
 - Webhooks for `person.created`, `export.completed`, and similar events, after the pull API settles.
