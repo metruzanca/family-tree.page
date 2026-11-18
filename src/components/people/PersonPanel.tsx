@@ -1,3 +1,4 @@
+import { A } from "@solidjs/router";
 import { For, Show, createMemo } from "solid-js";
 import {
   Baby,
@@ -415,9 +416,20 @@ export function PersonPanel(props: PersonPanelProps) {
         </section>
 
         <section data-testid="person-panel-media">
-          <div class="flex items-center justify-between">
+          <div class="flex items-center justify-between gap-2">
             <h3 class="field-label">Photos and files</h3>
-            <span class="text-[0.7rem] text-muted-foreground">{mediaCount()}</span>
+            <div class="flex items-center gap-2">
+              <span class="text-[0.7rem] text-muted-foreground">{mediaCount()}</span>
+              <Show when={!props.readOnly && mediaCount()}>
+                <A
+                  href={`/trees/${props.data.tree.id}/media?person=${props.person.id}`}
+                  class="text-[0.7rem] font-semibold text-primary hover:underline"
+                  data-testid="person-panel-view-all-media"
+                >
+                  View all
+                </A>
+              </Show>
+            </div>
           </div>
           <Show
             when={mediaCount()}

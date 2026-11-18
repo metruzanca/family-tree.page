@@ -52,6 +52,8 @@ type MediaLightboxProps = {
   onSaveTags: (fileId: string, personIds: string[]) => void;
   onSetTakenAt: (fileId: string, value: FuzzyDate | null) => void;
   onDeleteFile: (file: GraphFile) => void;
+  /** Reports the photo the lightbox is showing, including after arrow keys. */
+  onCurrentChange?: (file: GraphFile) => void;
   onAssignFace?: (fileId: string, faceId: string, personId: string) => void;
   onUnlinkFace?: (fileId: string, faceId: string) => void;
   onSetFaceIgnored?: (fileId: string, faceId: string, ignored: boolean) => void;
@@ -91,6 +93,10 @@ export function MediaLightbox(props: MediaLightboxProps) {
   let imageRef: HTMLImageElement | undefined;
 
   const current = createMemo(() => props.files[index()] ?? props.files[0]);
+  createEffect(() => {
+    const file = current();
+    if (file) props.onCurrentChange?.(file);
+  });
   const isImage = () => current()?.kind === "image";
   const canEditFaces = () =>
     editable() && Boolean(props.onAssignFace) && isImage();
@@ -383,7 +389,7 @@ export function MediaLightbox(props: MediaLightboxProps) {
                   </a>
                 )}
               </Show>
-              <Show when={editable() && current()?.kind === "image"}>
+              <Show when={editable() && current()?.kind === "image" && props.person}>
                 <Button
                   size="sm"
                   variant="secondary"
@@ -460,7 +466,16 @@ export function MediaLightbox(props: MediaLightboxProps) {
               <h3 class="field-label">Attached to</h3>
               <Show
                 when={props.person}
-                fallback={<p class="mt-1.5 text-xs text-muted-foreground">This person is no longer in the tree.</p>}
+                fallback={
+                  <p class="mt-1.5 rounded-xl border border-dashed border-border px-3 py-3 text-xs leading-relaxed text-muted-foreground">
+                    <Show
+                      when={current()?.personId}
+                      fallback="Waiting in the tree inbox. Tag someone to file it under them."
+                    >
+                      This person is no longer in the tree.
+                    </Show>
+                  </p>
+                }
               >
                 {person => (
                   <button

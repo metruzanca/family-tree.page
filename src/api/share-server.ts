@@ -239,17 +239,14 @@ export async function getSharedImage(
     return null;
   }
 
-  const person = await (async () => {
-    if (!file.personId) return null;
-    const [row] = await db
-      .select({ deathDate: people.deathDate })
-      .from(people)
-      .where(eq(people.id, file.personId))
-      .limit(1);
-    return row ?? null;
-  })();
   // Never serve a thumbnail for a living person unless the owner opted into
   // full details. Inbox files have no person, so they never leave the app.
+  if (!file.personId) return null;
+  const [person] = await db
+    .select({ deathDate: people.deathDate })
+    .from(people)
+    .where(eq(people.id, file.personId))
+    .limit(1);
   if (!person?.deathDate && link.livingVisibility !== "full") return null;
 
   return { thumbKey: file.thumbKey, thumbMime: file.thumbMime };

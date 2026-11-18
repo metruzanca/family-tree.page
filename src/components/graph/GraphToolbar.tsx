@@ -8,6 +8,7 @@ import {
   History,
   Image as ImageIcon,
   ImageOff,
+  Images,
   Maximize2,
   MoreHorizontal,
   Plus,
@@ -201,6 +202,13 @@ export function GraphToolbar(props: ToolbarProps) {
                 <BookOpen size={17} />
               </ToolButton>
               <ToolButton
+                testId="tree-toolbar-gallery"
+                label="Photos"
+                href={`/trees/${props.treeId}/media`}
+              >
+                <Images size={17} />
+              </ToolButton>
+              <ToolButton
                 testId="tree-toolbar-activity"
                 label="Activity"
                 href={`/trees/${props.treeId}/activity`}
@@ -295,6 +303,15 @@ export function GraphToolbar(props: ToolbarProps) {
               </GlassItem>
               <Show when={props.showTreeLinks !== false}>
                 <DropdownMenuSeparator class="my-1 bg-white/10" />
+                <DropdownMenuItem
+                  as={A}
+                  href={`/trees/${props.treeId}/media`}
+                  data-testid="tree-toolbar-more-gallery"
+                  class="gap-2 rounded-xl px-3 py-2 text-white/80 data-[highlighted]:bg-white/10 data-[highlighted]:text-white"
+                >
+                  <Images />
+                  Photos
+                </DropdownMenuItem>
                 <DropdownMenuItem
                   as={A}
                   href={`/trees/${props.treeId}/research`}

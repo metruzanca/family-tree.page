@@ -401,10 +401,13 @@ export async function assignFilesToPerson(input: {
       entityType: "file",
       entityId: changed.length === 1 ? changed[0].id : null,
       personId: parsed.personId,
-      summary:
-        changed.length === 1
+      summary: parsed.personId
+        ? changed.length === 1
           ? `Filed ${changed[0].originalName} under ${destination}`
-          : `Filed ${changed.length} files under ${destination}`,
+          : `Filed ${changed.length} files under ${destination}`
+        : changed.length === 1
+          ? `Moved ${changed[0].originalName} to the tree inbox`
+          : `Moved ${changed.length} files to the tree inbox`,
     });
     notifyTreeChanged(access.tree.id);
     return { moved: changed.length };
@@ -620,6 +623,19 @@ export async function updateFileTags(input: {
             createdBy: access.user.id,
           })),
         );
+      }
+      if (autoFilePersonId) {
+        // The owner is implicit, so they are not a tag. Drop the row the tag
+        // picker just wrote to keep the two concepts consistent.
+        await tx
+          .delete(fileTags)
+          .where(
+            and(
+              eq(fileTags.fileId, file.id),
+              eq(fileTags.treeId, access.tree.id),
+              eq(fileTags.personId, autoFilePersonId),
+            ),
+          );
       }
       await tx
         .update(trees)

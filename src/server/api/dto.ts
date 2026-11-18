@@ -339,7 +339,7 @@ export function buildTreeSnapshot(input: SnapshotInput): ApiTreeSnapshot {
       people: input.people.length,
       relationships: input.parents.length + input.partnerships.length,
       events: input.events.length,
-      media: readyFiles.length,
+      media: media.length,
     }),
     people,
     relationships,

@@ -17,7 +17,7 @@ export const GET = apiHandler("tree:read", async (event, context) => {
     people: data.people.length,
     relationships: data.parents.length + data.partnerships.length,
     events: data.events.length,
-    media: data.files.length,
+    media: data.files.filter(file => file.personId !== null).length,
   };
   const etag = weakEtag(
     tree.updatedAt,

@@ -62,6 +62,9 @@ The graph is the main view. People are nodes, parent and partner relationships a
 - Per-account storage and lifetime people limits, with a usage card in account settings
 - Coarse abuse signals in Postgres with a `pnpm abuse:report` summary
 - Full-screen image lightbox with a details sidebar
+- Photo gallery grouped by year, with filename search and person filters, plus bulk filing and deletion
+- People folders that mirror a file manager, where dragging a photo onto a person files it under them
+- A tree inbox for uploads that do not belong to a person yet; tag the photo to file it, or drag it later
 - Tag other people in a photo, with an "Also in photos" section on each tagged person's profile
 - Optional date taken on photos, prefilled from EXIF and editable as a partial or approximate date
 - Multi-file uploads become albums rendered as stacked nodes on the graph
@@ -200,6 +203,14 @@ The bucket stays private. Browsers never receive storage credentials. SVG, HTML,
 Uploads do not have to belong to anyone. A file uploaded without a person is unfiled: it waits in the tree inbox, is listed in the media gallery, and never appears on the graph or in share links. Editors can tag an inbox photo with people, which files it under the first person picked, or move it to a person's folder later. Storage keys for inbox files live under `trees/<treeId>/inbox/`.
 
 Files still have one home, the person they are filed under, which is where a graph node lives. Deleting a person keeps their photos: those files return to the inbox, lose their portrait flag, and leave albums that disappear with the person.
+
+### Gallery and folders
+
+`/trees/:treeId/media` shows every image in the tree, grouped by year and ordered by the date taken with the upload date as a fallback. Filename search and a person filter narrow the grid, and selecting photos enables bulk actions: file under a person, delete, or clear. Clicking a photo opens the same lightbox used on the graph, so tagging, faces, dates, and portraits all work there.
+
+The People tab is a file manager. Each person is a folder, the inbox sits at the top, and albums appear as subfolders. Drag a photo onto a folder to file it under that person, drag it back to the inbox to unfile it, or drop files from the desktop straight onto a folder to upload there. Touch and keyboard users get the same result through selection and "File under…".
+
+Both views read the graph payload, so opening the media page costs no extra query. A tree with thousands of photos would eventually need a paginated media query; family-sized libraries do not.
 
 ### Photo tags and dates
 

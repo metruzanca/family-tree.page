@@ -36,6 +36,7 @@ export type AnalyticsEvent =
   | "focus_radius_changed"
   | "invite_accepted"
   | "invite_created"
+  | "media_filed"
   | "media_uploaded"
   | "person_created"
   | "person_deleted"
@@ -67,6 +68,7 @@ type AnalyticsPayloads = {
   focus_radius_changed: { radius: string };
   invite_accepted: undefined;
   invite_created: { role: string; delivery: "email" | "link" };
+  media_filed: { count: number; inbox: boolean };
   media_uploaded: { count: number; album: boolean; size_bucket?: string };
   person_created: undefined;
   person_deleted: undefined;
@@ -99,6 +101,7 @@ const PAYLOAD_KEYS: Record<AnalyticsEvent, readonly string[]> = {
   focus_radius_changed: ["radius"],
   invite_accepted: [],
   invite_created: ["role", "delivery"],
+  media_filed: ["count", "inbox"],
   media_uploaded: ["count", "album", "size_bucket"],
   person_created: [],
   person_deleted: [],
