@@ -1,15 +1,25 @@
 import { Match, Show, Suspense, Switch, createMemo, createSignal, onMount } from "solid-js";
-import { A, createAsync, useParams, useSearchParams } from "@solidjs/router";
+import { A, createAsync, revalidate, useParams, useSearchParams } from "@solidjs/router";
 import { BookOpen, Network, Printer, Search } from "lucide-solid";
-import type { TreeGraph } from "~/api/people-server";
+import type { GraphPerson, GraphPersonEvent, TreeGraph } from "~/api/people-server";
+import { deletePersonEvent } from "~/api/people-server";
 import type { PublicUser } from "~/server/auth-service";
 import { getTreeGraph, requireUserPage } from "~/api";
 import { AppErrorBoundary } from "~/components/app/AppErrorBoundary";
 import { AppHeader } from "~/components/app/AppHeader";
 import { LoadingScreen } from "~/components/ui/Loading";
 import { Button, buttonVariants } from "~/components/ui/button";
+import { ConfirmDialog } from "~/components/ui/ConfirmDialog";
+import { useToast } from "~/components/ui/Toast";
+import { AddRelativeDialog } from "~/components/people/AddRelativeDialog";
+import { PersonEventDialog } from "~/components/people/PersonEventDialog";
+import {
+  PersonFormDialog,
+  type PersonFormField,
+} from "~/components/people/PersonFormDialog";
 import { DossierView } from "~/components/research/DossierView";
 import { DescendantRegisterView } from "~/components/research/DescendantRegisterView";
+import type { ResearchEditing } from "~/components/research/editing";
 import { FamilyGroupSheet } from "~/components/research/FamilyGroupSheet";
 import { PedigreeOutline } from "~/components/research/PedigreeOutline";
 import { PersonPicker } from "~/components/research/PersonPicker";
@@ -27,6 +37,8 @@ import {
   type ResearchView,
 } from "~/components/research/views";
 import { formatDate } from "~/lib/format";
+import { attemptAction } from "~/lib/action-result";
+import { eventPartnerOf } from "~/lib/person-events";
 import { useI18n } from "~/i18n/LocaleProvider";
 import { buildDossier } from "~/lib/research/dossier";
 import {
@@ -127,6 +139,81 @@ function ResearchWorkspace(props: {
   const surnames = createMemo(() => buildSurnameIndex(index()));
   const places = createMemo(() => buildPlaceIndex(index(), locale()));
   const issues = createMemo(() => buildResearchIssues(index(), locale()));
+
+  const toast = useToast();
+  const editable = () =>
+    props.graph.role === "owner" || props.graph.role === "editor";
+
+  const [personTarget, setPersonTarget] = createSignal<{
+    person: GraphPerson;
+    focus?: PersonFormField;
+  } | null>(null);
+  const [eventTarget, setEventTarget] = createSignal<{
+    person: GraphPerson;
+    event: GraphPersonEvent | null;
+  } | null>(null);
+  const [relativeAnchor, setRelativeAnchor] = createSignal<GraphPerson | null>(null);
+  const [deleteEventTarget, setDeleteEventTarget] = createSignal<{
+    person: GraphPerson;
+    event: GraphPersonEvent;
+  } | null>(null);
+  const [deleteEventPending, setDeleteEventPending] = createSignal(false);
+
+  const focusPerson = (nextId: string) => {
+    setSearchParams({ person: nextId }, { replace: true });
+  };
+
+  const editing: ResearchEditing = {
+    editPerson: (targetId, focus) => {
+      const target = index().peopleById.get(targetId);
+      if (!target) return;
+      // Pin a default focus person before a date change reorders the fallback.
+      if (targetId === personId()) focusPerson(targetId);
+      setPersonTarget({ person: target, focus });
+    },
+    addEvent: personId => {
+      const person = index().peopleById.get(personId);
+      if (person) setEventTarget({ person, event: null });
+    },
+    editEvent: (personId, event) => {
+      const person = index().peopleById.get(personId);
+      if (person) setEventTarget({ person, event });
+    },
+    deleteEvent: (personId, event) => {
+      const person = index().peopleById.get(personId);
+      if (person) setDeleteEventTarget({ person, event });
+    },
+    addRelative: personId => {
+      const person = index().peopleById.get(personId);
+      if (person) setRelativeAnchor(person);
+    },
+  };
+  const editAccess = () => (editable() ? editing : undefined);
+
+  /** The other participant of the event being deleted, for a shared warning. */
+  const deleteEventPartner = createMemo(() => {
+    const target = deleteEventTarget();
+    if (!target) return null;
+    const otherId = eventPartnerOf(target.event, target.person.id);
+    return otherId ? (index().peopleById.get(otherId) ?? null) : null;
+  });
+
+  async function handleDeleteEvent() {
+    const target = deleteEventTarget();
+    if (!target) return;
+    setDeleteEventPending(true);
+    const result = await attemptAction(() =>
+      deletePersonEvent({ treeId: props.treeId, eventId: target.event.id }),
+    );
+    setDeleteEventPending(false);
+    if (!result.ok) {
+      toast.show(result.error, "error");
+      return;
+    }
+    setDeleteEventTarget(null);
+    await revalidate(getTreeGraph.key);
+    toast.show(t("tree.event.removed"), "success");
+  }
 
   const [printedOn, setPrintedOn] = createSignal("");
   onMount(() => setPrintedOn(formatDate(new Date(), locale())));
@@ -239,6 +326,7 @@ function ResearchWorkspace(props: {
                     index={index()}
                     families={families()}
                     personId={personId()}
+                    editing={editAccess()}
                   />
                   <Show when={allFamilies().length > 1}>
                     <p class="mt-3 text-xs text-muted-foreground">
@@ -256,6 +344,7 @@ function ResearchWorkspace(props: {
                       index={index()}
                       dossier={data()}
                       viewerPersonId={props.graph.viewerPersonId}
+                      editing={editAccess()}
                     />
                   )}
                 </Show>
@@ -295,12 +384,74 @@ function ResearchWorkspace(props: {
                   treeId={props.treeId}
                   issues={issues()}
                   index={index()}
+                  editing={editAccess()}
                 />
               </Match>
             </Switch>
           </div>
         </Show>
       </main>
+
+      <Show when={personTarget()}>
+        {target => (
+          <PersonFormDialog
+            open
+            onClose={() => setPersonTarget(null)}
+            treeId={props.treeId}
+            person={target().person}
+            focusField={target().focus}
+          />
+        )}
+      </Show>
+
+      <Show when={eventTarget()}>
+        {target => (
+          <PersonEventDialog
+            open
+            onClose={() => setEventTarget(null)}
+            treeId={props.treeId}
+            person={target().person}
+            people={props.graph.people}
+            relationships={props.graph.relationships}
+            event={target().event}
+          />
+        )}
+      </Show>
+
+      <Show when={relativeAnchor()}>
+        {anchor => (
+          <AddRelativeDialog
+            open
+            onClose={() => setRelativeAnchor(null)}
+            treeId={props.treeId}
+            anchor={anchor()}
+            people={props.graph.people}
+            relationships={props.graph.relationships}
+            anchorParentCount={index().parents.get(anchor().id)?.length ?? 0}
+            onAdded={focusPerson}
+          />
+        )}
+      </Show>
+
+      <ConfirmDialog
+        open={Boolean(deleteEventTarget())}
+        onClose={() => setDeleteEventTarget(null)}
+        title={t("tree.delete.title", {
+          name: deleteEventTarget()?.event.title ?? t("tree.delete.eventName"),
+        })}
+        message={
+          deleteEventPartner()
+            ? t("tree.delete.eventSharedMessage", {
+                name: deleteEventPartner()!.displayName,
+              })
+            : t("tree.delete.eventMessage")
+        }
+        confirmLabel={t("tree.delete.eventConfirm")}
+        danger
+        pending={deleteEventPending()}
+        testId="research-confirm-delete-event"
+        onConfirm={handleDeleteEvent}
+      />
     </div>
   );
 }

@@ -1,4 +1,6 @@
 import { For, Show, createMemo, type JSX } from "solid-js";
+import { Pencil, Plus } from "lucide-solid";
+import type { GraphPersonEvent } from "~/api/people-server";
 import { formatFuzzyDate, formatFuzzyYearRange } from "~/lib/fuzzy-date";
 import { personEventKindLabel } from "~/lib/person-events";
 import {
@@ -12,13 +14,17 @@ import { Trans } from "~/i18n/Trans";
 import { parentTypeKey, partnershipStatusKey, researchHref } from "./views";
 import { Avatar } from "../ui/Avatar";
 import { Badge } from "../ui/badge";
+import { Button } from "../ui/button";
+import type { ResearchEditing } from "./editing";
 import { PersonLine } from "./PersonLine";
+import { ResearchRowAction } from "./ResearchRowAction";
 
 export function DossierView(props: {
   treeId: string;
   index: ResearchIndex;
   dossier: PersonDossier;
   viewerPersonId: string | null;
+  editing?: ResearchEditing;
 }) {
   const { t, locale } = useI18n();
   const person = () => props.dossier.person;
@@ -108,15 +114,51 @@ export function DossierView(props: {
                 </p>
               </Show>
             </div>
+            <Show when={props.editing}>
+              {editing => (
+                <div
+                  class="flex shrink-0 flex-wrap items-center gap-2 print:hidden"
+                  data-testid="research-dossier-actions"
+                >
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    type="button"
+                    onClick={() => editing().editPerson(person().id)}
+                    data-testid="research-dossier-edit-person"
+                  >
+                    <Pencil size={13} />
+                    {t("common.edit")}
+                  </Button>
+                </div>
+              )}
+            </Show>
           </div>
         </section>
 
         <section class="rounded-3xl border border-border bg-card p-5 shadow-card print:break-inside-avoid">
-          <div class="mb-3 flex items-baseline justify-between gap-3">
+          <div class="mb-3 flex flex-wrap items-baseline justify-between gap-3">
             <h3 class="text-sm font-semibold">{t("research.dossier.chronology")}</h3>
-            <span class="text-xs text-muted-foreground">
-              {t("research.dossier.entries", { count: props.dossier.timeline.length })}
-            </span>
+            <div class="flex items-center gap-2">
+              <span class="text-xs text-muted-foreground">
+                {t("research.dossier.entries", { count: props.dossier.timeline.length })}
+              </span>
+              <Show when={props.editing}>
+                {editing => (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    type="button"
+                    class="print:hidden"
+                    onClick={() => editing().addEvent(person().id)}
+                    data-testid="research-dossier-add-event"
+                  >
+                    <Plus size={13} />
+                    {t("person.panel.addEvent")}
+                  </Button>
+                )}
+              </Show>
+            </div>
           </div>
           <Show
             when={props.dossier.timeline.length}
@@ -128,7 +170,18 @@ export function DossierView(props: {
           >
             <ol class="space-y-1" data-testid="research-timeline">
               <For each={props.dossier.timeline}>
-                {item => <TimelineRow item={item} />}
+                {item => (
+                  <TimelineRow
+                    item={item}
+                    personId={person().id}
+                    event={
+                      item.kind === "event"
+                        ? (props.dossier.events.find(event => event.id === item.id) ?? null)
+                        : null
+                    }
+                    editing={props.editing}
+                  />
+                )}
               </For>
             </ol>
           </Show>
@@ -242,6 +295,20 @@ export function DossierView(props: {
           </For>
         </SideSection>
 
+        <Show when={props.editing}>
+          {editing => (
+            <button
+              type="button"
+              onClick={() => editing().addRelative(person().id)}
+              data-testid="research-dossier-add-relative"
+              class="flex w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed border-border py-2.5 text-xs font-semibold text-muted-foreground transition hover:border-primary/40 hover:text-foreground print:hidden"
+            >
+              <Plus size={13} />
+              {t("person.panel.connectAnother")}
+            </button>
+          )}
+        </Show>
+
         <section
           class="rounded-2xl border border-border bg-card p-4"
           data-testid="research-dossier-missing"
@@ -286,11 +353,20 @@ function SideSection(props: {
   );
 }
 
-function TimelineRow(props: { item: TimelineItem }) {
+function TimelineRow(props: {
+  item: TimelineItem;
+  personId: string;
+  event: GraphPersonEvent | null;
+  editing?: ResearchEditing;
+}) {
   const { t, locale } = useI18n();
   return (
     <li
-      class="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-3 rounded-xl px-2 py-2 odd:bg-muted/40"
+      class={`grid gap-3 rounded-xl px-2 py-2 odd:bg-muted/40 ${
+        props.editing
+          ? "grid-cols-[5.5rem_minmax(0,1fr)_auto] print:grid-cols-[5.5rem_minmax(0,1fr)]"
+          : "grid-cols-[5.5rem_minmax(0,1fr)]"
+      }`}
       data-testid={`research-timeline-item-${props.item.id}`}
     >
       <span class="text-xs text-muted-foreground">
@@ -316,6 +392,47 @@ function TimelineRow(props: { item: TimelineItem }) {
           </p>
         </Show>
       </div>
+      <Show when={props.editing}>
+        {editing => (
+          <div class="flex items-start gap-0.5 print:hidden">
+            <ResearchRowAction
+              icon="edit"
+              label={
+                props.item.kind === "event" ? t("person.event.edit") : t("common.edit")
+              }
+              testId={
+                props.item.kind === "event"
+                  ? `research-timeline-edit-${props.item.id}`
+                  : `research-timeline-edit-${props.item.kind}`
+              }
+              reveal
+              onClick={() => {
+                if (props.item.kind === "event") {
+                  if (props.event) editing().editEvent(props.personId, props.event);
+                  return;
+                }
+                editing().editPerson(
+                  props.personId,
+                  props.item.kind === "birth" ? "birthDate" : "deathDate",
+                );
+              }}
+            />
+            <Show when={props.event}>
+              {event => (
+                <Show when={props.item.kind === "event"}>
+                  <ResearchRowAction
+                    icon="delete"
+                    label={t("tree.delete.eventConfirm")}
+                    testId={`research-timeline-delete-${props.item.id}`}
+                    reveal
+                    onClick={() => editing().deleteEvent(props.personId, event())}
+                  />
+                </Show>
+              )}
+            </Show>
+          </div>
+        )}
+      </Show>
     </li>
   );
 }

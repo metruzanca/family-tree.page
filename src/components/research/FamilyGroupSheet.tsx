@@ -1,4 +1,5 @@
 import { For, Show, createEffect, createMemo, createSignal } from "solid-js";
+import { Plus } from "lucide-solid";
 import type { GraphPerson, GraphPersonEvent } from "~/api/people-server";
 import { formatFuzzyDate } from "~/lib/fuzzy-date";
 import { personEventKindLabel } from "~/lib/person-events";
@@ -13,12 +14,16 @@ import {
 import { useI18n } from "~/i18n/LocaleProvider";
 import { partnershipStatusKey, researchHref } from "./views";
 import { Avatar } from "../ui/Avatar";
+import { Button } from "../ui/button";
+import type { ResearchEditing } from "./editing";
+import { ResearchRowAction } from "./ResearchRowAction";
 
 export function FamilyGroupSheet(props: {
   treeId: string;
   index: ResearchIndex;
   families: FamilyUnit[];
   personId: string;
+  editing?: ResearchEditing;
 }) {
   const { t, locale } = useI18n();
   const [selectedKey, setSelectedKey] = createSignal("");
@@ -45,20 +50,39 @@ export function FamilyGroupSheet(props: {
             {unit() ? familyLabel(unit()!, locale()) : t("research.sheet.noFamily")}
           </h2>
         </div>
-        <Show when={props.families.length > 1}>
-          <label class="flex flex-col gap-1 text-[0.68rem] font-semibold uppercase tracking-wide text-muted-foreground">
-            {t("research.sheet.family")}
-            <select
-              class="input min-w-[15rem] text-sm normal-case tracking-normal"
-              value={selectedKey()}
-              onChange={event => setSelectedKey(event.currentTarget.value)}
-              data-testid="research-family-select"
-            >
-              <For each={props.families}>
-                {family => <option value={family.key}>{familyLabel(family, locale())}</option>}
-              </For>
-            </select>
-          </label>
+        <Show when={props.families.length > 1 || props.editing}>
+          <div class="flex flex-wrap items-end gap-2">
+            <Show when={props.families.length > 1}>
+              <label class="flex flex-col gap-1 text-[0.68rem] font-semibold uppercase tracking-wide text-muted-foreground">
+                {t("research.sheet.family")}
+                <select
+                  class="input min-w-[15rem] text-sm normal-case tracking-normal"
+                  value={selectedKey()}
+                  onChange={event => setSelectedKey(event.currentTarget.value)}
+                  data-testid="research-family-select"
+                >
+                  <For each={props.families}>
+                    {family => <option value={family.key}>{familyLabel(family, locale())}</option>}
+                  </For>
+                </select>
+              </label>
+            </Show>
+            <Show when={props.editing}>
+              {editing => (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  type="button"
+                  class="print:hidden"
+                  onClick={() => editing().addRelative(props.personId)}
+                  data-testid="research-sheet-add-relative"
+                >
+                  <Plus size={13} />
+                  {t("person.panel.connectAnother")}
+                </Button>
+              )}
+            </Show>
+          </div>
         </Show>
       </div>
 
@@ -79,6 +103,7 @@ export function FamilyGroupSheet(props: {
                     parent={parent}
                     events={eventsOf(props.index, parent.id)}
                     href={researchHref(props.treeId, "dossier", parent.id)}
+                    editing={props.editing}
                   />
                 )}
               </For>
@@ -136,13 +161,16 @@ export function FamilyGroupSheet(props: {
                         <th class="py-2 pr-3 font-semibold">{t("person.field.born")}</th>
                         <th class="py-2 pr-3 font-semibold">{t("person.field.died")}</th>
                         <th class="py-2 font-semibold">{t("person.relation.partner")}</th>
+                        <Show when={props.editing}>
+                          <th class="w-8 py-2 print:hidden" aria-hidden="true" />
+                        </Show>
                       </tr>
                     </thead>
                     <tbody>
                       <For each={family().children}>
                         {(child, position) => (
                           <tr
-                            class="border-b border-border/60 last:border-0"
+                            class="group border-b border-border/60 last:border-0"
                             data-testid={`research-child-row-${child.id}`}
                           >
                             <td class="py-2 pr-2 text-xs text-muted-foreground">
@@ -177,6 +205,19 @@ export function FamilyGroupSheet(props: {
                                 .map(link => personName(link.person, locale()))
                                 .join(", ") || t("research.notRecorded")}
                             </td>
+                            <Show when={props.editing}>
+                              {editing => (
+                                <td class="py-2 text-right print:hidden">
+                                  <ResearchRowAction
+                                    icon="edit"
+                                    label={t("common.edit")}
+                                    testId={`research-child-edit-${child.id}`}
+                                    reveal
+                                    onClick={() => editing().editPerson(child.id)}
+                                  />
+                                </td>
+                              )}
+                            </Show>
                           </tr>
                         )}
                       </For>
@@ -196,6 +237,7 @@ function ParentCard(props: {
   parent: GraphPerson;
   events: GraphPersonEvent[];
   href: string;
+  editing?: ResearchEditing;
 }) {
   const { t, locale } = useI18n();
   return (
@@ -226,6 +268,17 @@ function ParentCard(props: {
             </p>
           </Show>
         </div>
+        <Show when={props.editing}>
+          {editing => (
+            <ResearchRowAction
+              icon="edit"
+              label={t("common.edit")}
+              testId={`research-parent-edit-${props.parent.id}`}
+              class="ml-auto"
+              onClick={() => editing().editPerson(props.parent.id)}
+            />
+          )}
+        </Show>
       </div>
 
       <dl class="mt-3 space-y-1.5 text-sm">
@@ -259,17 +312,28 @@ function ParentCard(props: {
         <ul class="mt-3 space-y-1 border-t border-border/60 pt-3 text-sm">
           <For each={props.events}>
             {event => (
-              <li class="flex gap-2">
+              <li class="group flex items-center gap-2">
                 <span class="w-12 shrink-0 text-xs text-muted-foreground">
                   {formatFuzzyDate(event.date, { locale: locale() }) ||
                     t("research.noDate")}
                 </span>
-                <span>
+                <span class="min-w-0 flex-1">
                   {event.title || personEventKindLabel(event.kind, locale())}
                   <Show when={event.place}>
                     <span class="text-muted-foreground">, {event.place}</span>
                   </Show>
                 </span>
+                <Show when={props.editing}>
+                  {editing => (
+                    <ResearchRowAction
+                      icon="edit"
+                      label={t("person.event.edit")}
+                      testId={`research-parent-event-edit-${event.id}`}
+                      reveal
+                      onClick={() => editing().editEvent(props.parent.id, event)}
+                    />
+                  )}
+                </Show>
               </li>
             )}
           </For>

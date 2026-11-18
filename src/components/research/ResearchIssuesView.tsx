@@ -1,5 +1,6 @@
 import { For, Show, createMemo } from "solid-js";
 import { TriangleAlert } from "lucide-solid";
+import type { PersonFormField } from "~/components/people/PersonFormDialog";
 import {
   ISSUE_CATEGORY_KEYS,
   type ResearchIssue,
@@ -9,6 +10,8 @@ import { personName, type ResearchIndex } from "~/lib/research/graph";
 import { useI18n } from "~/i18n/LocaleProvider";
 import { researchHref } from "./views";
 import { Badge } from "../ui/badge";
+import type { ResearchEditing } from "./editing";
+import { ResearchRowAction } from "./ResearchRowAction";
 
 const CATEGORY_ORDER: ResearchIssueCategory[] = [
   "dates",
@@ -17,10 +20,17 @@ const CATEGORY_ORDER: ResearchIssueCategory[] = [
   "duplicates",
 ];
 
+/** Gaps that map to one field, so the edit form opens where the fix goes. */
+const ISSUE_FOCUS_FIELDS: Record<string, PersonFormField> = {
+  "missing-birth-date": "birthDate",
+  "missing-birth-place": "birthPlace",
+};
+
 export function ResearchIssuesView(props: {
   treeId: string;
   issues: ResearchIssue[];
   index: ResearchIndex;
+  editing?: ResearchEditing;
 }) {
   const { t } = useI18n();
   const warnings = createMemo(
@@ -74,6 +84,7 @@ export function ResearchIssuesView(props: {
                             issue={issue}
                             treeId={props.treeId}
                             index={props.index}
+                            editing={props.editing}
                           />
                         )}
                       </For>
@@ -93,6 +104,7 @@ function IssueCard(props: {
   issue: ResearchIssue;
   treeId: string;
   index: ResearchIndex;
+  editing?: ResearchEditing;
 }) {
   const { t, locale } = useI18n();
   const people = createMemo(() =>
@@ -128,13 +140,31 @@ function IssueCard(props: {
         <div class="mt-2 flex flex-wrap gap-x-3 gap-y-1">
           <For each={visible()}>
             {person => (
-              <a
-                href={researchHref(props.treeId, "dossier", person.id)}
-                class="text-xs font-medium text-primary underline-offset-2 hover:underline"
-                data-testid={`research-issue-person-${props.issue.id}-${person.id}`}
-              >
-                {personName(person, locale())}
-              </a>
+              <span class="group inline-flex items-center gap-0.5">
+                <a
+                  href={researchHref(props.treeId, "dossier", person.id)}
+                  class="text-xs font-medium text-primary underline-offset-2 hover:underline"
+                  data-testid={`research-issue-person-${props.issue.id}-${person.id}`}
+                >
+                  {personName(person, locale())}
+                </a>
+                <Show when={props.editing}>
+                  {editing => (
+                    <ResearchRowAction
+                      icon="edit"
+                      label={t("common.edit")}
+                      testId={`research-issue-edit-${props.issue.id}-${person.id}`}
+                      reveal
+                      onClick={() =>
+                        editing().editPerson(
+                          person.id,
+                          ISSUE_FOCUS_FIELDS[props.issue.id],
+                        )
+                      }
+                    />
+                  )}
+                </Show>
+              </span>
             )}
           </For>
           <Show when={people().length > visible().length}>
